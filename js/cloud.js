@@ -366,7 +366,9 @@ function renderAccountSlot() {
 }
 function libraryNote() {
   if (!cloud.user) return '';
-  return `<p class="lib-note ${cloud.status === 'error' ? 'bad' : ''}" id="lib-note">${icon(cloud.status === 'error' ? 'x' : 'check')} ${cloud.status === 'error' ? esc(cloud.error) : `In deinem Konto <strong>${esc(cloud.user)}</strong> gespeichert.`}</p>`;
+  // Nur bei einem Problem anzeigen; sonst zeigt der Punkt oben rechts, dass alles gespeichert ist
+  if (cloud.status !== 'error') return '<p class="lib-note" id="lib-note" hidden></p>';
+  return `<p class="lib-note bad" id="lib-note">${icon('x')} ${esc(cloud.error)}</p>`;
 }
 function accountStatusText() {
   if (cloud.status === 'syncing') return '<span class="spinner"></span> Wird abgeglichen …';
