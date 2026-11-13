@@ -313,6 +313,7 @@ function renderPreview() {
       <button type="button" class="btn small ghost" data-action="draft-swap" title="Falls Deutsch und ${L} vertauscht sind">${icon('swap')} Spalten tauschen</button>
     </div>
     ${missing ? `<p class="warn">${missing === 1 ? 'Bei einer Zeile fehlt' : `Bei ${missing} Zeilen fehlt`} die Übersetzung. Trenne die Wörter mit – oder =.</p>` : ''}
+    ${(() => { const g = guessForeignLang(res.rows); return g && g !== lang ? `<p class="warn lang-guess">${flag(g)} Das sieht nach <strong>${LANGS[g].name}</strong> aus. <button type="button" class="btn small secondary" data-action="home-lang" data-lang="${g}">Als ${LANGS[g].name}-Portion erstellen</button></p>` : ''; })()}
     <div class="preview-table" role="table" aria-label="Erkannte Vokabeln">
       <div class="pt-row pt-head" role="row"><span role="columnheader">${flag(lang)} ${L}</span><span role="columnheader">Deutsch</span></div>
       ${res.rows.map((r) => `<div class="pt-row" role="row"><span role="cell" class="${r.foreign ? '' : 'missing'}">${esc(r.foreign) || 'fehlt'}</span><span role="cell" class="${r.german ? '' : 'missing'}">${esc(r.german) || 'fehlt'}</span></div>`).join('')}

@@ -484,7 +484,7 @@ function foScore(x, lang) {
 const DE_WORDS = new Set('der die das den dem des ein eine einen einem einer sich und oder nicht mit von zu im in am auf aus bei für ist sind bin bist war haben hat habe sein mein meine meinen dein deine sein seine ihr ihre unser unsere euer eure ich du er sie es wir man gehen geht machen spielen kein keine sehr viel wie was wer wo wann warum danke bitte ja nein gut gross groß klein'.split(' '));
 const FO_WORDS = {
   en: new Set('the a an to of and or not with from in on at for is are am was be have has i you he she it we they my your his her our their me go goes do does play very much how what who where when why thank thanks please yes no good big small'.split(' ')),
-  fr: new Set('le la les un une des du de et ou ne pas avec pour dans sur est sont suis es être avoir a ai je tu il elle nous vous ils elles mon ma mes ton ta tes son sa ses notre votre leur aller va faire jouer très beaucoup comment quoi qui où quand pourquoi merci oui non bon grand petit'.split(' ')),
+  fr: new Set('le la les un une des du de et ou ne pas avec pour dans sur est sont suis es être avoir a ai je tu il elle nous vous ils elles mon ma mes ton ta tes son sa ses notre votre leur aller va faire jouer très beaucoup comment quoi qui où quand pourquoi merci oui non bon bonne grand grande petit petite bonjour salut bonsoir rouge bleu vert jaune noir blanc'.split(' ')),
 };
 function tokVote(w, lang) {
   const raw = w.replace(/^[«"„“(]+|[»"“”).,!?;:]+$/g, '');
@@ -502,7 +502,27 @@ function tokVote(w, lang) {
   if (/(ung|heit|keit|lich|chen|isch|ieren)$/.test(low)) v += 1;
   else if (/[a-zäöü]en$/.test(low) && lang === 'en') v += 0.4;
   if (lang === 'en' && /(ing|tion|ly|ous|ness|ful)$/.test(low)) v -= 1;
+  if (lang === 'fr') {
+    if (/[a-zäöü]en$/.test(low)) v += 0.6; // essen, schwimmen
+    // manger, finir, prendre, voir – deutsche Wörter auf -er (Wasser, teuer) nicht: gross geschrieben oder im Bilder-Wörterbuch
+    if (/(ir|oir|re)$/.test(low) || (/er$/.test(low) && !/^[A-ZÄÖÜ]/.test(raw) && !PICTURES.maps.de.has(low) && !DE_WORDS.has(low))) v -= 0.6;
+    if (/(tion|ment|eau|eux|euse|oire|ette|ais|ait)$/.test(low)) v -= 1;
+  }
   return v;
+}
+/** Welche Fremdsprache steckt in den Wörtern? 'fr', 'en' oder '' (unklar) */
+function guessForeignLang(rows) {
+  let fr = 0, en = 0;
+  for (const r of rows) {
+    const s = String(r.foreign || '').trim();
+    if (!s) continue;
+    if (FO_ART_START.fr.test(s) || /[éèêëàâçîïôûùœ]/i.test(s)) fr++;
+    else if (FO_ART_START.en.test(s) || /(ing|tion|ly|ness|ful)\b/i.test(s) || PICTURES.maps.en.has(stripArticle(s, 'en').toLowerCase())) en++;
+  }
+  const n = rows.length || 1;
+  if (fr >= Math.max(2, n * 0.4) && fr > en * 2) return 'fr';
+  if (en >= Math.max(2, n * 0.4) && en > fr * 2) return 'en';
+  return '';
 }
 /** Bester Schnitt einer Zeile ohne Trennzeichen: [links, rechts, Punkte] */
 function bestSplit(line, lang) {
@@ -565,7 +585,23 @@ function parseVocab(text, opts = {}) {
   }
   rows = rows.filter((r) => r[0] || r[1]);
 
-  // Welche Spalte ist Deutsch?
+  // Einzelne Zeilen ohne Trennzeichen zwischen anderen: selbst teilen („die Katze le chat“)
+  rows = rows.map((r) => {
+    if (r[1] || !/\s/.test((r[0] || '').trim())) return r;
+    const [a, b, sc] = bestSplit(r[0], lang);
+    return b && sc >= 1.5 ? [a, b] : r;
+  });
+  // Zwei Zeilen ohne Übersetzung hintereinander: untereinander geschriebenes Paar („nager“ / „schwimmen“)
+  const merged = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i], n = rows[i + 1];
+    if (r[0] && !r[1] && n && n[0] && !n[1]) { merged.push([r[0], n[0]]); i++; } else merged.push(r);
+  }
+  rows = merged;
+
+  // Welche Seite ist Deutsch? Jede Zeile stimmt einzeln ab; unklare Zeilen folgen der Mehrheit.
+  const vote = (x) => String(x || '').split(/\s+/).filter(Boolean).reduce((sum, w) => sum + tokVote(w, lang), 0);
+  const diffs = rows.map(([a, b]) => (b ? vote(a) - vote(b) : 0)); // > 0: links Deutsch
   const col0 = { de: 0, en: 0 }, col1 = { de: 0, en: 0 };
   for (const [a, b] of rows) {
     const sa = langScore(a), sb = langScore(b || '');
@@ -574,12 +610,16 @@ function parseVocab(text, opts = {}) {
     if (capB && !capA) col1.de += 0.3;
     if (capA && !capB && b) col0.de += 0.3;
   }
-  let germanFirst = col0.de > col1.de && col1.en >= col0.en;
+  const total = diffs.reduce((x, y) => x + y, 0);
+  let germanFirst = total !== 0 ? total > 0 : (col0.de > col1.de && col1.en >= col0.en);
   if (opts.swap) germanFirst = !germanFirst;
 
   return {
-    rows: rows.map(([a, b]) => (germanFirst ? { foreign: b || '', german: a } : { foreign: a, german: b || '' }))
-      .filter((r) => r.foreign || r.german),
+    rows: rows.map(([a, b], i) => {
+      let gf = Math.abs(diffs[i]) >= 1 ? diffs[i] > 0 : germanFirst;
+      if (opts.swap && Math.abs(diffs[i]) >= 1) gf = !gf;
+      return gf ? { foreign: b || '', german: a } : { foreign: a, german: b || '' };
+    }).filter((r) => r.foreign || r.german),
     germanFirst,
   };
 }
