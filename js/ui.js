@@ -337,7 +337,7 @@ function openSet(id) {
   ui.confirmDelete = null;
   go('set', { setId: id });
   const set = getSet(id);
-  if (set) ttsPrefetch(set.words.map((w) => w.foreign));
+  if (set) audioForSet(set);
   if (set && set.words.some((w) => w.picStatus !== 'done' && !(w.pic && w.pic.manual))) startPictureFill(set);
 }
 
@@ -384,6 +384,7 @@ function viewSet(set) {
       </div>`}
     </header>
 
+    ${voicePrepHTML(set)}
     <ol class="path" aria-label="Lernweg">
       ${step(1, 'Lernkarten', 'Karten umdrehen und merken.', info.cards,
         `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>`, !!p.cards, 'stack')}
@@ -923,7 +924,6 @@ async function drawMissing(set) {
 /* ---------------- Einstellungen ---------------- */
 function openSettings() {
   const s = db.settings;
-  kokoroStart();
   openModal(`
     <header class="modal-head"><h2>Einstellungen</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
     <div class="settings">
@@ -936,13 +936,7 @@ function openSettings() {
         </div>
       </div>
       ${canSpeak() ? `
-      <div class="field"><span class="label">Stimme</span>
-        <div class="seg" role="group" aria-label="Stimme">
-          <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${s.voiceSex !== 'm'}">Frau</button>
-          <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${s.voiceSex === 'm'}">Mann</button>
-        </div>
-        <p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>
-      </div>
+      <div class="field" id="voice-field">${voiceFieldHTML()}</div>
       <label class="field" for="set-rate"><span class="label">Sprechtempo</span><input type="range" id="set-rate" min="0.6" max="1.2" step="0.05" value="${s.rate}"></label>
       <div class="row"><button type="button" class="btn small secondary" data-action="voice-test" data-lang="en">${icon('speaker')} Stimme testen</button></div>`
         : '<p class="warn">Dieser Browser kann nicht vorlesen.</p>'}
@@ -973,6 +967,7 @@ function openSettings() {
     if (t.id === 'set-sound') s.sound = t.checked;
     if (t.id === 'set-autospeak') s.autoSpeak = t.checked;
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
+    if (t.id === 'device-voice') { s.deviceVoice = t.value; speak('Hello! The apple is red.', 'en'); }
     if (t.id === 'ph-on' || t.id === 'ph-min') {
       s.phonetic = { ...phCfg(), on: $('#ph-on').checked, passMin: parseInt($('#ph-min').value, 10) || 60 };
       if (t.id === 'ph-on' && t.checked && !phState.engine) loadPhoneticEngine().catch(() => {});
@@ -981,14 +976,47 @@ function openSettings() {
   });
 }
 
+/** Stimmen-Auswahl: angemeldet (oder Kinder-Login) die vier Vokaboom-Stimmen, sonst die besten Gerätestimmen */
+function voiceFieldHTML() {
+  const s = db.settings;
+  if (useKokoro()) {
+    return `<span class="label">Stimme</span>
+      <div class="seg" role="group" aria-label="Stimme">
+        <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${s.voiceSex !== 'm'}">Frau</button>
+        <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${s.voiceSex === 'm'}">Mann</button>
+      </div>
+      <p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>`;
+  }
+  const list = bestDeviceVoices('en');
+  if (!list.length) return '<span class="label">Stimme</span><p class="small muted">Dieses Gerät hat keine englische Stimme gefunden. Es liest mit der Standardstimme vor.</p>';
+  return `<label class="label" for="device-voice">Stimme</label>
+    <select id="device-voice">
+      <option value="">Automatisch (${esc(list[0].name)})</option>
+      ${list.map((v) => `<option value="${esc(v.name)}" ${s.deviceVoice === v.name ? 'selected' : ''}>${esc(v.name.replace(/\s*\((Natural|Enhanced|Premium)\)/i, ' ★'))}</option>`).join('')}
+    </select>
+    <p class="small muted">Die besten Stimmen dieses Geräts.${typeof cloud === 'object' && cloudConfigured() ? ' Mit Anmeldung gibt es die Vokaboom-Stimmen (überall gleich).' : ''}</p>`;
+}
+
 function voiceStatusText() {
   const name = VOICE_NAMES[kokoroVoice()] || '';
-  if (!ttsSupported || kokoro.state === 'failed') return 'Die Vokaboom-Stimmen laufen auf diesem Gerät nicht. Es liest die Stimme des Geräts vor.';
-  if (kokoro.state === 'ready') return `${icon('check')} Stimme „${esc(name)}“ ist bereit.`;
-  if (kokoro.state === 'loading') return `<span class="spinner"></span> Stimmen werden geladen${kokoro.progress ? ` … ${Math.round(kokoro.progress * 100)} %` : ' …'} (nur beim ersten Mal, ca. 90 MB). So lange liest die Stimme des Geräts vor.`;
-  return '';
+  if (!ttsSupported) return 'Dieses Gerät liest mit seiner eigenen Stimme vor.';
+  return `Stimme: <strong>${esc(name)}</strong>. Wörter, für die es noch keine Aufnahme gibt, liest die Stimme des Geräts vor.`;
 }
-kokoro.listeners.add(() => { const el = document.getElementById('voice-status'); if (el) el.innerHTML = voiceStatusText(); });
+/** Zeile in der Portion: Wie viele Aufnahmen sind schon gespeichert? (nur bei eigenen Portionen) */
+function voicePrepHTML(set) {
+  if (!set || !mayGenerate(set)) return '';
+  if (prep.note) return `<p class="voice-prep warn" id="voice-prep">${icon('speaker')} ${esc(prep.note)}</p>`;
+  const { done, total } = audioCounts(set);
+  if (!total) return '<p class="voice-prep" id="voice-prep"></p>';
+  if (done >= total) return `<p class="voice-prep done" id="voice-prep">${icon('speaker')} Alle Wörter sind mit allen 4 Stimmen gespeichert${ownsAudio(set) ? ' – auch die Kinder hören sie sofort' : ''}.</p>`;
+  const loading = kokoro.state === 'loading' ? ` · Stimmen werden geladen${kokoro.progress ? ` (${Math.round(kokoro.progress * 100)} %)` : ''}, nur beim ersten Mal ca. 90 MB` : '';
+  return `<p class="voice-prep" id="voice-prep">${prep.running.has(set.id) ? '<span class="spinner"></span>' : icon('speaker')} Aufnahmen werden vorbereitet: <b>${done} von ${total}</b>${loading}. ${ownsAudio(set) ? 'Einmalig – danach hören alle Kinder die Stimmen sofort.' : 'Melde dich an, damit die Aufnahmen auch für die Kinder gespeichert werden.'} Seite offen lassen.</p>`;
+}
+kokoro.listeners.add(() => {
+  const el = document.getElementById('voice-status'); if (el) el.innerHTML = voiceStatusText();
+  const vp = document.getElementById('voice-prep');
+  if (vp && ui.view === 'set') vp.outerHTML = voicePrepHTML(currentSet()) || '<p class="voice-prep" id="voice-prep"></p>';
+});
 
 /* ---------- Lauterkennung ---------- */
 function phoneticSettingsHTML(s) {

@@ -317,3 +317,20 @@ revoke execute on function public.vokaboom_student_login(text, text), public.vok
   public.vokaboom_student_save(uuid, text, jsonb), public.vokaboom_student_logout(uuid) from public;
 grant execute on function public.vokaboom_student_login(text, text), public.vokaboom_student_data(uuid),
   public.vokaboom_student_save(uuid, text, jsonb), public.vokaboom_student_logout(uuid) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Audio-Speicher für die Vokaboom-Stimmen
+-- Jedes Wort wird einmal auf dem Gerät der Lehrperson erzeugt und hier gespeichert.
+-- Lesen darf jede Person (Kinder ohne Konto spielen die Dateien ab), hochladen nur
+-- angemeldete Lehrpersonen und nur in ihren eigenen Ordner (Ordnername = Konto-ID).
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('vokaboom-audio', 'vokaboom-audio', true, 2097152, array['audio/wav'])
+on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "vokaboom audio hochladen" on storage.objects;
+create policy "vokaboom audio hochladen" on storage.objects for insert to authenticated
+  with check (bucket_id = 'vokaboom-audio' and (storage.foldername(name))[1] = (select auth.uid())::text);
+drop policy if exists "vokaboom audio löschen" on storage.objects;
+create policy "vokaboom audio löschen" on storage.objects for delete to authenticated
+  using (bucket_id = 'vokaboom-audio' and (storage.foldername(name))[1] = (select auth.uid())::text);

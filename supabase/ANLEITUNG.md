@@ -98,6 +98,16 @@ Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Kla
 
 Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
 
+## Vokaboom-Stimmen (Audio-Speicher)
+
+Angemeldete Lehrpersonen und Kinder mit Klassen-Login hören die vier Vokaboom-Stimmen (britisch Emma/George, amerikanisch Heart/Michael). Wer nicht angemeldet ist, wählt in den Einstellungen eine der besten Stimmen seines Geräts.
+
+- Die Stimmen werden im Browser erzeugt, das dauert pro Wort ein paar Sekunden. Deshalb passiert es nur **einmal**: Öffnet eine angemeldete Lehrperson eine eigene Portion, erzeugt ihr Gerät im Hintergrund alle Wörter mit allen 4 Stimmen und speichert sie im Supabase-Speicher (Bucket `vokaboom-audio`). Oben in der Portion steht der Fortschritt („Aufnahmen werden vorbereitet: 37 von 120“). Seite offen lassen, bis „Alle Wörter sind … gespeichert“ erscheint.
+- Beim ersten Mal lädt das Gerät der Lehrperson dafür einmalig ca. 90 MB.
+- Kinder-Geräte laden nichts davon: Sie spielen die fertigen Aufnahmen sofort ab. Gibt es für ein Wort noch keine Aufnahme, liest die Gerätestimme.
+- Eine Aufnahme ist ca. 40 KB gross. Der Gratis-Speicher von Supabase (1 GB) reicht für viele tausend Wörter.
+- Dafür braucht es den Speicher: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen.
+
 ## Passwort vergessen
 
 - **Mit E-Mail-Versand:** Im Anmelde-Fenster die E-Mail-Adresse eingeben und auf **Passwort vergessen?** klicken. Der Link in der E-Mail öffnet Vokaboom, dort wählt man ein neues Passwort.

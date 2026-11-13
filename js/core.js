@@ -988,18 +988,33 @@ if ('speechSynthesis' in window) {
 const ttsSupported = typeof Worker !== 'undefined' && typeof WebAssembly === 'object' && !!(window.AudioContext || window.webkitAudioContext);
 const canSpeak = () => ttsSupported || 'speechSynthesis' in window;
 
-/** Gerätestimme als Ersatz: passender Akzent, möglichst gute Qualität */
-function deviceVoice(lang) {
+/* Gerätestimmen: Spass-Stimmen von Apple u. a. weglassen, gute Stimmen nach vorne */
+const NOVELTY_VOICES = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|fred|good news|hysterical|jester|junior|kathy|organ|pipe organ|princess|ralph|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
+const GOOD_VOICES = /daniel|kate|serena|arthur|martha|oliver|stephanie|samantha|alex|ava|allison|susan|tom|nathan|evan|zoe|joelle|nicky|libby|ryan|sonia|maisie|aria|guy|jenny|emma|brian|andrew|google/i;
+function voiceRank(v, want) {
+  const l = v.lang.toLowerCase().replace('_', '-');
+  let r = l === want ? 10 : 0;
+  if (/natural|neural|premium|enhanced|online/i.test(v.name)) r += 6;
+  if (GOOD_VOICES.test(v.name)) r += 3;
+  if (v.localService) r += 1;
+  return r;
+}
+/** Die besten Gerätestimmen für Englisch im gewählten Akzent (höchstens 8) */
+function bestDeviceVoices(lang = 'en') {
   const want = (lang === 'de' ? 'de-DE' : langCode(lang)).toLowerCase();
   const base = want.slice(0, 2);
-  const rank = (v) => {
-    const l = v.lang.toLowerCase().replace('_', '-');
-    let r = l === want ? 10 : 0;
-    if (/natural|neural|premium|enhanced|google/i.test(v.name)) r += 5;
-    if (v.localService) r += 1;
-    return r;
-  };
-  return tts.voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(base)).sort((a, b) => rank(b) - rank(a))[0] || null;
+  const all = tts.voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(base) && !NOVELTY_VOICES.test(v.name));
+  const exact = all.filter((v) => v.lang.toLowerCase().replace('_', '-') === want);
+  return (exact.length ? exact : all).sort((a, b) => voiceRank(b, want) - voiceRank(a, want)).slice(0, 8);
+}
+/** Gerätestimme: die gewählte, sonst die beste im passenden Akzent */
+function deviceVoice(lang) {
+  const list = bestDeviceVoices(lang);
+  if (lang !== 'de' && db.settings.deviceVoice) {
+    const chosen = list.find((v) => v.name === db.settings.deviceVoice);
+    if (chosen) return chosen;
+  }
+  return list[0] || null;
 }
 function deviceSpeak(text, lang, slow) {
   if (!('speechSynthesis' in window)) return;
@@ -1014,14 +1029,76 @@ function deviceSpeak(text, lang, slow) {
   } catch { /* */ }
 }
 
-const kokoro = { worker: null, state: 'idle', progress: 0, cache: new Map(), queue: [], busy: null, seq: 0, playId: 0, source: null, listeners: new Set() };
+/* ---------- Audio-Speicher ----------
+   Kokoro braucht im Browser 2–5 Sekunden pro Wort. Deshalb wird jedes Wort nur EINMAL erzeugt:
+   auf dem Gerät der Lehrperson im Hintergrund, mit allen vier Stimmen. Die Tondateien kommen in den
+   Supabase-Speicher (Bucket „vokaboom-audio“, Ordner = Konto der Lehrperson) und auf dem Gerät in die
+   IndexedDB. In der Portion steht, welche Aufnahmen es gibt (set.audio = { o: Konto, h: { Stimme: { Kennung: 1 } } }).
+   Kinder-Geräte laden kein Modell: Sie spielen die fertigen Dateien ab; fehlt eine, liest die Gerätestimme. */
+const ALL_VOICES = ['bf_emma', 'bm_george', 'af_heart', 'am_michael'];
+const AUDIO_BUCKET = 'vokaboom-audio';
+/** Kurze Kennung eines Textes (für Dateinamen) */
+function textHash(t) {
+  let a = 0x811c9dc5, b = 5381;
+  for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193); b = (Math.imul(b, 33) + c) | 0; }
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
+const audioPublicURL = (owner, voice, h) => `${cloudUrl()}/storage/v1/object/public/${AUDIO_BUCKET}/${owner}/${voice}/${h}.wav`;
+
+/* Gerätespeicher (IndexedDB) für erzeugte und geladene Aufnahmen */
+const idb = { p: null };
+function idbOpen() {
+  if (!idb.p) {
+    idb.p = new Promise((resolve) => {
+      try {
+        const r = indexedDB.open('vokaboom-audio', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('clips');
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => resolve(null);
+        r.onblocked = () => resolve(null);
+      } catch { resolve(null); }
+    });
+  }
+  return idb.p;
+}
+async function idbGet(k) {
+  const d = await idbOpen();
+  if (!d) return null;
+  return new Promise((resolve) => {
+    try { const q = d.transaction('clips').objectStore('clips').get(k); q.onsuccess = () => resolve(q.result || null); q.onerror = () => resolve(null); } catch { resolve(null); }
+  });
+}
+async function idbPut(k, v) {
+  const d = await idbOpen();
+  if (!d) return;
+  try { d.transaction('clips', 'readwrite').objectStore('clips').put(v, k); } catch { /* voll oder privat */ }
+}
+
+/** Float32-Audio → WAV (16 Bit, mono) */
+function wavBlob(f32, sr) {
+  const n = f32.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true);
+  v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, f32[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+const kokoro = { worker: null, state: 'idle', progress: 0, queue: [], busy: null, seq: 0, playId: 0, listeners: new Set() };
 const kokoroVoice = () => KOKORO_VOICES[db.settings.accent === 'us' ? 'us' : 'gb'][db.settings.voiceSex === 'm' ? 'm' : 'f'];
-const kokoroSpeed = (slow) => (slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9)));
 function kokoroNotify() { kokoro.listeners.forEach((fn) => { try { fn(); } catch { /* */ } }); }
+const kidDevice = () => typeof isKid === 'function' && isKid();
+const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
+/** Kokoro nur für angemeldete Lehrpersonen und Kinder mit Klassen-Login; alle anderen hören die beste Gerätestimme. */
+const useKokoro = () => ttsSupported && !!ttsEl && (kidDevice() || teacherIn());
+/** Darf dieses Gerät Aufnahmen selbst erzeugen? Nur angemeldete Lehrperson, nur eigene Portionen. */
+const mayGenerate = (set) => useKokoro() && !kidDevice() && teacherIn() && kokoro.state !== 'failed' && !(set && (set.shareId || set.assigned));
+const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
 /** Kokoro im Hintergrund laden (einmal pro Gerät ~90 MB, danach aus dem Speicher des Browsers) */
 function kokoroStart() {
-  if (!ttsSupported || kokoro.worker || kokoro.state === 'failed') return;
+  if (!ttsSupported || kidDevice() || !teacherIn() || kokoro.worker || kokoro.state === 'failed') return;
   try {
     const v = typeof APP_VERSION === 'string' && APP_VERSION ? `?v=${APP_VERSION}` : '';
     kokoro.worker = new Worker(`js/tts-worker.js${v}`, { type: 'module' });
@@ -1033,10 +1110,8 @@ function kokoroStart() {
     else if (m.type === 'ready') { kokoro.state = 'ready'; kokoro.progress = 1; kokoroNotify(); kokoroPump(); }
     else if (m.type === 'audio' && kokoro.busy && kokoro.busy.id === m.id) {
       const job = kokoro.busy; kokoro.busy = null;
-      const clip = { audio: m.audio, sr: m.sr };
-      kokoro.cache.set(job.key, clip);
-      if (kokoro.cache.size > 400) kokoro.cache.delete(kokoro.cache.keys().next().value);
-      job.done.forEach((d) => d.resolve(clip));
+      const blob = wavBlob(m.audio, m.sr);
+      job.done.forEach((d) => d.resolve(blob));
       kokoroPump();
     } else if (m.type === 'error') {
       if (m.id == null) { kokoroFail(); return; }
@@ -1059,72 +1134,210 @@ function kokoroPump() {
   const job = kokoro.queue.shift();
   job.id = ++kokoro.seq;
   kokoro.busy = job;
-  kokoro.worker.postMessage({ type: 'gen', id: job.id, text: job.text, voice: job.voice, speed: job.speed });
+  kokoro.worker.postMessage({ type: 'gen', id: job.id, text: job.text, voice: job.voice, speed: 1 });
 }
-/** Audio für einen Text holen (aus dem Zwischenspeicher oder neu erzeugen). urgent = vor allen anderen. */
-function kokoroGet(text, { slow = false, urgent = false } = {}) {
-  const voice = kokoroVoice(), speed = kokoroSpeed(slow);
-  const key = `${voice}|${speed}|${text}`;
-  const hit = kokoro.cache.get(key);
-  if (hit) return Promise.resolve(hit);
+/** Neue Aufnahme erzeugen (Warteschlange; urgent = vor allen anderen) */
+function kokoroGen(text, voice, urgent = false) {
+  kokoroStart();
+  const key = `${voice}|${text}`;
   return new Promise((resolve, reject) => {
+    if (kokoro.state === 'failed') { reject(new Error('tts')); return; }
     let job = kokoro.busy?.key === key ? kokoro.busy : kokoro.queue.find((j) => j.key === key);
-    if (!job) { job = { key, text, voice, speed, done: [] }; kokoro.queue.push(job); }
-    if (urgent && job !== kokoro.busy) { kokoro.queue = [job, ...kokoro.queue.filter((j) => j !== job)]; }
+    if (!job) { job = { key, text, voice, done: [] }; kokoro.queue.push(job); }
+    if (urgent && job !== kokoro.busy) kokoro.queue = [job, ...kokoro.queue.filter((j) => j !== job)];
     job.done.push({ resolve, reject });
     kokoroPump();
   });
 }
-/** Wörter einer Portion schon im Hintergrund vorbereiten, damit sie sofort kommen */
-function ttsPrefetch(texts) {
-  if (!ttsSupported || kokoro.state === 'failed') return;
-  kokoroStart();
-  const seen = new Set();
-  texts.slice(0, 120).forEach((t) => {
-    const x = ttsText(String(t || ''), 'en');
-    if (!x || seen.has(x)) return;
-    seen.add(x);
-    kokoroGet(x).catch(() => {});
-  });
+
+/* Aufnahmen holen: Arbeitsspeicher → Gerät → Audio-Speicher im Konto → (falls erlaubt) neu erzeugen */
+const clipMem = new Map(); // "Stimme|Kennung" → { blob, url }
+function memPut(key, blob) {
+  if (clipMem.has(key)) return clipMem.get(key);
+  const c = { blob, url: URL.createObjectURL(blob) };
+  clipMem.set(key, c);
+  if (clipMem.size > 500) { const [k, old] = clipMem.entries().next().value; URL.revokeObjectURL(old.url); clipMem.delete(k); }
+  return c;
+}
+/** Wer hat diese Aufnahme gespeichert? (Konto-Ordner im Audio-Speicher) */
+function audioOwnerFor(voice, h, set) {
+  const list = set ? [set, ...db.sets.filter((s) => s !== set)] : db.sets;
+  for (const s of list) {
+    const a = s?.audio;
+    if (!a?.o) continue;
+    if (a.h?.[voice]?.[h]) return a.o;
+  }
+  // Über QR-Code bekommen: Liste der Aufnahmen fehlt, trotzdem beim Besitzer nachsehen
+  if (set?.audio?.o && set.shareId) return set.audio.o;
+  return '';
+}
+const remoteMiss = new Set();
+async function fetchRemoteClip(owner, voice, h) {
+  const k = `${owner}|${voice}|${h}`;
+  if (!cloudConfigured() || remoteMiss.has(k)) return null;
+  try {
+    const r = await fetch(audioPublicURL(owner, voice, h));
+    if (!r.ok) { remoteMiss.add(k); return null; }
+    const b = await r.blob();
+    return b.size > 100 ? new Blob([b], { type: 'audio/wav' }) : null;
+  } catch { return null; }
+}
+const clipLoading = new Map();
+/** Aufnahme suchen, ohne neu zu erzeugen */
+function findClip(text, voice, set) {
+  const h = textHash(text), key = `${voice}|${h}`;
+  if (clipMem.has(key)) return Promise.resolve(clipMem.get(key));
+  if (clipLoading.has(key)) return clipLoading.get(key);
+  const p = (async () => {
+    const local = await idbGet(key);
+    if (local) return memPut(key, local);
+    const owner = audioOwnerFor(voice, h, set);
+    if (owner) {
+      const b = await fetchRemoteClip(owner, voice, h);
+      if (b) { idbPut(key, b); return memPut(key, b); }
+    }
+    return null;
+  })().finally(() => clipLoading.delete(key));
+  clipLoading.set(key, p);
+  return p;
+}
+/** Aufnahme erzeugen und speichern (Gerät + Konto der Lehrperson) */
+async function makeClip(text, voice, set, urgent = false) {
+  const h = textHash(text), key = `${voice}|${h}`;
+  const blob = await kokoroGen(text, voice, urgent);
+  idbPut(key, blob);
+  const c = memPut(key, blob);
+  if (ownsAudio(set)) uploadClip(set, voice, h, blob);
+  return c;
 }
 
-function audioContext() {
-  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-  return audioCtx;
+/* Hochladen in den Audio-Speicher (nur angemeldete Lehrperson, nur in den eigenen Ordner) */
+const upload = { queue: [], busy: false, failed: false };
+function uploadClip(set, voice, h, blob) {
+  if (upload.failed || !cloud.uid) return;
+  upload.queue.push({ set, voice, h, blob });
+  pumpUpload();
 }
-function playClip(clip) {
+async function pumpUpload() {
+  if (upload.busy || !upload.queue.length) return;
+  upload.busy = true;
+  const job = upload.queue.shift();
   try {
-    const ctx = audioContext();
-    const buf = ctx.createBuffer(1, clip.audio.length, clip.sr);
-    buf.copyToChannel(clip.audio, 0);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start();
-    kokoro.source = src;
-  } catch { /* kein Audio */ }
+    const c = await cloudClient();
+    const path = `${cloud.uid}/${job.voice}/${job.h}.wav`;
+    const { error } = await c.storage.from(AUDIO_BUCKET).upload(path, job.blob, { contentType: 'audio/wav', upsert: false, cacheControl: '31536000' });
+    if (error && !/exist|duplicate|409/i.test(`${error.message} ${error.statusCode || ''} ${error.error || ''}`)) throw error;
+    markClip(job.set, job.voice, job.h);
+  } catch (e) {
+    // Speicher fehlt (SQL noch nicht ausgeführt) oder keine Berechtigung: nicht weiter versuchen
+    if (/bucket|not found|row-level|security|unauthor|403|404/i.test(String(e?.message || e))) { upload.failed = true; upload.queue = []; prep.note = 'Der Audio-Speicher ist in Supabase noch nicht eingerichtet: supabase/vokabelwelt.sql nochmals ganz ausführen.'; kokoroNotify(); }
+  } finally {
+    upload.busy = false;
+    pumpUpload();
+  }
+}
+function markClip(set, voice, h) {
+  if (!set || !cloud.uid) return;
+  if (!set.audio || set.audio.o !== cloud.uid) set.audio = { o: cloud.uid, h: {} };
+  (set.audio.h[voice] = set.audio.h[voice] || {})[h] = 1;
+  set.updated = Date.now();
+  saveDB();
+  kokoroNotify();
+}
+
+/* Im Hintergrund alle Wörter einer eigenen Portion mit allen vier Stimmen vorbereiten */
+const prep = { running: new Set(), note: '' };
+function setTexts(set) { return [...new Set(set.words.slice(0, 150).map((w) => ttsText(String(w.foreign || ''), 'en')).filter(Boolean))]; }
+function audioCounts(set) {
+  const texts = setTexts(set);
+  const total = texts.length * ALL_VOICES.length;
+  let done = 0;
+  for (const v of ALL_VOICES) for (const t of texts) if (set.audio?.h?.[v]?.[textHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${textHash(t)}`))) done++;
+  return { done, total };
+}
+async function audioPrepare(set) {
+  if (!set || !mayGenerate(set) || prep.running.has(set.id)) return;
+  prep.running.add(set.id);
+  try {
+    const texts = setTexts(set);
+    const voices = [kokoroVoice(), ...ALL_VOICES.filter((v) => v !== kokoroVoice())];
+    for (const v of voices) {
+      for (const t of texts) {
+        if (!getSet(set.id) || kokoro.state === 'failed') return;
+        const h = textHash(t);
+        if (set.audio?.h?.[v]?.[h] && set.audio.o === cloud.uid) continue; // schon im Konto
+        const local = await findClip(t, v, set);
+        if (local) { if (ownsAudio(set) && !(set.audio?.o === cloud.uid && set.audio.h?.[v]?.[h])) uploadClip(set, v, h, local.blob); kokoroNotify(); continue; }
+        try { await makeClip(t, v, set); } catch { return; }
+        kokoroNotify();
+      }
+    }
+  } finally { prep.running.delete(set.id); kokoroNotify(); }
+}
+/** Aufnahmen der aktuellen Stimme schon laden (Kinder-Geräte und alle anderen), damit sie sofort kommen */
+async function audioWarm(set) {
+  if (!set || !useKokoro()) return;
+  const v = kokoroVoice();
+  const texts = setTexts(set);
+  for (let i = 0; i < texts.length; i += 4) await Promise.all(texts.slice(i, i + 4).map((t) => findClip(t, v, set).catch(() => null)));
+}
+function audioForSet(set) {
+  if (!set) return;
+  audioWarm(set).then(() => audioPrepare(set));
+}
+
+/* Abspielen über ein einziges Audio-Element: Tempo ändern, ohne dass die Stimme höher/tiefer wird */
+const ttsEl = typeof Audio === 'function' ? new Audio() : null;
+if (ttsEl) { ttsEl.preload = 'auto'; ttsEl.preservesPitch = true; ttsEl.mozPreservesPitch = true; ttsEl.webkitPreservesPitch = true; }
+const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+let ttsUnlocked = false;
+function unlockTtsEl() {
+  if (ttsUnlocked || !ttsEl) return;
+  ttsUnlocked = true;
+  try { ttsEl.src = SILENT_WAV; const p = ttsEl.play(); if (p) p.then(() => ttsEl.pause()).catch(() => { ttsUnlocked = false; }); } catch { ttsUnlocked = false; }
+}
+document.addEventListener('pointerdown', unlockTtsEl, { capture: true });
+document.addEventListener('keydown', unlockTtsEl, { capture: true });
+function playClipURL(url, rate) {
+  if (!ttsEl) return;
+  try {
+    ttsEl.pause();
+    ttsEl.src = url;
+    ttsEl.playbackRate = rate;
+    ttsEl.defaultPlaybackRate = rate;
+    const p = ttsEl.play();
+    if (p) p.catch(() => {});
+  } catch { /* */ }
 }
 
 function speak(text, lang, { slow = false } = {}) {
   stopSpeaking();
   if (!text) return;
-  if (lang === 'de' || !ttsSupported || kokoro.state === 'failed') { deviceSpeak(text, lang, slow); return; }
-  try { audioContext(); } catch { /* */ } // im Antippen freischalten (iPhone/iPad)
-  const t = ttsText(text, lang);
-  const voice = kokoroVoice(), speed = kokoroSpeed(slow);
-  const hit = kokoro.cache.get(`${voice}|${speed}|${t}`);
-  if (hit) { playClip(hit); return; }
-  if (kokoro.state !== 'ready') { kokoroStart(); deviceSpeak(text, lang, slow); return; } // lädt noch: Gerätestimme
+  if (lang === 'de' || !useKokoro()) { deviceSpeak(text, lang, slow); return; }
+  const set = typeof currentSet === 'function' ? currentSet() : null;
+  const t = ttsText(text, lang), voice = kokoroVoice();
+  const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
+  const key = `${voice}|${textHash(t)}`;
+  const mem = clipMem.get(key);
+  if (mem) { playClipURL(mem.url, rate); return; }
   const my = kokoro.playId;
-  kokoroGet(t, { slow, urgent: true })
-    .then((clip) => { if (my === kokoro.playId) playClip(clip); })
-    .catch(() => { if (my === kokoro.playId) deviceSpeak(text, lang, slow); });
+  let fellBack = false;
+  // Nicht lange warten lassen: Ist die Aufnahme nicht gleich da, liest die Gerätestimme.
+  const timer = setTimeout(() => { if (my === kokoro.playId) { fellBack = true; deviceSpeak(text, lang, slow); } }, 1200);
+  findClip(t, voice, set).then((c) => {
+    if (c) {
+      if (my === kokoro.playId && !fellBack) { clearTimeout(timer); playClipURL(c.url, rate); }
+      return;
+    }
+    clearTimeout(timer);
+    if (my === kokoro.playId && !fellBack) deviceSpeak(text, lang, slow);
+    // Für das nächste Mal erzeugen (nur wo erlaubt)
+    if (mayGenerate(set)) makeClip(t, voice, set, true).catch(() => {});
+  }).catch(() => { clearTimeout(timer); if (my === kokoro.playId && !fellBack) deviceSpeak(text, lang, slow); });
 }
 const stopSpeaking = () => {
   kokoro.playId++;
-  try { kokoro.source?.stop(); } catch { /* */ }
-  kokoro.source = null;
+  try { ttsEl?.pause(); } catch { /* */ }
   try { 'speechSynthesis' in window && speechSynthesis.cancel(); } catch { /* */ }
 };
 
@@ -1370,6 +1583,7 @@ function codeToPic(code) {
 async function encodeShare(set, { lite = false } = {}) {
   const data = {
     v: 2, n: set.name, l: set.lang, s: set.picStyle,
+    ...(set.audio?.o || (typeof cloud === 'object' && cloud.uid && !set.shareId && !set.assigned) ? { o: set.audio?.o || cloud.uid } : {}), // Audio-Speicher der Lehrperson
     w: set.words.map((w) => {
       let code = picToCode(w.pic);
       if (lite && /^[fus]/.test(code)) code = '';
@@ -1399,6 +1613,7 @@ async function decodeShare(code) {
       : r[2] && r[3] ? { kind: String(r[2]), src: String(r[3]), manual: true } : null);
   return {
     name: String(d.n || 'Vokabeln'), lang: 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(d.s) ? d.s : 'picto',
+    audioOwner: /^[0-9a-f-]{36}$/i.test(String(d.o || '')) ? String(d.o) : '',
     rows: (d.w || []).map((r) => ({
       foreign: String(r[0] || ''), german: String(r[1] || ''),
       pic: d.v === 2 ? codeToPic(r[2]) : v1pic(r),

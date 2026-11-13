@@ -156,16 +156,16 @@ const actions = {
   'set-accent': (el) => {
     db.settings.accent = el.dataset.accent; saveDB();
     $$('[data-action="set-accent"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.accent === db.settings.accent)));
-    const vs = $('#voice-status'); if (vs) vs.innerHTML = voiceStatusText();
+    const vf = $('#voice-field'); if (vf) vf.innerHTML = voiceFieldHTML();
     speak('Hello! The apple is red.', 'en');
-    if (currentSet()) ttsPrefetch(currentSet().words.map((w) => w.foreign));
+    if (currentSet()) audioWarm(currentSet());
   },
   'set-voice-sex': (el) => {
     db.settings.voiceSex = el.dataset.sex; saveDB();
     $$('[data-action="set-voice-sex"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sex === db.settings.voiceSex)));
     const vs = $('#voice-status'); if (vs) vs.innerHTML = voiceStatusText();
     speak('Hello! The apple is red.', 'en');
-    if (currentSet()) ttsPrefetch(currentSet().words.map((w) => w.foreign));
+    if (currentSet()) audioWarm(currentSet());
   },
   'voice-test': () => speak('Hello! The apple is red.', 'en'),
   wipe: async (el) => {
@@ -419,6 +419,7 @@ async function importFromHash() {
     if (!data.rows.length) throw new Error('leer');
     const set = newSet({ name: data.name, lang: 'en', rows: data.rows, picStyle: data.picStyle });
     set.shareId = share;
+    if (data.audioOwner) set.audio = { o: data.audioOwner, h: {} };
     saveDB();
     openSet(set.id);
     toast(`Neue Vokabelportion „${set.name}“ geladen.`);

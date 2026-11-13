@@ -95,7 +95,7 @@ Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie stren
 ## Browser
 
 - **Spracherkennung** gibt es in Chrome, Edge und Safari (auch auf iPad/iPhone). Firefox kann das nicht; dort bewerten sich die Kinder selbst (anhören und vergleichen).
-- **Vorlesen**: Englisch lesen vier ausgewählte Stimmen von [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) vor (frei nutzbar, Apache-2.0-Lizenz): britisch Emma (Frau) und George (Mann), amerikanisch Heart (Frau) und Michael (Mann). In den Einstellungen wählt man nur noch britisch/amerikanisch und Frau/Mann. Die Stimmen laufen direkt im Browser: Beim ersten Mal lädt jedes Gerät einmalig ca. 90 MB, danach sind sie gespeichert. Die Wörter einer Portion werden beim Öffnen schon vorbereitet. Solange die Stimmen laden – oder auf sehr alten Geräten, wo sie nicht laufen – liest die Stimme des Geräts vor. Deutsche Wörter liest immer die Gerätestimme.
+- **Vorlesen**: Für angemeldete Lehrpersonen und Kinder mit Klassen-Login lesen vier ausgewählte Stimmen von [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) vor (frei nutzbar, Apache-2.0-Lizenz): britisch Emma (Frau) und George (Mann), amerikanisch Heart (Frau) und Michael (Mann). Jedes Wort wird nur einmal auf dem Gerät der Lehrperson erzeugt und im Audio-Speicher des Kontos abgelegt; Kinder-Geräte spielen die fertigen Aufnahmen sofort ab (siehe `supabase/ANLEITUNG.md`). Wer nicht angemeldet ist, wählt in den Einstellungen eine der besten Stimmen seines Geräts. Fehlt eine Aufnahme, und für deutsche Wörter, liest die Gerätestimme.
 
 ## Aufbau
 
