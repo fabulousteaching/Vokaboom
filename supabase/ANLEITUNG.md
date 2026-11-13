@@ -81,6 +81,23 @@ Oben in der Titelleiste gibt es die Suche „Portionen von anderen suchen“ (am
 - Dafür braucht es die Tabelle `vokabelwelt_public`: einfach `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
 - Unpassende Einträge kannst du in Supabase unter **Table Editor → vokabelwelt_public** löschen.
 
+## Klassen und Kinder-Logins
+
+Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Klassen**.
+
+1. **Klasse anlegen**, z. B. „5a Englisch“.
+2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
+3. Jedes Kind bekommt automatisch einen eigenen **Benutzernamen** (z. B. `Baum34`, nie doppelt vergeben) und ein **Bilder-Passwort** aus 3 Bildern.
+4. **Portionen**: anhaken, welche Portionen die Klasse sieht. Kinder sehen nur diese – mit allen Übungen, aber ohne Bearbeiten.
+5. **Kärtchen**: als PDF herunterladen (10 pro A4-Seite), ausdrucken, ausschneiden.
+6. **Auswertung**: pro Kind und Portion der Anteil richtiger Antworten, wie viele Wörter und Übungen gemacht sind und der beste Test. Antippen eines Kindes zeigt seine schwierigsten Wörter; unten stehen die schwierigsten Wörter der ganzen Klasse.
+
+**Anmelden als Kind:** QR-Code auf dem Kärtchen mit der Kamera scannen – oder auf **Anmelden → Kinder-Login**, Benutzernamen eintippen und die 3 Bilder der Reihe nach antippen. Nach 8 falschen Versuchen ist 5 Minuten Pause. Auf einem Gerät, auf dem eine Lehrperson angemeldet ist, geht das Kinder-Login erst nach dem Abmelden.
+
+**Kärtchen verloren?** Beim Kind auf das Symbol mit den gekreuzten Pfeilen tippen: Es bekommt neue Bilder, das alte Kärtchen gilt nicht mehr.
+
+Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
+
 ## Passwort vergessen
 
 - **Mit E-Mail-Versand:** Im Anmelde-Fenster die E-Mail-Adresse eingeben und auf **Passwort vergessen?** klicken. Der Link in der E-Mail öffnet Vokaboom, dort wählt man ein neues Passwort.
@@ -97,5 +114,5 @@ Danach mit dem neuen Passwort anmelden und es unter «Konto → Passwort ändern
 ## Gut zu wissen
 
 - **Pause bei Gratis-Projekten:** Supabase pausiert Gratis-Projekte nach etwa 7 Tagen ohne Nutzung. Die Daten bleiben erhalten. Beim Projekt in Supabase **Restore** klicken, dann geht es nach ein paar Minuten weiter. Während der Pause meldet Vokaboom «Keine Verbindung zum Server»; auf dem Gerät gespeicherte Portionen funktionieren trotzdem.
-- **Datenschutz:** Gespeichert werden die E-Mail-Adresse (für die Anmeldung) und die Portionen: Vokabeln, Bilder-Auswahl und der Übungsstand dieses Geräts. Keine Namen von Kindern.
+- **Datenschutz:** Gespeichert werden die E-Mail-Adresse (für die Anmeldung) und die Portionen: Vokabeln, Bilder-Auswahl und der Übungsstand dieses Geräts. Von Kindern nur Vorname, erster Buchstabe des Nachnamens, Benutzername, Bilder-Passwort und Übungsstand – keine E-Mail-Adressen. Kläre mit deiner Schule, ob das so erlaubt ist.
 - **Eigene Fotos** (hochgeladen oder eingefügt) werden mitgespeichert. Eine Portion darf im Konto höchstens ca. 3 MB gross sein.

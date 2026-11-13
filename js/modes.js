@@ -7,6 +7,26 @@ const sayBtn = (text, lang, label = 'Anhören', extra = '') => (canSpeak() && te
   ? `<button type="button" class="say ${extra}" data-action="say" data-text="${esc(text)}" data-lang="${lang}" aria-label="${esc(label)}" title="${esc(label)}">${icon('speaker')}</button>` : '');
 const progressBar = (frac, label) => `<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(frac * 100)}" aria-label="${esc(label)}"><div class="progress-fill" style="width:${(frac * 100).toFixed(1)}%"></div></div>`;
 
+/**
+ * Merkt sich pro Wort, wie es in einer Übung lief (für „Schwierige Wörter“ und die Auswertung der Lehrperson).
+ * result: 'correct' | 'almost' | 'wrong'. Gespeichert in set.progress.words[wid] = { n, bad, almost, last, t, by: { mode: [n, bad] } }
+ */
+function trackWord(set, wid, mode, result) {
+  if (!set || !wid || !result) return;
+  set.progress = set.progress || {};
+  const words = set.progress.words = set.progress.words || {};
+  const s = words[wid] = words[wid] || { n: 0, bad: 0, almost: 0 };
+  s.n++;
+  if (result === 'wrong') s.bad++;
+  if (result === 'almost') s.almost = (s.almost || 0) + 1;
+  s.last = result; s.t = Date.now();
+  const by = s.by = s.by || {};
+  const m = by[mode] = by[mode] || [0, 0];
+  m[0]++; if (result === 'wrong') m[1]++;
+  set.updated = Date.now();
+  saveDB();
+}
+
 function saveProgress(set, key, value) {
   set.progress = set.progress || {};
   set.progress[key] = value;
@@ -216,6 +236,7 @@ function cardAnswer(known) {
   if (!cards.firstTry.has(id)) {
     cards.firstTry.set(id, known);
     if (known) cards.known++;
+    trackWord(set, id, 'cards', known ? 'correct' : 'wrong');
   }
   if (!known) cards.queue.splice(Math.min(cards.queue.length, 3 + Math.floor(Math.random() * 3)), 0, id);
   cards.flipped = false;
@@ -268,6 +289,7 @@ function dealRound() {
   const ids = match.rounds[match.round] || [];
   match.tiles = shuffle(ids.flatMap((id) => [{ id, side: 'L', gone: false }, { id, side: 'R', gone: false }]));
   match.sel = null; match.open = []; match.busy = false;
+  match.missed = new Set();
 }
 
 function memTileHTML(set, t, i) {
@@ -397,6 +419,7 @@ function memTap(i) {
   }
   match.sel = null;
   if (isPair(sel, i)) { memMatched(set, sel, i); return; }
+  match.missed?.add(s.id); match.missed?.add(t.id);
   match.mistakes++;
   updateMemMiss();
   sfx.bad();
@@ -411,6 +434,7 @@ function memMatched(set, a, b) {
   [a, b].forEach((k) => { match.tiles[k].gone = true; const el = memEl(k); if (el) { el.classList.remove('selected'); el.classList.add('matched'); el.disabled = true; } });
   match.found++;
   match.open = [];
+  if (w) trackWord(set, w.id, 'match', match.missed?.has(w.id) ? 'wrong' : 'correct');
   sfx.good();
   if (w && db.settings.autoSpeak) speak(w.foreign, set.lang);
   const pf = $('.match-mode .progress-fill'), pl = $('.match-mode .progress-label span');
@@ -737,7 +761,10 @@ async function doListen() {
 
 function markSpeakOk(w) {
   speakM.state = 'ok';
-  if (!speakM.results.has(w.id)) speakM.results.set(w.id, speakM.attempts === 1 && !speakM.revealed ? 'ok' : 'retry');
+  if (!speakM.results.has(w.id)) {
+    speakM.results.set(w.id, speakM.attempts === 1 && !speakM.revealed ? 'ok' : 'retry');
+    trackWord(currentSet(), w.id, 'speak', speakM.attempts === 1 && !speakM.revealed ? 'correct' : 'wrong');
+  }
   sfx.good();
   revealSpeakWord();
   // Richtig → automatisch zum nächsten Wort
@@ -794,6 +821,8 @@ phState.listeners.add((st) => {
 function nextSpeak() {
   clearTimeout(speakM.timer);
   stopListening(true);
+  const skipped = speakM.ids[speakM.idx];
+  if (skipped && !speakM.results.has(skipped) && (speakM.attempts > 0 || speakM.revealed)) { speakM.results.set(skipped, 'skip'); trackWord(currentSet(), skipped, 'speak', 'wrong'); }
   speakM.idx++;
   resetSpeakWord();
   if (speakM.idx >= speakM.ids.length) {
@@ -894,7 +923,7 @@ function checkDict(giveUp = false) {
   const r = giveUp ? { status: 'wrong' } : checkAnswer(input.value, w);
   dict.checked = true;
   dict.status = r.status;
-  if (!dict.firstTry.has(w.id)) dict.firstTry.set(w.id, r.status === 'correct');
+  if (!dict.firstTry.has(w.id)) { dict.firstTry.set(w.id, r.status === 'correct'); trackWord(set, w.id, 'dictation', r.status); }
   input.readOnly = true;
   input.classList.add(r.status);
   $('#d-submit').innerHTML = `Weiter ${icon('right')}`;
@@ -1134,26 +1163,11 @@ function nextQuestion() {
     const pct = Math.round((test.points / test.questions.length) * 100);
     const prev = set.progress?.test || {};
     if (!test.onlyIds) saveProgress(set, 'test', { best: Math.max(prev.best ?? 0, pct), last: pct, date: Date.now() });
-    recordWordResults(set, test.questions);
+    test.questions.forEach((q) => trackWord(set, q.wid, 'test', q.result));
     sfx.win();
     if (pct >= 80) confetti();
   }
   renderTest();
-}
-
-/** Merkt sich pro Wort, wie oft es im Test richtig, fast richtig oder falsch war (für „Schwierige Wörter“). */
-function recordWordResults(set, questions) {
-  const words = { ...(set.progress?.words || {}) };
-  for (const q of questions) {
-    if (!q.result) continue;
-    const s = { ...(words[q.wid] || { n: 0, bad: 0, almost: 0 }) };
-    s.n++;
-    if (q.result === 'wrong') s.bad++;
-    if (q.result === 'almost') s.almost = (s.almost || 0) + 1;
-    s.last = q.result;
-    words[q.wid] = s;
-  }
-  saveProgress(set, 'words', words);
 }
 
 /** Übersicht: pro Aufgabenart richtig/falsch und die Wörter, die am meisten Mühe machen */

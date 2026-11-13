@@ -353,6 +353,8 @@ const actions = {
   },
 };
 
+Object.assign(actions, classActions); // Klassen und Kinder-Login (js/classes.js)
+
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;
@@ -389,8 +391,14 @@ document.addEventListener('keydown', (e) => {
 
 /* ---------------- Start ---------------- */
 async function importFromHash() {
+  if (await kidLoginFromHash()) return true;
   const m = location.hash.match(/^#v=([A-Za-z0-9_-]+)$/);
   if (!m) return false;
+  if (isKid()) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
+    toast('Du bist mit deinem Kärtchen angemeldet. Hier siehst du die Portionen deiner Lehrperson.');
+    return false;
+  }
   const code = m[1];
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
   try {
@@ -435,6 +443,7 @@ async function checkForUpdate() {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
 
 async function boot() {
+  kidLoadSession(); // Kind angemeldet? Dann dessen Speicher (js/classes.js)
   loadDB();
   renderShell();
   bindTopSearch();
@@ -443,7 +452,8 @@ async function boot() {
   setTimeout(initClaude, 1500);
   if (!(await importFromHash())) render();
   window.addEventListener('hashchange', importFromHash);
-  cloudInit();
+  if (isKid()) kidRefresh().catch(() => { kid.status = 'error'; renderAccountSlot(); });
+  else cloudInit();
   setTimeout(checkForUpdate, 1500);
 }
 boot();

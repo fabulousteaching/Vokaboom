@@ -87,6 +87,8 @@ function setCloudUser(user) {
 }
 function forgetCloudUser() {
   cloud.uid = ''; cloud.user = ''; cloud.status = 'off'; cloud.error = '';
+  if (typeof klass === 'object') Object.assign(klass, { list: [], students: {}, progress: {}, loaded: false, error: '' });
+  if (['classes', 'class'].includes(ui.view)) { ui.view = 'home'; setTimeout(render, 0); }
   cloud.sent = {}; cloud.synced = {}; cloud.deleted = [];
   saveCloudState();
   renderAccountSlot();
@@ -296,7 +298,7 @@ const cloudPushSoon = debounce(async () => {
   }
   if (cloud.again) { cloud.again = false; cloudSync(); }
 }, 2500);
-function onDbSaved() { if (cloud.uid) cloudPushSoon(); }
+function onDbSaved() { if (isKid()) kidPushSoon(); else if (cloud.uid) cloudPushSoon(); }
 
 async function cloudDeleteSet(id) {
   if (!cloud.uid || !cloud.synced[id]) return;
@@ -344,6 +346,7 @@ function cloudErrorText(e) {
 
 /* ---------- Oberfläche ---------- */
 function accountButtonHTML() {
+  if (isKid()) return kidAccountButtonHTML();
   if (cloud.user) {
     const st = cloud.status === 'syncing' ? 'syncing' : cloud.status === 'error' ? 'error' : 'ok';
     const label = st === 'syncing' ? 'wird gespeichert' : st === 'error' ? 'Problem beim Speichern' : 'gespeichert';
@@ -384,6 +387,7 @@ function openLogin(mode = 'login') {
   const prevEmail = $('#auth-email')?.value || '';
   openModal(`
     <header class="modal-head"><h2>${create ? 'Konto erstellen' : 'Anmelden'}</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
+    <button type="button" class="kid-entry" data-action="kid-login"><span class="kid-entry-pics" aria-hidden="true">${[0, 5, 8].map((i) => kidPwImg(i)).join('')}</span><span><strong>Kinder-Login</strong><small>mit deinem Kärtchen</small></span>${icon('right')}</button>
     <div class="seg auth-seg" role="group" aria-label="Anmelden oder Konto erstellen">
       <button type="button" class="seg-btn" data-action="login" data-mode="login" aria-pressed="${!create}">Anmelden</button>
       <button type="button" class="seg-btn" data-action="login" data-mode="create" aria-pressed="${create}">Neues Konto</button>
@@ -487,6 +491,7 @@ function openAccount() {
     </div>
     <p class="muted small">Deine Portionen werden automatisch in deinem Konto gespeichert. Beim Abmelden werden sie von diesem Gerät entfernt – sie bleiben in deinem Konto und sind beim nächsten Anmelden wieder da.</p>
     <div class="row">
+      <button type="button" class="btn primary" data-action="classes">${icon('user')} Klassen & Kinder-Logins</button>
       <button type="button" class="btn secondary" data-action="cloud-sync">${icon('flip')} Jetzt abgleichen</button>
       <button type="button" class="btn ghost" data-action="logout">Abmelden</button>
     </div>
@@ -584,7 +589,7 @@ async function publicSearch(q) {
 
 /** Suchfeld in der Titelleiste (am Handy hinter der Lupe) */
 function searchSlotHTML() {
-  if (!cloudConfigured()) return '';
+  if (!cloudConfigured() || isKid()) return '';
   return `<div class="top-search" id="top-search">
     <button type="button" class="icon-btn search-toggle" data-action="search-open" aria-label="Portionen von anderen suchen" title="Portionen von anderen suchen">${icon('search')}</button>
     <form class="top-search-form" id="pub-form" role="search" autocomplete="off">

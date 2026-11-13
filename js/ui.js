@@ -15,6 +15,7 @@ const ICONS = {
   shuffle: '<path d="M3 7h3c4 0 6 10 10 10h5"/><path d="M3 17h3c1.5 0 2.7-1.4 3.7-3.2M14.3 10.2C15.3 8.4 16.5 7 18 7h3"/><path d="M18 4l3 3-3 3M18 14l3 3-3 3"/>',
   flip: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  down: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   swap: '<path d="M7 4 3 8l4 4M3 8h14M17 12l4 4-4 4M21 16H7"/>',
   grid: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
@@ -81,6 +82,7 @@ function renderCrumbs() {
   const el = $('#crumbs');
   if (!el) return;
   const set = currentSet();
+  if (ui.view === 'classes' || ui.view === 'class') { el.innerHTML = classesCrumbs(); return; }
   if (!set || ui.view === 'home') { el.innerHTML = ''; return; }
   let html = `<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="open-set" data-id="${set.id}">${flag(set.lang)}<span>${esc(set.name)}</span></button>`;
   if (MODE_NAMES[ui.view]) html += `<span class="crumb-sep sep-current" aria-hidden="true">/</span><span class="crumb current">${MODE_NAMES[ui.view]}</span>`;
@@ -90,7 +92,8 @@ function renderCrumbs() {
 function render() {
   const v = $('#view');
   const set = currentSet();
-  if (ui.view !== 'home' && !set) ui.view = 'home';
+  if (!['home', 'classes', 'class'].includes(ui.view) && !set) ui.view = 'home';
+  if (isKid() && ['classes', 'class', 'pics'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
   switch (ui.view) {
     case 'set': v.innerHTML = viewSet(set); break;
@@ -100,6 +103,8 @@ function render() {
     case 'dictation': renderDictation(); break;
     case 'test': renderTest(); break;
     case 'pics': v.innerHTML = viewPics(set); loadReview(set); break;
+    case 'classes': renderClasses(); break;
+    case 'class': renderClass(); break;
     default: v.innerHTML = viewHome(); bindHome();
   }
 }
@@ -217,6 +222,7 @@ function bindBoom() {
 }
 
 function viewHome() {
+  if (isKid()) return kidHomeHTML();
   const d = ui.draft;
   const sets = db.sets;
   return `
@@ -245,7 +251,7 @@ function viewHome() {
       </form>
 
       <aside class="panel library" aria-labelledby="lib-title">
-        <h2 id="lib-title">Meine Vokabelportionen</h2>
+        <div class="lib-head"><h2 id="lib-title">Meine Vokabelportionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
         ${libraryNote()}
         ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>` : '<p class="empty">Noch keine Portion gespeichert. Füge links deine Vokabeln ein – sie bleiben in diesem Browser gespeichert.</p>'}
       </aside>
@@ -273,6 +279,7 @@ function libItem(s) {
 }
 
 function bindHome() {
+  if (!$('#vocab-input')) return; // Kinder-Ansicht
   bindBoom();
   const ta = $('#vocab-input'), name = $('#set-name');
   const update = () => { ui.draft.text = ta.value; renderPreview(); };
@@ -361,17 +368,19 @@ function viewSet(set) {
       <div class="step-actions">${actions}</div>
     </li>`;
   const p = set.progress || {};
+  // Über QR-Code bekommen oder von der Lehrperson freigegeben: nur die Übungen, keine Karten-Ansicht
+  const locked = !!set.shareId || !!set.assigned || isKid();
   return `
-  <section class="set-view">
+  <section class="set-view ${locked ? 'locked' : ''}">
     <header class="set-head">
       <div class="set-title-wrap">
         <p class="eyebrow">${flag()} ${L} · ${set.words.length} Vokabeln</p>
         <h1 class="set-title">${esc(set.name)}</h1>
       </div>
-      <div class="set-tools">
+      ${locked ? '' : `<div class="set-tools">
         <button class="btn ghost" data-action="edit-words">${icon('edit')} Bearbeiten</button>
         <button class="btn ghost" data-action="share">${icon(isFramed ? 'copy' : 'link')} ${isFramed ? 'Liste kopieren' : 'Teilen'}</button>
-      </div>
+      </div>`}
     </header>
 
     <ol class="path" aria-label="Lernweg">
@@ -387,7 +396,7 @@ function viewSet(set) {
         `<button class="btn primary" data-action="mode" data-mode="test">Test starten</button>`, !!p.test, 'pencil2')}
     </ol>
 
-    <section class="deck" aria-labelledby="deck-title">
+    ${locked ? '' : `<section class="deck" aria-labelledby="deck-title">
       <div class="deck-head">
         <h2 id="deck-title">Deine Karten</h2>
         <div class="deck-controls">
@@ -402,7 +411,7 @@ function viewSet(set) {
       <p class="pic-status" id="pic-status">${picStatusText(set)}</p>
       <div class="deck-grid" id="deck-grid">${set.words.map((w) => deckCard(set, w)).join('')}</div>
       <p class="credits" id="credits">${creditsText(set)}</p>
-    </section>
+    </section>`}
   </section>`;
 }
 

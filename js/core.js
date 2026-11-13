@@ -410,7 +410,8 @@ function parseVocab(text, opts = {}) {
 }
 
 /* ---------------- Speicher ---------------- */
-const STORE_KEY = 'vokabelwelt.v1';
+const MAIN_STORE_KEY = 'vokabelwelt.v1';
+let STORE_KEY = MAIN_STORE_KEY; // angemeldetes Kind: eigener Speicherplatz (js/classes.js)
 const DEFAULT_SETTINGS = { sound: true, autoSpeak: true, accent: 'gb', voice: { en: '' }, rate: 0.9, micId: '', phonetic: { on: false, passMin: 60 } };
 let db = { sets: [], settings: structuredClone(DEFAULT_SETTINGS) };
 
