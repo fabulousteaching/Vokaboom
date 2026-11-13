@@ -577,9 +577,21 @@ function stackedPairs(lines, blocks) {
 /** Zeilen ohne Trennzeichen: untereinander (Paare) oder je Zeile geteilt? */
 function pairUp(lines, blocks) {
   if (lines.length < 2) return null;
-  const stacked = stackedPairs(lines, blocks);
+  // Nur wenn fast jede Zeile eindeutig beide Sprachen enthält, sind Wort und Übersetzung auf derselben Zeile.
+  // Sonst gilt immer: untereinander – und dann wird keine Zeile auseinandergenommen (sonst verschiebt sich alles).
   const sameLine = lines.filter(strongSplit).length / lines.length;
-  if (stacked && stacked.fit >= 0.6 && stacked.fit >= sameLine) return stacked.pairs;
+  if (sameLine < 0.8) {
+    const stacked = stackedPairs(lines, blocks);
+    if (stacked && stacked.fit >= 0.5) return stacked.pairs;
+    // Weniger als die Hälfte der Zeilen enthält beide Sprachen: untereinander, der Reihe nach – nichts teilen
+    // (auch bei ungerader Zahl, z. B. wenn eine Übersetzung fehlt)
+    if (sameLine < 0.5) {
+      if (stacked) return stacked.pairs;
+      const out = [];
+      for (let i = 0; i < lines.length; i += 2) out.push([lines[i], lines[i + 1] || '']);
+      return out;
+    }
+  }
   // Gleiche Zeile: wo eindeutig die Sprache wechselt; sonst an der wahrscheinlichsten Stelle (jede Zeile ist ein Paar)
   return lines.map((l) => {
     let [x, y, sc] = bestSplit(l);
@@ -604,19 +616,18 @@ function parseVocab(text, opts = {}) {
   }
   rows = rows.filter((r) => r[0] || r[1]);
 
-  // Einzelne Zeilen ohne Trennzeichen zwischen anderen: selbst teilen („die Katze le chat“)
-  rows = rows.map((r) => {
-    if (r[1] || !/\s/.test((r[0] || '').trim())) return r;
-    const [a, b, sc] = bestSplit(r[0]);
-    return b && sc >= 1.5 ? [a, b] : r;
-  });
-  // Zwei Zeilen ohne Übersetzung hintereinander: untereinander geschriebenes Paar („nager“ / „schwimmen“)
+  // Zwei Zeilen ohne Übersetzung hintereinander: untereinander geschriebenes Paar („nager“ / „schwimmen“) – nicht teilen
   const merged = [];
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i], n = rows[i + 1];
     if (r[0] && !r[1] && n && n[0] && !n[1]) { merged.push([r[0], n[0]]); i++; } else merged.push(r);
   }
-  rows = merged;
+  // Nur eine einzelne Zeile ohne Trennzeichen (zwischen Zeilen mit Strich): selbst teilen („die Katze le chat“)
+  rows = merged.map((r) => {
+    if (r[1] || !/\s/.test((r[0] || '').trim())) return r;
+    const [a, b, sc] = bestSplit(r[0]);
+    return b && sc >= 1.5 ? [a, b] : r;
+  });
 
   // Welche Seite ist Deutsch? Jede Zeile stimmt einzeln ab; unklare Zeilen folgen der Mehrheit.
   const vote = (x) => String(x || '').split(/\s+/).filter(Boolean).reduce((sum, w) => sum + tokVote(w, lang), 0);
