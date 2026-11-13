@@ -989,8 +989,8 @@ const ttsSupported = typeof Worker !== 'undefined' && typeof WebAssembly === 'ob
 const canSpeak = () => ttsSupported || 'speechSynthesis' in window;
 
 /* Gerätestimmen: Spass-Stimmen von Apple u. a. weglassen, gute Stimmen nach vorne */
-const NOVELTY_VOICES = /^(albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|fred|good news|hysterical|jester|junior|kathy|organ|pipe organ|princess|ralph|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
-const GOOD_VOICES = /daniel|kate|serena|arthur|martha|oliver|stephanie|samantha|alex|ava|allison|susan|tom|nathan|evan|zoe|joelle|nicky|libby|ryan|sonia|maisie|aria|guy|jenny|emma|brian|andrew|google/i;
+const NOVELTY_VOICES = /^(samantha|albert|bad news|bahh|bells|boing|bubbles|cellos|deranged|fred|good news|hysterical|jester|junior|kathy|organ|pipe organ|princess|ralph|superstar|trinoids|whisper|wobble|zarvox|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
+const GOOD_VOICES = /daniel|kate|serena|arthur|martha|oliver|stephanie|alex|ava|allison|susan|tom|nathan|evan|zoe|joelle|nicky|libby|ryan|sonia|maisie|aria|guy|jenny|emma|brian|andrew|google/i;
 function voiceRank(v, want) {
   const l = v.lang.toLowerCase().replace('_', '-');
   let r = l === want ? 10 : 0;
