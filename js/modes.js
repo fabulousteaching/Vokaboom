@@ -629,12 +629,12 @@ function speakZone(set, w) {
       </div>`;
   }
   if (s === 'ok' && speakM.ph) {
-    return `<div class="banner good">${icon('check')}<div><strong>Richtig! ${speakM.ph.score} von 100 Punkten.</strong></div></div>
+    return `<div class="banner good">${icon('check')}<div><strong>Richtig!</strong></div></div>
       <div class="row center"><button class="btn primary" data-action="speak-next">Weiter ${icon('right')}</button></div>`;
   }
   if (s === 'bad' && speakM.ph) {
     const r = speakM.ph;
-    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz: ${r.score} von 100 Punkten</strong> (nötig: ${r.passMin}). Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
+    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz.</strong> Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
       <div class="row center">${listenBtns}</div>
       <div class="row center">
         <button class="btn primary" data-action="listen">${icon('mic')} Nochmal sprechen</button>

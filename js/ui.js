@@ -939,7 +939,7 @@ function openSettings() {
       <label class="field" for="set-rate"><span class="label">Sprechtempo</span><input type="range" id="set-rate" min="0.6" max="1.2" step="0.05" value="${s.rate}"></label>
       <div class="row"><button type="button" class="btn small secondary" data-action="voice-test" data-lang="en">${icon('speaker')} Stimme testen</button></div>`
         : '<p class="warn">Dieser Browser kann nicht vorlesen.</p>'}
-      ${isTeacher() ? phoneticSettingsHTML(s) : ''}
+      ${mayEditPoints() ? phoneticSettingsHTML(s) : ''}
       <div class="field"><span class="label">Mikrofon und Spracherkennung</span>
         ${canListen()
           ? `<label class="field" for="mic-device"><span class="small muted">Mikrofon</span>
@@ -1021,7 +1021,7 @@ function phoneticSettingsHTML(s) {
     <span class="label">Aussprechen: Lauterkennung</span>
     <label for="ph-min"><span class="small muted">Ein Wort zählt ab <strong id="ph-min-val">${passMin}</strong> von 100 Punkten</span></label>
     <input type="range" id="ph-min" min="30" max="90" step="5" value="${passMin}">
-    <p class="small muted">Gilt auch für deine Klassen und für Portionen, die du per QR-Code teilst.</p>
+    <p class="small muted">${isTeacher() ? 'Gilt auch für deine Klassen und für Portionen, die du per Link oder QR-Code teilst.' : 'Gilt auch für Portionen, die du per Link oder QR-Code teilst.'} Die Kinder sehen nur „richtig“ oder „noch nicht ganz“.</p>
   </div>`;
 }
 

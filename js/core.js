@@ -49,20 +49,29 @@ const LANGS = {
 const isTeacher = () => typeof cloud === 'object' && !!cloud.uid;
 const ctxSet = () => (typeof currentSet === 'function' ? currentSet() : null);
 const accentNow = () => (isTeacher() ? (db.settings.accent === 'us' ? 'us' : 'gb') : (ctxSet()?.accent === 'us' ? 'us' : 'gb'));
+/** Eigene Portion (selbst erstellt, nicht über Link/QR bekommen, nicht von der Klasse)? */
+const isOwnSet = (s) => !!s && !s.shareId && !s.assigned && !(typeof isKid === 'function' && isKid());
+/** Darf die Punktzahl einstellen: Lehrperson oder wer selbst Portionen erstellt (und per Link teilt) – nicht Kinder */
+const mayEditPoints = () => !(typeof isKid === 'function' && isKid()) && (isTeacher() || db.sets.some(isOwnSet));
 const passMinNow = () => {
   const own = Number(db.settings.phonetic?.passMin) || 60;
-  if (isTeacher()) return own;
-  const v = Number(ctxSet()?.passMin);
+  const set = ctxSet();
+  if (!set ? isTeacher() : isOwnSet(set)) return own;
+  const v = Number(set?.passMin);
   return v >= 30 && v <= 90 ? v : 60;
 };
-/** Einstellungen der Lehrperson in ihre eigenen Portionen schreiben (Kinder bekommen sie so mit). Liefert true bei Änderung. */
+/** Eigene Einstellungen in die eigenen Portionen schreiben (Klassen und Link/QR bekommen sie so mit).
+    Punktzahl: alle, die Portionen erstellen. Akzent: nur angemeldete Lehrperson. Liefert true bei Änderung. */
 function applyTeacherPrefs() {
-  if (!isTeacher()) return false;
+  if (typeof isKid === 'function' && isKid()) return false;
   const accent = db.settings.accent === 'us' ? 'us' : 'gb', passMin = Number(db.settings.phonetic?.passMin) || 60;
   let changed = false;
   for (const s of db.sets) {
-    if (s.shareId || s.assigned) continue;
-    if (s.accent !== accent || s.passMin !== passMin) { s.accent = accent; s.passMin = passMin; s.updated = Date.now(); changed = true; }
+    if (!isOwnSet(s)) continue;
+    let ch = false;
+    if (s.passMin !== passMin) { s.passMin = passMin; ch = true; }
+    if (isTeacher() && s.accent !== accent) { s.accent = accent; ch = true; }
+    if (ch) { s.updated = Date.now(); changed = true; }
   }
   return changed;
 }
@@ -434,7 +443,7 @@ function parseVocab(text, opts = {}) {
 /* ---------------- Speicher ---------------- */
 const MAIN_STORE_KEY = 'vokabelwelt.v1';
 let STORE_KEY = MAIN_STORE_KEY; // angemeldetes Kind: eigener Speicherplatz (js/classes.js)
-const DEFAULT_SETTINGS = { sound: true, autoSpeak: true, accent: 'gb', voiceSex: 'f', rate: 0.9, micId: '', phonetic: { on: false, passMin: 60 } };
+const DEFAULT_SETTINGS = { sound: true, autoSpeak: false, accent: 'gb', voiceSex: 'f', rate: 0.9, micId: '', phonetic: { on: false, passMin: 60 } };
 let db = { sets: [], settings: structuredClone(DEFAULT_SETTINGS) };
 
 function loadDB() {
@@ -445,7 +454,7 @@ function loadDB() {
     db = { ...db, ...d, settings: { ...structuredClone(DEFAULT_SETTINGS), ...(d.settings || {}) } };
     ['speechLevel', 'speechLevelChosen', 'minConf', 'azure'].forEach((k) => delete db.settings[k]); // alte Einstellungen aufräumen
     delete db.settings.voice; // frühere Auswahl der Gerätestimme gibt es nicht mehr
-    db.settings.sound = true; db.settings.autoSpeak = true; // nicht mehr einstellbar: immer an
+    db.settings.sound = true; db.settings.autoSpeak = false; // nicht mehr einstellbar: Klänge immer an, automatisches Vorlesen immer aus
     db.sets = (db.sets || []).filter((s) => s && Array.isArray(s.words));
     db.sets.forEach((s) => {
       s.lang = 'en'; // Vokaboom ist nur noch für Englisch
