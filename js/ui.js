@@ -967,7 +967,6 @@ function openSettings() {
     if (t.id === 'set-sound') s.sound = t.checked;
     if (t.id === 'set-autospeak') s.autoSpeak = t.checked;
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
-    if (t.id === 'device-voice') { s.deviceVoice = t.value; speak('Hello! The apple is red.', 'en'); }
     if (t.id === 'ph-on' || t.id === 'ph-min') {
       s.phonetic = { ...phCfg(), on: $('#ph-on').checked, passMin: parseInt($('#ph-min').value, 10) || 60 };
       if (t.id === 'ph-on' && t.checked && !phState.engine) loadPhoneticEngine().catch(() => {});
@@ -987,14 +986,17 @@ function voiceFieldHTML() {
       </div>
       <p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>`;
   }
-  const list = bestDeviceVoices('en');
-  if (!list.length) return '<span class="label">Stimme</span><p class="small muted">Dieses Gerät hat keine englische Stimme gefunden. Es liest mit der Standardstimme vor.</p>';
-  return `<label class="label" for="device-voice">Stimme</label>
-    <select id="device-voice">
-      <option value="">Automatisch (${esc(list[0].name)})</option>
-      ${list.map((v) => `<option value="${esc(v.name)}" ${s.deviceVoice === v.name ? 'selected' : ''}>${esc(v.name.replace(/\s*\((Natural|Enhanced|Premium)\)/i, ' ★'))}</option>`).join('')}
-    </select>
-    <p class="small muted">Die besten Stimmen dieses Geräts.${typeof cloud === 'object' && cloudConfigured() ? ' Mit Anmeldung gibt es die Vokaboom-Stimmen (überall gleich).' : ''}</p>`;
+  const v = deviceVoice('en');
+  const want = s.voiceSex === 'm' ? 'm' : 'f';
+  const note = !v ? 'Dieses Gerät hat keine englische Stimme gefunden. Es liest mit der Standardstimme vor.'
+    : voiceSexOf(v) && voiceSexOf(v) !== want ? `Auf diesem Gerät gibt es keine passende ${want === 'm' ? 'Männer' : 'Frauen'}stimme. Es liest „${esc(v.name)}“ vor.`
+      : `Beste Stimme dieses Geräts: „${esc(v.name)}“.`;
+  return `<span class="label">Stimme</span>
+    <div class="seg" role="group" aria-label="Stimme">
+      <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${want === 'f'}">Frau</button>
+      <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${want === 'm'}">Mann</button>
+    </div>
+    <p class="small muted">${note}${typeof cloud === 'object' && cloudConfigured() ? ' Mit Anmeldung gibt es die Vokaboom-Stimmen (auf allen Geräten gleich).' : ''}</p>`;
 }
 
 function voiceStatusText() {

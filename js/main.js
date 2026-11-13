@@ -162,8 +162,7 @@ const actions = {
   },
   'set-voice-sex': (el) => {
     db.settings.voiceSex = el.dataset.sex; saveDB();
-    $$('[data-action="set-voice-sex"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sex === db.settings.voiceSex)));
-    const vs = $('#voice-status'); if (vs) vs.innerHTML = voiceStatusText();
+    const vf = $('#voice-field'); if (vf) vf.innerHTML = voiceFieldHTML();
     speak('Hello! The apple is red.', 'en');
     if (currentSet()) audioWarm(currentSet());
   },

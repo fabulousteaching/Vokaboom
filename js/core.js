@@ -983,7 +983,7 @@ function refreshVoices() {
 }
 if ('speechSynthesis' in window) {
   refreshVoices();
-  speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
+  speechSynthesis.addEventListener?.('voiceschanged', () => { refreshVoices(); const vf = document.getElementById('voice-field'); if (vf && typeof voiceFieldHTML === 'function') vf.innerHTML = voiceFieldHTML(); });
 }
 const ttsSupported = typeof Worker !== 'undefined' && typeof WebAssembly === 'object' && !!(window.AudioContext || window.webkitAudioContext);
 const canSpeak = () => ttsSupported || 'speechSynthesis' in window;
@@ -999,22 +999,24 @@ function voiceRank(v, want) {
   if (v.localService) r += 1;
   return r;
 }
-/** Die besten Gerätestimmen für Englisch im gewählten Akzent (höchstens 8) */
+/** Die Gerätestimmen im gewählten Akzent, die besten zuerst */
 function bestDeviceVoices(lang = 'en') {
   const want = (lang === 'de' ? 'de-DE' : langCode(lang)).toLowerCase();
   const base = want.slice(0, 2);
   const all = tts.voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(base) && !NOVELTY_VOICES.test(v.name));
   const exact = all.filter((v) => v.lang.toLowerCase().replace('_', '-') === want);
-  return (exact.length ? exact : all).sort((a, b) => voiceRank(b, want) - voiceRank(a, want)).slice(0, 8);
+  return (exact.length ? exact : all).sort((a, b) => voiceRank(b, want) - voiceRank(a, want));
 }
-/** Gerätestimme: die gewählte, sonst die beste im passenden Akzent */
+/* Frau oder Mann? Browser verraten es nicht – es geht nur über die bekannten Namen. */
+const FEMALE_VOICE = /female|woman|google us english$|kate|serena|stephanie|martha|libby|sonia|maisie|hazel|susan|samantha|ava\b|allison|zoe|nicky|joelle|victoria|aria|jenny|\bana\b|michelle|emma|zira|karen|moira|tessa|fiona|catherine|amy|sara|linda|heather/i;
+const MALE_VOICE = /\bmale\b|daniel|arthur|oliver|ryan|thomas|george|\balex\b|\btom\b|nathan|evan|aaron|\bguy\b|davis|andrew|brian|christopher|eric|roger|steffan|david|mark|james|gordon|\blee\b|rishi|william|noah|tony/i;
+function voiceSexOf(v) { return FEMALE_VOICE.test(v.name) ? 'f' : MALE_VOICE.test(v.name) ? 'm' : ''; }
+/** Gerätestimme: die beste Frauen- bzw. Männerstimme im gewählten Akzent (sonst die beste überhaupt) */
 function deviceVoice(lang) {
   const list = bestDeviceVoices(lang);
-  if (lang !== 'de' && db.settings.deviceVoice) {
-    const chosen = list.find((v) => v.name === db.settings.deviceVoice);
-    if (chosen) return chosen;
-  }
-  return list[0] || null;
+  if (lang === 'de') return list[0] || null;
+  const want = db.settings.voiceSex === 'm' ? 'm' : 'f';
+  return list.find((v) => voiceSexOf(v) === want) || list[0] || null;
 }
 function deviceSpeak(text, lang, slow) {
   if (!('speechSynthesis' in window)) return;
@@ -1291,10 +1293,22 @@ const ttsEl = typeof Audio === 'function' ? new Audio() : null;
 if (ttsEl) { ttsEl.preload = 'auto'; ttsEl.preservesPitch = true; ttsEl.mozPreservesPitch = true; ttsEl.webkitPreservesPitch = true; }
 const SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
 let ttsUnlocked = false;
+/* iPhone/iPad spielen Ton nur, wenn er beim Antippen startet. Beim ersten Antippen werden deshalb das
+   Audio-Element und die Gerätestimme einmal „freigeschaltet“; danach dürfen sie auch etwas später spielen. */
 function unlockTtsEl() {
   if (ttsUnlocked || !ttsEl) return;
   ttsUnlocked = true;
-  try { ttsEl.src = SILENT_WAV; const p = ttsEl.play(); if (p) p.then(() => ttsEl.pause()).catch(() => { ttsUnlocked = false; }); } catch { ttsUnlocked = false; }
+  try {
+    if (ttsEl.paused) {
+      ttsEl.muted = true;
+      ttsEl.src = SILENT_WAV;
+      const p = ttsEl.play();
+      if (p) p.then(() => { if (ttsEl.src === SILENT_WAV) ttsEl.pause(); }).catch(() => {}).finally(() => { if (ttsEl.src === SILENT_WAV) ttsEl.muted = false; });
+    }
+  } catch { /* */ }
+  try {
+    if ('speechSynthesis' in window && !speechSynthesis.speaking) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }
+  } catch { /* */ }
 }
 document.addEventListener('pointerdown', unlockTtsEl, { capture: true });
 document.addEventListener('keydown', unlockTtsEl, { capture: true });
@@ -1302,6 +1316,7 @@ function playClipURL(url, rate) {
   if (!ttsEl) return;
   try {
     ttsEl.pause();
+    ttsEl.muted = false;
     ttsEl.src = url;
     ttsEl.playbackRate = rate;
     ttsEl.defaultPlaybackRate = rate;
@@ -1320,6 +1335,12 @@ function speak(text, lang, { slow = false } = {}) {
   const key = `${voice}|${textHash(t)}`;
   const mem = clipMem.get(key);
   if (mem) { playClipURL(mem.url, rate); return; }
+  if (!audioOwnerFor(voice, textHash(t), set)) {
+    // Keine Aufnahme im Speicher bekannt: sofort die Gerätestimme (noch beim Antippen – wichtig fürs iPhone)
+    deviceSpeak(text, lang, slow);
+    if (mayGenerate(set)) findClip(t, voice, set).then((c) => c || makeClip(t, voice, set, true)).catch(() => {});
+    return;
+  }
   const my = kokoro.playId;
   let fellBack = false;
   // Nicht lange warten lassen: Ist die Aufnahme nicht gleich da, liest die Gerätestimme.
