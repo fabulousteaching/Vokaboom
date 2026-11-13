@@ -1134,10 +1134,69 @@ function nextQuestion() {
     const pct = Math.round((test.points / test.questions.length) * 100);
     const prev = set.progress?.test || {};
     if (!test.onlyIds) saveProgress(set, 'test', { best: Math.max(prev.best ?? 0, pct), last: pct, date: Date.now() });
+    recordWordResults(set, test.questions);
     sfx.win();
     if (pct >= 80) confetti();
   }
   renderTest();
+}
+
+/** Merkt sich pro Wort, wie oft es im Test richtig, fast richtig oder falsch war (für „Schwierige Wörter“). */
+function recordWordResults(set, questions) {
+  const words = { ...(set.progress?.words || {}) };
+  for (const q of questions) {
+    if (!q.result) continue;
+    const s = { ...(words[q.wid] || { n: 0, bad: 0, almost: 0 }) };
+    s.n++;
+    if (q.result === 'wrong') s.bad++;
+    if (q.result === 'almost') s.almost = (s.almost || 0) + 1;
+    s.last = q.result;
+    words[q.wid] = s;
+  }
+  saveProgress(set, 'words', words);
+}
+
+/** Übersicht: pro Aufgabenart richtig/falsch und die Wörter, die am meisten Mühe machen */
+function testSummaryHTML(set) {
+  const byType = {};
+  for (const q of test.questions) {
+    const t = (byType[q.type] = byType[q.type] || { n: 0, ok: 0, almost: 0, bad: 0 });
+    t.n++;
+    if (q.result === 'correct') t.ok++; else if (q.result === 'almost') t.almost++; else t.bad++;
+  }
+  const types = Object.keys(TEST_TYPES).filter((k) => byType[k]);
+  const hist = set.progress?.words || {};
+  const hard = test.questions.filter((q) => q.result !== 'correct')
+    .map((q) => ({ q, w: set.words.find((x) => x.id === q.wid), h: hist[q.wid] || { n: 1, bad: 0 } }))
+    .filter((x) => x.w)
+    .sort((a, b) => (a.q.result === 'wrong' ? 0 : 1) - (b.q.result === 'wrong' ? 0 : 1) || (b.h.bad / b.h.n) - (a.h.bad / a.h.n) || b.h.bad - a.h.bad);
+  const typeRows = types.map((k) => {
+    const t = byType[k];
+    const pct = (x) => (100 * x / t.n).toFixed(1);
+    return `<li class="ts-row">
+      <span class="ts-name">${icon(TEST_TYPES[k].icon)} ${TEST_TYPES[k].label}</span>
+      <span class="ts-bar" aria-hidden="true"><i class="ok" style="width:${pct(t.ok)}%"></i><i class="almost" style="width:${pct(t.almost)}%"></i><i class="bad" style="width:${pct(t.bad)}%"></i></span>
+      <span class="ts-num"><b>${t.ok}</b> von ${t.n} richtig${t.bad ? `, <span class="bad-t">${t.bad} falsch</span>` : ''}${t.almost ? `, ${t.almost} fast` : ''}</span>
+    </li>`;
+  }).join('');
+  const hardRows = hard.slice(0, 10).map(({ q, w, h }) => `<li class="hw ${q.result}">
+      <span class="hw-word"><strong lang="${set.lang}">${esc(w.foreign)}</strong>${w.german ? ` <span class="muted" lang="de">${esc(w.german)}</span>` : ''}</span>
+      <span class="hw-tag">${q.result === 'almost' ? 'fast richtig' : 'falsch'}${h.bad > 1 ? ` · schon ${h.bad}× falsch` : ''}</span>
+    </li>`).join('');
+  return `<div class="test-summary">
+    <h3>Übersicht</h3>
+    <ul class="ts-list">${typeRows}</ul>
+    ${hard.length ? `<h3>Diese Wörter machen dir am meisten Mühe</h3>
+      <ul class="hw-list">${hardRows}</ul>
+      ${hard.length > 10 ? `<p class="muted small">… und ${hard.length - 10} weitere.</p>` : ''}
+      <p class="label">Gleich nochmal üben:</p>
+      <div class="row center wrap practice-row">
+        <button class="btn primary" data-action="test-retry-wrong">${icon('pencil2')} Nochmal testen</button>
+        <button class="btn secondary" data-action="test-practice" data-mode="cards">${icon('stack')} Lernkarten</button>
+        <button class="btn secondary" data-action="test-practice" data-mode="dictation">${icon('speaker')} Hören & Schreiben</button>
+        ${canListen() ? `<button class="btn secondary" data-action="test-practice" data-mode="speak">${icon('mic')} Aussprechen</button>` : ''}
+      </div>` : '<p class="lead">Alles richtig – keine schwierigen Wörter. 🎉</p>'}
+  </div>`;
 }
 
 function renderTestResult(set) {
@@ -1158,11 +1217,11 @@ function renderTestResult(set) {
       </div>
       <h2>${msg}</h2>
       <p class="result-line">${fmtPoints(test.points)} von ${total} Punkten. Fast richtige Antworten zählen einen halben Punkt.</p>
+      ${testSummaryHTML(set)}
       <div class="row center">
-        ${wrongIds.length ? `<button class="btn primary" data-action="test-retry-wrong">${icon('pencil2')} Nur die Fehler nochmal</button>
-          <button class="btn secondary" data-action="cards-from-test">${icon('stack')} Fehler als Lernkarten</button>` : ''}
-        <button class="btn ${wrongIds.length ? 'ghost' : 'primary'}" data-action="test-restart">${icon('shuffle')} Neuer Test</button>
+        <button class="btn ${wrongIds.length ? 'ghost' : 'primary'}" data-action="test-restart">${icon('shuffle')} Neuer Test mit allen Wörtern</button>
       </div>
+      <h3 class="review-title">Alle Antworten</h3>
       <ol class="review">
         ${test.questions.map((q) => {
           const w = set.words.find((x) => x.id === q.wid);

@@ -714,6 +714,24 @@ input:focus, textarea:focus, select:focus { border-color: var(--brand); outline:
 .ring-fg.good { stroke: var(--green); } .ring-fg.mid { stroke: var(--amber); } .ring-fg.low { stroke: var(--red); }
 .score-num { position: absolute; inset: 0; display: grid; grid-auto-flow: column; justify-content: center; align-items: center; font-family: var(--font-display); font-weight: 800; font-size: 2.7rem; font-variant-numeric: tabular-nums; }
 .score-num small { font-size: .5em; margin-left: .1em; }
+.test-summary { width: 100%; max-width: 40rem; display: grid; gap: .7rem; text-align: left; }
+.test-summary h3, .review-title { font-family: var(--font-display); font-size: 1.15rem; margin: .4rem 0 0; }
+.review-title { width: 100%; max-width: 40rem; text-align: left; }
+.ts-list, .hw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ts-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "name num" "bar bar"; gap: 6px .8rem; padding: .6rem .8rem; border-radius: 14px; background: var(--paper-2); border: 1px solid var(--line); }
+.ts-name { grid-area: name; display: flex; align-items: center; gap: .4rem; font-weight: 600; }
+.ts-num { grid-area: num; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ts-num .bad-t { color: var(--red); font-weight: 600; }
+.ts-bar { grid-area: bar; display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--sunken); }
+.ts-bar i { display: block; height: 100%; }
+.ts-bar i.ok { background: var(--green); }
+.ts-bar i.almost { background: var(--orange); }
+.ts-bar i.bad { background: var(--red); }
+.hw { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .3rem .8rem; padding: .55rem .8rem; border-radius: 14px; background: var(--red-wash); border-left: 5px solid var(--red); }
+.hw.almost { background: var(--orange-wash); border-left-color: var(--orange); }
+.hw-word { font-family: var(--font-word); font-size: 1.1rem; overflow-wrap: anywhere; }
+.hw-tag { font-size: .85rem; color: var(--ink-2); }
+.practice-row { gap: .5rem; }
 .review { list-style: none; margin: .6rem 0 0; padding: 0; width: 100%; max-width: 40rem; display: grid; gap: 6px; text-align: left; }
 .rv { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1.3fr); align-items: center; gap: .8rem; padding: .5rem .75rem; border-radius: 14px; background: var(--paper-2); border: 1px solid var(--line); }
 .rv-status { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; }

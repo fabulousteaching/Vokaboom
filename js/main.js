@@ -343,6 +343,10 @@ const actions = {
     test.idx = 0; test.points = 0; test.phase = 'q';
     renderTest();
   },
+  'test-practice': (el) => {
+    const ids = [...new Set(test.questions.filter((q) => q.result !== 'correct').map((q) => q.wid))];
+    startMode(el.dataset.mode, { ids });
+  },
   'cards-from-test': () => {
     const ids = [...new Set(test.questions.filter((q) => q.result !== 'correct').map((q) => q.wid))];
     startMode('cards', { ids });
