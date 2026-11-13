@@ -252,7 +252,7 @@ function viewHome() {
           <span class="label">Vokabeln</span>
           <textarea id="vocab-input" rows="9" spellcheck="false" placeholder="${ph[1]}">${esc(d.text)}</textarea>
         </label>
-        <p class="hint">Eine Vokabel pro Zeile, zum Beispiel ${ph[2]}. Tabellen aus Word, Excel oder dem Schulbuch kannst du direkt hineinkopieren.</p>
+        <p class="hint">Eine Vokabel pro Zeile, zum Beispiel ${ph[2]}. Es geht auch ohne Strich: beide Wörter einfach auf derselben Zeile oder untereinander. Tabellen aus Word, Excel oder dem Schulbuch kannst du direkt hineinkopieren.</p>
         <div id="parse-preview" class="parse-preview"></div>
         <button class="btn primary big" type="submit" data-action="create-set">${icon('stack')} Karten erstellen</button>
       </form>
@@ -303,7 +303,7 @@ function renderPreview() {
   const box = $('#parse-preview');
   if (!box) return;
   const d = ui.draft;
-  const res = parseVocab(d.text, { swap: d.swap });
+  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang() });
   if (!res.rows.length) { box.innerHTML = ''; return; }
   const lang = homeLang(), L = LANGS[lang].name;
   const missing = res.rows.filter((r) => !r.foreign || !r.german).length;
@@ -325,7 +325,7 @@ function createSetFromDraft() {
   const ta = $('#vocab-input'), nm = $('#set-name');
   if (ta) d.text = ta.value;
   if (nm) d.name = nm.value;
-  const res = parseVocab(d.text, { swap: d.swap });
+  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang() });
   const rows = res.rows.filter((r) => r.foreign);
   if (!rows.length) {
     toast('Füge zuerst ein paar Vokabeln ein – eine pro Zeile.', 'bad');
@@ -1003,7 +1003,7 @@ function voiceStatusText() {
 /** Zeile in der Portion: Wie viele Aufnahmen sind schon gespeichert? (nur bei eigenen Portionen) */
 function voicePrepHTML(set) {
   if (!set || !mayGenerate(set)) return '';
-  const vname = VOICE_NAMES[kokoroVoice()] || '';
+  const vname = VOICE_NAMES[kokoroVoice(set)] || '';
   if (!teacherIn()) {
     // Ohne Anmeldung: nur die gewählte Stimme, nur auf diesem Gerät – kurze, ruhige Zeile
     const { done, total } = audioCounts(set);

@@ -112,7 +112,7 @@ Vokaboom liest mit zwei Frauenstimmen vor: britisch Emma und amerikanisch Heart 
 
 Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder Reiter hat seine eigenen Portionen; neue Portionen bekommen die Sprache des gewählten Reiters. Kinder sehen alle freigegebenen Portionen mit Flagge.
 
-- Französisch liest vorerst die beste französische Stimme des Geräts vor (z. B. Audrey/Amélie/Thomas auf iPhone/iPad, Denise/Henri unter Windows).
+- Französisch liest die Vokaboom-Stimme **Siwis** vor (Kokoro, Apache-2.0). Die Aufnahmen entstehen wie bei Englisch einmal auf dem Gerät der Lehrperson und kommen in den Audio-Speicher. Dafür lädt dieses Gerät zusätzlich die französische Lautschrift (eSpeak NG, ca. 6 MB, GPL-3.0, wird nur nachgeladen). Bis eine Aufnahme da ist, liest die beste französische Gerätestimme.
 - Beim Schreiben gehört der Artikel dazu: „chien“ statt „le chien“ ist fast richtig (Hinweis auf den Artikel), „la chien“ ist falsch.
 - Die Lauterkennung gibt es nur für Englisch; Französisch prüft die Spracherkennung des Browsers.
 - Damit die Suche weiss, welche Sprache eine Portion hat, `supabase/vokabelwelt.sql` nochmals ganz ausführen (neue Spalte `lang`).

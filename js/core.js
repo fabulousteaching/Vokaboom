@@ -447,12 +447,122 @@ function langScore(text) {
     en: (text.match(new RegExp(EN_HINT, 'gi')) || []).length };
 }
 
+/* ---------- Ohne Trennzeichen: Wo wechselt die Sprache? ----------
+   „the dog der Hund“ (gleiche Zeile) oder „apple“ / „Apfel“ (untereinander). Punkte für typisch Deutsches
+   (der/die/das, grosses Nomen, ä/ö/ü/ß, bekannte deutsche Wörter) und typisch Fremdsprachiges. */
+const DE_ART_START = /^(der|die|das|den|dem|des|ein|eine|einen|einem|einer|sich)\s+\S/i;
+const FO_ART_START = { en: /^(the|a|an|to)\s+\S/i, fr: /^((le|la|les|un|une|des|du|de la|se)\s+\S|(l|d|s)['’]\S)/i };
+function deScore(x) {
+  const s = x.trim();
+  if (!s) return -5;
+  let v = 0;
+  if (DE_ART_START.test(s)) v += 3;
+  const core0 = stripArticle(s, 'de');
+  if (/^[A-ZÄÖÜ]/.test(core0)) v += DE_ART_START.test(s) ? 2 : 1.5;
+  if (/[äöüß]/i.test(s)) v += 2;
+  v += (s.match(new RegExp(DE_HINT, 'gi')) || []).length * 0.5;
+  const low = core0.toLowerCase();
+  if (PICTURES.maps.de.has(low) || PICTURES.maps.deExact.has(core0)) v += 2;
+  if (/^[a-zäöü]+en$/.test(low) && !/\s/.test(core0)) v += 0.5; // Verben: schwimmen
+  return v;
+}
+function foScore(x, lang) {
+  const s = x.trim();
+  if (!s) return -5;
+  let v = 0;
+  if (FO_ART_START[lang]?.test(s)) v += 3;
+  if (lang === 'fr' && /[éèêëàâçîïôûùœ]/i.test(s)) v += 2;
+  if (lang === 'en') {
+    v += (s.match(new RegExp(EN_HINT, 'gi')) || []).length * 0.5;
+    if (PICTURES.maps.en.has(stripArticle(s, 'en').toLowerCase())) v += 2;
+  }
+  if (/[äöüß]/i.test(s)) v -= 2;
+  if (/^[a-zà-ÿ]/.test(s)) v += 0.5;
+  return v;
+}
+/* Jedes Wort stimmt ab: eher deutsch (+) oder eher Fremdsprache (−) */
+const DE_WORDS = new Set('der die das den dem des ein eine einen einem einer sich und oder nicht mit von zu im in am auf aus bei für ist sind bin bist war haben hat habe sein mein meine meinen dein deine sein seine ihr ihre unser unsere euer eure ich du er sie es wir man gehen geht machen spielen kein keine sehr viel wie was wer wo wann warum danke bitte ja nein gut gross groß klein'.split(' '));
+const FO_WORDS = {
+  en: new Set('the a an to of and or not with from in on at for is are am was be have has i you he she it we they my your his her our their me go goes do does play very much how what who where when why thank thanks please yes no good big small'.split(' ')),
+  fr: new Set('le la les un une des du de et ou ne pas avec pour dans sur est sont suis es être avoir a ai je tu il elle nous vous ils elles mon ma mes ton ta tes son sa ses notre votre leur aller va faire jouer très beaucoup comment quoi qui où quand pourquoi merci oui non bon grand petit'.split(' ')),
+};
+function tokVote(w, lang) {
+  const raw = w.replace(/^[«"„“(]+|[»"“”).,!?;:]+$/g, '');
+  const low = raw.toLowerCase();
+  if (!low) return 0;
+  let v = 0;
+  if (DE_WORDS.has(low)) v += 2;
+  if (FO_WORDS[lang]?.has(low)) v -= 2;
+  if (/[äöüß]/i.test(raw)) v += 2;
+  if (lang === 'fr' && /[éèêëàâçîïôûùœ]/i.test(raw)) v -= 2;
+  if (lang === 'fr' && /^(l|d|s|j|qu|n|m|t|c)['’]/i.test(raw)) v -= 2;
+  if (PICTURES.maps.de.has(low) || PICTURES.maps.deExact.has(raw)) v += 1.5;
+  if (lang === 'en' && PICTURES.maps.en.has(low)) v -= 1.5;
+  if (/^[A-ZÄÖÜ][a-zäöüß]/.test(raw)) v += 1; // deutsche Nomen gross
+  if (/(ung|heit|keit|lich|chen|isch|ieren)$/.test(low)) v += 1;
+  else if (/[a-zäöü]en$/.test(low) && lang === 'en') v += 0.4;
+  if (lang === 'en' && /(ing|tion|ly|ous|ness|ful)$/.test(low)) v -= 1;
+  return v;
+}
+/** Bester Schnitt einer Zeile ohne Trennzeichen: [links, rechts, Punkte] */
+function bestSplit(line, lang) {
+  const t = line.split(/\s+/).filter(Boolean);
+  if (t.length < 2) return [line, '', -Infinity];
+  const votes = t.map((w, i) => tokVote(w, lang) - (i === 0 && /^[A-Z]/.test(w) ? 1 : 0)); // Satzanfang gross zählt nicht
+  let best = null;
+  for (let k = 1; k < t.length; k++) {
+    // Ein Artikel gehört zum Wort danach: nie direkt nach „der“, „the“, „la“ … schneiden
+    if (/^(der|die|das|den|dem|des|ein|eine|einen|mein|meine|the|a|an|to|my|le|la|les|un|une|des|du|se|mon|ma|mes)$/i.test(t[k - 1])) continue;
+    const left = votes.slice(0, k).reduce((x, y) => x + y, 0), right = votes.slice(k).reduce((x, y) => x + y, 0);
+    const startsDe = /^[A-ZÄÖÜ]/.test(t[k]) || DE_ART_START.test(t.slice(k).join(' ')); // Schnitt vor deutschem Nomen/Artikel bevorzugen
+    const sc = Math.abs(right - left) + (startsDe && right > left ? 0.6 : 0) - Math.abs(k - t.length / 2) * 0.05;
+    if (!best || sc > best[2]) best = [t.slice(0, k).join(' '), t.slice(k).join(' '), sc];
+  }
+  return best || [line, '', -Infinity];
+}
+/** Zeilen ohne Trennzeichen: als Paare untereinander oder je Zeile geteilt? */
+function pairUp(lines, blocks, lang) {
+  if (lines.length < 2) return null;
+  const single = lines.filter((l) => !/\s/.test(l.trim())).length;
+  const pairsOk = lines.length % 2 === 0;
+  const twoBlocks = blocks.length >= 2 && blocks.every((b) => b.length === 2);
+  let usePairs = false;
+  if (twoBlocks) usePairs = true;
+  else if (pairsOk) {
+    if (single / lines.length >= 0.5) usePairs = true;
+    else {
+      let o1 = 0, o2 = 0;
+      for (let i = 0; i < lines.length; i += 2) {
+        const a = lines[i], b = lines[i + 1];
+        o1 += deScore(b) + foScore(a, lang); o2 += deScore(a) + foScore(b, lang);
+      }
+      const pairAvg = Math.max(o1, o2) / (lines.length / 2);
+      const splitAvg = lines.reduce((s, l) => s + Math.max(0, bestSplit(l, lang)[2]), 0) / lines.length;
+      usePairs = pairAvg > splitAvg + 1;
+    }
+  }
+  if (usePairs && (pairsOk || twoBlocks)) {
+    const out = [];
+    for (let i = 0; i + 1 < lines.length; i += 2) out.push([lines[i], lines[i + 1]]);
+    return out;
+  }
+  return lines.map((l) => { const [a, b] = bestSplit(l, lang); return b ? [a, b] : [l, '']; });
+}
+
 /** Liefert { rows: [{foreign, german}], germanFirst } */
 function parseVocab(text, opts = {}) {
-  const raw = String(text || '').split(/\r?\n/)
-    .map((l) => l.replace(/^\s*(?:\d+\s*[.)]|[-•*·▪●◦–])\s+/, '').trim())
-    .filter((l) => l && !/^[-–—_=\s]+$/.test(l));
+  const lang = opts.lang === 'fr' ? 'fr' : 'en';
+  const clean = (l) => l.replace(/^\s*(?:\d+\s*[.)]|[-•*·▪●◦–])\s+/, '').trim();
+  const isJunk = (l) => !l || /^[-–—_=\s]+$/.test(l);
+  // Blöcke (durch Leerzeilen getrennt) – „apple / Apfel“ mit Leerzeile dazwischen
+  const blocks = String(text || '').split(/\r?\n\s*\r?\n/).map((b) => b.split(/\r?\n/).map(clean).filter((l) => !isJunk(l))).filter((b) => b.length);
+  const raw = blocks.flat();
   let rows = raw.map((l) => splitLine(l).map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
+  // Keine Trennzeichen (bei den meisten Zeilen): gleiche Zeile teilen oder Zeilenpaare bilden
+  const noSep = rows.filter((r) => r[0] && !r[1]).length;
+  if (noSep >= 2 && noSep >= rows.length * 0.6 && noSep === rows.length) {
+    rows = pairUp(raw, blocks, lang).map((r) => r.map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
+  }
   rows = rows.filter((r) => r[0] || r[1]);
 
   // Welche Spalte ist Deutsch?
@@ -1042,8 +1152,8 @@ function fileToDataURL(file, max = 520) {
    Englisch liest Kokoro vor (zwei Frauenstimmen: britisch Emma, amerikanisch Heart; js/tts-worker.js).
    Solange Kokoro noch lädt oder auf alten Geräten nicht läuft, springt die Stimme des Geräts ein.
    Deutsch (selten gebraucht) liest immer die Gerätestimme. */
-const KOKORO_VOICES = { gb: 'bf_emma', us: 'af_heart' };
-const VOICE_NAMES = { bf_emma: 'Emma', bm_george: 'George', af_heart: 'Heart', am_michael: 'Michael' };
+const KOKORO_VOICES = { gb: 'bf_emma', us: 'af_heart', fr: 'ff_siwis' };
+const VOICE_NAMES = { bf_emma: 'Emma', bm_george: 'George', af_heart: 'Heart', am_michael: 'Michael', ff_siwis: 'Siwis' };
 const tts = { voices: [] };
 function refreshVoices() {
   if (!('speechSynthesis' in window)) return;
@@ -1105,7 +1215,7 @@ function deviceSpeak(text, lang, slow) {
    Supabase-Speicher (Bucket „vokaboom-audio“, Ordner = Konto der Lehrperson) und auf dem Gerät in die
    IndexedDB. In der Portion steht, welche Aufnahmen es gibt (set.audio = { o: Konto, h: { Stimme: { Kennung: 1 } } }).
    Kinder-Geräte laden kein Modell: Sie spielen die fertigen Dateien ab; fehlt eine, liest die Gerätestimme. */
-const ALL_VOICES = ['bf_emma', 'af_heart'];
+const ALL_VOICES = ['bf_emma', 'af_heart', 'ff_siwis'];
 const AUDIO_BUCKET = 'vokaboom-audio';
 /** Kurze Kennung eines Textes (für Dateinamen) */
 function textHash(t) {
@@ -1156,7 +1266,9 @@ function wavBlob(f32, sr) {
 }
 
 const kokoro = { worker: null, state: 'idle', progress: 0, queue: [], busy: null, seq: 0, playId: 0, listeners: new Set() };
-const kokoroVoice = () => KOKORO_VOICES[accentNow()];
+/** Stimme für eine Sprache: Französisch Siwis, Englisch je nach Akzent Emma oder Heart */
+const kokoroVoiceFor = (lang) => (lang === 'fr' ? KOKORO_VOICES.fr : KOKORO_VOICES[accentNow()]);
+const kokoroVoice = (set = ctxSet()) => kokoroVoiceFor(langOf(set));
 function kokoroNotify() { kokoro.listeners.forEach((fn) => { try { fn(); } catch { /* */ } }); }
 const kidDevice = () => typeof isKid === 'function' && isKid();
 const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
@@ -1165,9 +1277,9 @@ const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
    - angemeldete Lehrperson und Kinder mit Klassen-Login: immer (gespeicherte Aufnahmen)
    - über QR-Code geteilte Portion einer Lehrperson: deren gespeicherte Aufnahmen
    - alle anderen: sobald die Stimmen im Hintergrund geladen sind (Aufnahmen entstehen dann auf dem Gerät) */
-const useKokoro = (set) => ttsSupported && !!ttsEl && langOf(set) === 'en' && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
+const useKokoro = (set) => ttsSupported && !!ttsEl && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
 /** Darf dieses Gerät Aufnahmen selbst erzeugen? Nur angemeldete Lehrperson, nur eigene Portionen. */
-const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned) && langOf(set) === 'en'
+const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned)
   && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready');
 const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
@@ -1187,6 +1299,7 @@ function kokoroStart() {
       kokoro.state = 'ready'; kokoro.progress = 1; bgLoadMark(0); kokoroNotify(); kokoroPump();
       const cur = typeof currentSet === 'function' ? currentSet() : null;
       if (cur && !teacherIn()) audioForSet(cur);
+      setTimeout(() => kokoro.worker?.postMessage({ type: 'preload-fr' }), 4000); // französische Lautschrift (~6 MB) gleich mitladen
     }
     else if (m.type === 'audio' && kokoro.busy && kokoro.busy.id === m.id) {
       const job = kokoro.busy; kokoro.busy = null;
@@ -1348,11 +1461,11 @@ function markClip(set, voice, h) {
 
 /* Im Hintergrund alle Wörter einer eigenen Portion mit beiden Stimmen vorbereiten */
 const prep = { running: new Set(), note: '' };
-function setTexts(set) { return [...new Set(set.words.slice(0, 150).map((w) => ttsText(String(w.foreign || ''), 'en')).filter(Boolean))]; }
+function setTexts(set) { return [...new Set(set.words.slice(0, 150).map((w) => ttsText(String(w.foreign || ''), langOf(set))).filter(Boolean))]; }
 /** Welche Stimmen werden vorbereitet? Lehrperson alle vier (für die Kinder), sonst nur die gewählte. */
-const prepVoices = () => [kokoroVoice()]; // nur die Stimme des gewählten Akzents – spart Daten
+const prepVoices = (set) => [kokoroVoice(set)]; // nur die Stimme der Sprache bzw. des gewählten Akzents – spart Daten
 function audioCounts(set) {
-  const texts = setTexts(set), voices = prepVoices();
+  const texts = setTexts(set), voices = prepVoices(set);
   const total = texts.length * voices.length;
   let done = 0;
   for (const v of voices) for (const t of texts) if (set.audio?.h?.[v]?.[textHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${textHash(t)}`))) done++;
@@ -1363,7 +1476,7 @@ async function audioPrepare(set) {
   prep.running.add(set.id);
   try {
     const texts = setTexts(set);
-    const voices = prepVoices();
+    const voices = prepVoices(set);
     for (const v of voices) {
       for (const t of texts) {
         if (!getSet(set.id) || kokoro.state === 'failed') return;
@@ -1380,7 +1493,7 @@ async function audioPrepare(set) {
 /** Aufnahmen der aktuellen Stimme schon laden (Kinder-Geräte und alle anderen), damit sie sofort kommen */
 async function audioWarm(set) {
   if (!set || !useKokoro(set)) return;
-  const v = kokoroVoice();
+  const v = kokoroVoice(set);
   const texts = setTexts(set);
   for (let i = 0; i < texts.length; i += 4) await Promise.all(texts.slice(i, i + 4).map((t) => findClip(t, v, set).catch(() => null)));
 }
@@ -1430,8 +1543,8 @@ function speak(text, lang, { slow = false } = {}) {
   stopSpeaking();
   if (!text) return;
   const set = typeof currentSet === 'function' ? currentSet() : null;
-  if (lang !== 'en' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
-  const t = ttsText(text, lang), voice = kokoroVoice();
+  if (lang === 'de' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
+  const t = ttsText(text, lang), voice = kokoroVoiceFor(lang);
   const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
   const key = `${voice}|${textHash(t)}`;
   const mem = clipMem.get(key);
