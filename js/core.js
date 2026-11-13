@@ -470,12 +470,10 @@ function foScore(x, lang) {
   const s = x.trim();
   if (!s) return -5;
   let v = 0;
-  if (FO_ART_START[lang]?.test(s)) v += 3;
-  if (lang === 'fr' && /[éèêëàâçîïôûùœ]/i.test(s)) v += 2;
-  if (lang === 'en') {
-    v += (s.match(new RegExp(EN_HINT, 'gi')) || []).length * 0.5;
-    if (PICTURES.maps.en.has(stripArticle(s, 'en').toLowerCase())) v += 2;
-  }
+  if (FO_ART_START.en.test(s) || FO_ART_START.fr.test(s)) v += 3;
+  if (/[éèêëàâçîïôûùœ]/i.test(s)) v += 2;
+  v += (s.match(new RegExp(EN_HINT, 'gi')) || []).length * 0.5;
+  if (PICTURES.maps.en.has(stripArticle(s, 'en').toLowerCase())) v += 2;
   if (/[äöüß]/i.test(s)) v -= 2;
   if (/^[a-zà-ÿ]/.test(s)) v += 0.5;
   return v;
@@ -486,28 +484,28 @@ const FO_WORDS = {
   en: new Set('the a an to of and or not with from in on at for is are am was be have has i you he she it we they my your his her our their me go goes do does play very much how what who where when why thank thanks please yes no good big small'.split(' ')),
   fr: new Set('le la les un une des du de et ou ne pas avec pour dans sur est sont suis es être avoir a ai je tu il elle nous vous ils elles mon ma mes ton ta tes son sa ses notre votre leur aller va faire jouer très beaucoup comment quoi qui où quand pourquoi merci oui non bon bonne grand grande petit petite bonjour salut bonsoir rouge bleu vert jaune noir blanc'.split(' ')),
 };
-function tokVote(w, lang) {
-  const raw = w.replace(/^[«"„“(]+|[»"“”).,!?;:]+$/g, '');
+/* Unabhängig vom gewählten Reiter: Deutsch gegen Fremdsprache (Englisch oder Französisch).
+   So klappt es auch, wenn französische Wörter im Reiter „Englisch“ eingefügt werden. */
+const isFoWord = (low) => FO_WORDS.en.has(low) || FO_WORDS.fr.has(low);
+function tokVote(w) {
+  const raw = w.replace(/^[«"„“(]+|[»"“”).,!?;:…]+$/g, '');
   const low = raw.toLowerCase();
   if (!low) return 0;
   let v = 0;
   if (DE_WORDS.has(low)) v += 2;
-  if (FO_WORDS[lang]?.has(low)) v -= 2;
+  if (isFoWord(low)) v -= 2;
   if (/[äöüß]/i.test(raw)) v += 2;
-  if (lang === 'fr' && /[éèêëàâçîïôûùœ]/i.test(raw)) v -= 2;
-  if (lang === 'fr' && /^(l|d|s|j|qu|n|m|t|c)['’]/i.test(raw)) v -= 2;
+  if (/[éèêëàâçîïôûùœ]/i.test(raw)) v -= 2;
+  if (/^(l|d|s|j|qu|n|m|t|c)['’]\p{L}/iu.test(raw)) v -= 2; // l'école, j'ai
   if (PICTURES.maps.de.has(low) || PICTURES.maps.deExact.has(raw)) v += 1.5;
-  if (lang === 'en' && PICTURES.maps.en.has(low)) v -= 1.5;
+  if (PICTURES.maps.en.has(low)) v -= 1.5;
   if (/^[A-ZÄÖÜ][a-zäöüß]/.test(raw)) v += 1; // deutsche Nomen gross
   if (/(ung|heit|keit|lich|chen|isch|ieren)$/.test(low)) v += 1;
-  else if (/[a-zäöü]en$/.test(low) && lang === 'en') v += 0.4;
-  if (lang === 'en' && /(ing|tion|ly|ous|ness|ful)$/.test(low)) v -= 1;
-  if (lang === 'fr') {
-    if (/[a-zäöü]en$/.test(low)) v += 0.6; // essen, schwimmen
-    // manger, finir, prendre, voir – deutsche Wörter auf -er (Wasser, teuer) nicht: gross geschrieben oder im Bilder-Wörterbuch
-    if (/(ir|oir|re)$/.test(low) || (/er$/.test(low) && !/^[A-ZÄÖÜ]/.test(raw) && !PICTURES.maps.de.has(low) && !DE_WORDS.has(low))) v -= 0.6;
-    if (/(tion|ment|eau|eux|euse|oire|ette|ais|ait)$/.test(low)) v -= 1;
-  }
+  else if (/[a-zäöü]en$/.test(low)) v += 0.5; // essen, schwimmen
+  if (/(ing|tion|ly|ous|ness|ful)$/.test(low)) v -= 1;
+  // manger, finir, prendre, voir – deutsche Wörter auf -er (Wasser, teuer) nicht: gross geschrieben oder im Bilder-Wörterbuch
+  if (/(ir|oir|re)$/.test(low) || (/er$/.test(low) && !/^[A-ZÄÖÜ]/.test(raw) && !PICTURES.maps.de.has(low) && !DE_WORDS.has(low))) v -= 0.6;
+  if (/(ment|eau|eux|euse|oire|ette|ais|ait)$/.test(low)) v -= 1;
   return v;
 }
 /** Welche Fremdsprache steckt in den Wörtern? 'fr', 'en' oder '' (unklar) */
