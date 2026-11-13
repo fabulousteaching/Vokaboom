@@ -582,24 +582,14 @@ function stackedPairs(lines, blocks) {
     const base = prev || next;
     cls[i] = !base ? (i % 2 ? 'de' : 'fo') : columnLike ? base : (base === 'de' ? 'fo' : 'de');
   }
-  // Gleiche Sprache hintereinander = ein Abschnitt (z. B. eine Tabellenzelle mit zwei Zeilen: „er heisst“ / „sie heisst“)
+  // Gleiche Sprache hintereinander = ein Abschnitt (nur um spaltenweise kopierte Listen zu erkennen)
   const segs = [];
   lines.forEach((l, i) => { const last = segs[segs.length - 1]; if (last && last.cls === cls[i]) last.lines.push(l); else segs.push({ cls: cls[i], lines: [l] }); });
   // Spaltenweise kopiert: erst alle Wörter, dann alle Übersetzungen
   if (segs.length === 2 && segs[0].lines.length === segs[1].lines.length && segs[0].lines.length >= 2) {
     return { pairs: segs[0].lines.map((l, k) => [l, segs[1].lines[k]]), fit: known / n };
   }
-  // Reihenfolge wechselt von Paar zu Paar (Wort, Übersetzung | Übersetzung, Wort …): fast alle inneren Abschnitte
-  // haben genau 2 Zeilen – dann ist es keine Zelle mit 2 Zeilen, sondern streng abwechselnd
-  const inner = segs.slice(1, -1);
-  const flipping = inner.length >= 2 && inner.filter((sg) => sg.lines.length === 2).length >= inner.length * 0.75;
-  // Abschnitte paarweise: Wort + Übersetzung; mehrere Zeilen eines Abschnitts gehören zusammen (Zelle mit 2 Zeilen)
-  if (!flipping && segs.every((sg) => sg.lines.length <= 3)) {
-    const pairs = [];
-    for (let k = 0; k < segs.length; k += 2) pairs.push([segs[k].lines.join(' / '), segs[k + 1] ? segs[k + 1].lines.join(' / ') : '']);
-    return { pairs, fit: known / n };
-  }
-  // Sonst: streng abwechselnd
+  // Sonst: streng abwechselnd – die obere Zeile gehört zur Zeile direkt darunter (welche Deutsch ist, wird pro Paar erkannt)
   const pairs = [];
   for (let k = 0; k < n; k += 2) pairs.push([lines[k], lines[k + 1] || '']);
   return { pairs, fit: known / n };
@@ -639,7 +629,12 @@ function parseVocab(text, opts = {}) {
   const blocks = String(text || '').split(/\r?\n\s*\r?\n/).map((b) => b.split(/\r?\n/).map(clean).filter((l) => !isJunk(l))).filter((b) => b.length);
   const raw = blocks.flat();
   // Unsichere Trennzeichen nur, wenn links und rechts verschiedene Sprachen stehen – sonst bleibt die Zeile ganz
-  const otherLang = (a, b) => { const x = lineVote(a), y = lineVote(b); return x * y < 0 || (Math.abs(x) < 0.5 && Math.abs(y) >= 1.5) || (Math.abs(y) < 0.5 && Math.abs(x) >= 1.5); };
+  // Eine Seite klar fremdsprachig und die andere klar deutsch; ist eine Seite unklar, muss die andere eindeutig deutsch sein
+  // („voici, voilà“ bleibt eine Vokabel, „maison, Haus“ wird geteilt)
+  const otherLang = (a, b) => {
+    const x = lineVote(a), y = lineVote(b);
+    return (x * y < 0 && Math.min(Math.abs(x), Math.abs(y)) >= 0.5) || (Math.abs(x) < 0.5 && y >= 1.5) || (Math.abs(y) < 0.5 && x >= 1.5);
+  };
   let rows = raw.map((l) => {
     const [a, b, weak] = splitLine(l);
     if (weak && !otherLang(a, b)) return [l, ''];
@@ -667,8 +662,9 @@ function parseVocab(text, opts = {}) {
   // Nur eine einzelne Zeile ohne Trennzeichen (zwischen Zeilen mit Strich): selbst teilen („die Katze le chat“)
   rows = merged.map((r) => {
     if (r[1] || !/\s/.test((r[0] || '').trim())) return r;
-    const [a, b, sc] = bestSplit(r[0]);
-    return b && sc >= 1.5 ? [a, b] : r;
+    if (!strongSplit(r[0])) return r; // nur teilen, wenn beide Teile klar erkennbar sind
+    const [a, b] = bestSplit(r[0]);
+    return b ? [a, b] : r;
   });
 
   // Welche Seite ist Deutsch? Jede Zeile stimmt einzeln ab; unklare Zeilen folgen der Mehrheit.
