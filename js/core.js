@@ -411,9 +411,13 @@ function ttsText(text, lang = 'en') {
 }
 
 /* ---------------- Parser für eingefügte Vokabeln ---------------- */
-const SEPARATORS = [' = ', '=', ' -> ', '->', ' → ', '→', ' : ', ' | ', '|', ';'];
+// Eindeutige Trennzeichen zwischen Wort und Übersetzung
+const SEPARATORS = [' = ', '=', ' -> ', '->', ' → ', '→', ' | ', '|'];
+// Unsichere Trennzeichen (kommen auch IN einer Vokabel vor: „er ist, sie ist“) – zählen nur, wenn links und rechts verschiedene Sprachen stehen
+const WEAK_SEPARATORS = [' : ', ';'];
 const DASH_SEPARATORS = [' – ', ' — ', ' - ', ' ‒ '];
 
+/** Liefert [links, rechts, unsicher]: unsicher = Komma, Doppelpunkt, Strichpunkt oder mehrere Leerzeichen */
 function splitLine(line) {
   if (line.includes('\t')) {
     const cols = line.split('\t').map((s) => s.trim()).filter(Boolean);
@@ -428,14 +432,18 @@ function splitLine(line) {
     const i = line.lastIndexOf(sep);
     if (i > 0) return [line.slice(0, i), line.slice(i + sep.length)];
   }
+  for (const sep of WEAK_SEPARATORS) {
+    const i = line.indexOf(sep);
+    if (i > 0 && i < line.length - sep.length) return [line.slice(0, i), line.slice(i + sep.length), true];
+  }
   const cols = line.split(/\s{2,}/);
-  if (cols.length >= 2) return [cols[0], cols.slice(1).join(' ')];
+  if (cols.length >= 2) return [cols[0], cols.slice(1).join(' '), true];
   if (line.includes(':')) {
     const i = line.indexOf(':');
-    if (i > 0) return [line.slice(0, i), line.slice(i + 1)];
+    if (i > 0 && i < line.length - 1) return [line.slice(0, i), line.slice(i + 1), true];
   }
   const commas = line.split(',');
-  if (commas.length === 2) return commas;
+  if (commas.length === 2) return [commas[0], commas[1], true];
   return [line, ''];
 }
 
@@ -556,23 +564,45 @@ const strongSplit = (line) => { const r = bestSplit(line); return r[1] && Math.a
 function stackedPairs(lines, blocks) {
   const n = lines.length;
   if (blocks.length >= 2 && blocks.every((bl) => bl.length === 2)) return { pairs: blocks.map((bl) => [bl[0], bl[1]]), fit: 1 };
-  if (n < 2 || n % 2) return null;
-  const v = lines.map(lineVote), m = n / 2;
-  // Eine Zeile, die schon beide Sprachen enthält, ist keine Hälfte eines untereinander stehenden Paars
-  const mixed = lines.map(strongSplit);
-  const opp = (i, j) => {
-    if (mixed[i] || mixed[j]) return false;
-    const a = Math.abs(v[i]), b = Math.abs(v[j]);
-    return (v[i] * v[j] < 0 && Math.min(a, b) >= 0.5) || (Math.min(a, b) < 0.5 && Math.max(a, b) >= 1.5);
-  };
-  let alt = 0, half = 0;
-  for (let k = 0; k < m; k++) { if (opp(2 * k, 2 * k + 1)) alt++; if (opp(k, k + m)) half++; }
-  const pairsAlt = () => Array.from({ length: m }, (_, k) => [lines[2 * k], lines[2 * k + 1]]);
-  const pairsHalf = () => Array.from({ length: m }, (_, k) => [lines[k], lines[k + m]]);
-  // Nur einzelne Wörter: sicher untereinander
-  if (lines.every((l) => !/\s/.test(l.trim()))) return { pairs: half > alt ? pairsHalf() : pairsAlt(), fit: 1 };
-  if (alt >= half) return { pairs: pairsAlt(), fit: alt / m };
-  return { pairs: pairsHalf(), fit: half / m };
+  if (n < 2) return null;
+  // Jede Zeile: Deutsch, Fremdsprache oder unklar
+  const v = lines.map(lineVote);
+  const cls = v.map((x) => (x >= 0.75 ? 'de' : x <= -0.75 ? 'fo' : ''));
+  // Passt „untereinander“? Anteil der Zeilen mit klarer Sprache, die nicht schon beide Sprachen enthalten
+  const known = cls.filter((c, i) => c && !strongSplit(lines[i])).length;
+  // Wechselt die Sprache kaum (höchstens zweimal), ist die Liste spaltenweise kopiert
+  const clear = cls.filter(Boolean);
+  const switches = clear.filter((c, i) => i && c !== clear[i - 1]).length;
+  const columnLike = clear.length >= 4 && switches <= 2;
+  // Unklare Zeilen: spaltenweise gehören sie zu ihrer Spalte, abwechselnd bekommen sie die andere Sprache als die Zeile davor
+  for (let i = 0; i < n; i++) {
+    if (cls[i]) continue;
+    let prev = ''; for (let j = i - 1; j >= 0; j--) if (cls[j]) { prev = cls[j]; break; }
+    let next = ''; for (let j = i + 1; j < n; j++) if (cls[j]) { next = cls[j]; break; }
+    const base = prev || next;
+    cls[i] = !base ? (i % 2 ? 'de' : 'fo') : columnLike ? base : (base === 'de' ? 'fo' : 'de');
+  }
+  // Gleiche Sprache hintereinander = ein Abschnitt (z. B. eine Tabellenzelle mit zwei Zeilen: „er heisst“ / „sie heisst“)
+  const segs = [];
+  lines.forEach((l, i) => { const last = segs[segs.length - 1]; if (last && last.cls === cls[i]) last.lines.push(l); else segs.push({ cls: cls[i], lines: [l] }); });
+  // Spaltenweise kopiert: erst alle Wörter, dann alle Übersetzungen
+  if (segs.length === 2 && segs[0].lines.length === segs[1].lines.length && segs[0].lines.length >= 2) {
+    return { pairs: segs[0].lines.map((l, k) => [l, segs[1].lines[k]]), fit: known / n };
+  }
+  // Reihenfolge wechselt von Paar zu Paar (Wort, Übersetzung | Übersetzung, Wort …): fast alle inneren Abschnitte
+  // haben genau 2 Zeilen – dann ist es keine Zelle mit 2 Zeilen, sondern streng abwechselnd
+  const inner = segs.slice(1, -1);
+  const flipping = inner.length >= 2 && inner.filter((sg) => sg.lines.length === 2).length >= inner.length * 0.75;
+  // Abschnitte paarweise: Wort + Übersetzung; mehrere Zeilen eines Abschnitts gehören zusammen (Zelle mit 2 Zeilen)
+  if (!flipping && segs.every((sg) => sg.lines.length <= 3)) {
+    const pairs = [];
+    for (let k = 0; k < segs.length; k += 2) pairs.push([segs[k].lines.join(' / '), segs[k + 1] ? segs[k + 1].lines.join(' / ') : '']);
+    return { pairs, fit: known / n };
+  }
+  // Sonst: streng abwechselnd
+  const pairs = [];
+  for (let k = 0; k < n; k += 2) pairs.push([lines[k], lines[k + 1] || '']);
+  return { pairs, fit: known / n };
 }
 /** Zeilen ohne Trennzeichen: untereinander (Paare) oder je Zeile geteilt? */
 function pairUp(lines, blocks) {
@@ -608,11 +638,23 @@ function parseVocab(text, opts = {}) {
   // Blöcke (durch Leerzeilen getrennt) – „apple / Apfel“ mit Leerzeile dazwischen
   const blocks = String(text || '').split(/\r?\n\s*\r?\n/).map((b) => b.split(/\r?\n/).map(clean).filter((l) => !isJunk(l))).filter((b) => b.length);
   const raw = blocks.flat();
-  let rows = raw.map((l) => splitLine(l).map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
+  // Unsichere Trennzeichen nur, wenn links und rechts verschiedene Sprachen stehen – sonst bleibt die Zeile ganz
+  const otherLang = (a, b) => { const x = lineVote(a), y = lineVote(b); return x * y < 0 || (Math.abs(x) < 0.5 && Math.abs(y) >= 1.5) || (Math.abs(y) < 0.5 && Math.abs(x) >= 1.5); };
+  let rows = raw.map((l) => {
+    const [a, b, weak] = splitLine(l);
+    if (weak && !otherLang(a, b)) return [l, ''];
+    return [a, b].map((x) => String(x || '').trim().replace(/^["„“]|["“”]$/g, ''));
+  });
   // Keine Trennzeichen (bei den meisten Zeilen): gleiche Zeile teilen oder Zeilenpaare bilden
   const noSep = rows.filter((r) => r[0] && !r[1]).length;
   if (noSep >= 2 && noSep >= rows.length * 0.6 && noSep === rows.length) {
-    rows = pairUp(raw, blocks).map((r) => r.map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
+    // Anordnung von Hand gewählt (Vorschau): abwechselnd, spaltenweise oder auf derselben Zeile
+    const lay = opts.layout;
+    const forced = lay === 'alt' ? Array.from({ length: Math.ceil(raw.length / 2) }, (_, k) => [raw[2 * k], raw[2 * k + 1] || ''])
+      : lay === 'cols' ? Array.from({ length: Math.ceil(raw.length / 2) }, (_, k) => [raw[k], raw[k + Math.ceil(raw.length / 2)] || ''])
+        : lay === 'line' ? raw.map((l) => { let [x, y, sc] = bestSplit(l); if (!(y && sc > -Infinity)) [x, y, sc] = bestSplit(l, true); return y && sc > -Infinity ? [x, y] : [l, '']; })
+          : null;
+    rows = (forced || pairUp(raw, blocks)).map((r) => r.map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
   }
   rows = rows.filter((r) => r[0] || r[1]);
 

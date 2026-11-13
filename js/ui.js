@@ -296,6 +296,7 @@ function bindHome() {
   ta.addEventListener('input', debounce(update, 120));
   name.addEventListener('input', () => { ui.draft.name = name.value; });
   $('#new-set-form').addEventListener('submit', (e) => { e.preventDefault(); createSetFromDraft(); });
+  $('#new-set-form').addEventListener('change', (e) => { if (e.target.id === 'draft-layout') { ui.draft.layout = e.target.value; renderPreview(); } });
   renderPreview();
 }
 
@@ -303,8 +304,10 @@ function renderPreview() {
   const box = $('#parse-preview');
   if (!box) return;
   const d = ui.draft;
-  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang() });
+  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang(), layout: d.layout });
   if (!res.rows.length) { box.innerHTML = ''; return; }
+  // Auswahl der Anordnung nur zeigen, wenn die Zeilen keine eindeutigen Trennzeichen haben
+  const plain = String(d.text || '').split(/\r?\n/).filter((l) => l.trim()).every((l) => !(/\t| = |=| -> |→| \| | [–—-] /.test(l)));
   const lang = homeLang(), L = LANGS[lang].name;
   const missing = res.rows.filter((r) => !r.foreign || !r.german).length;
   box.innerHTML = `
@@ -312,6 +315,10 @@ function renderPreview() {
       <strong>${res.rows.length} ${res.rows.length === 1 ? 'Vokabel' : 'Vokabeln'} erkannt</strong>
       <button type="button" class="btn small ghost" data-action="draft-swap" title="Falls Deutsch und ${L} vertauscht sind">${icon('swap')} Spalten tauschen</button>
     </div>
+    ${plain ? `<label class="layout-pick"><span class="small muted">Anordnung:</span>
+      <select id="draft-layout">
+        ${[['', 'Automatisch'], ['alt', 'Untereinander: Wort, Übersetzung, Wort …'], ['cols', 'Untereinander: erst alle Wörter, dann alle Übersetzungen'], ['line', 'Wort und Übersetzung auf derselben Zeile']].map(([k, t]) => `<option value="${k}" ${(d.layout || '') === k ? 'selected' : ''}>${t}</option>`).join('')}
+      </select></label>` : ''}
     ${missing ? `<p class="warn">${missing === 1 ? 'Bei einer Zeile fehlt' : `Bei ${missing} Zeilen fehlt`} die Übersetzung. Trenne die Wörter mit – oder =.</p>` : ''}
     ${(() => { const g = guessForeignLang(res.rows); return g && g !== lang ? `<p class="warn lang-guess">${flag(g)} Das sieht nach <strong>${LANGS[g].name}</strong> aus. <button type="button" class="btn small secondary" data-action="home-lang" data-lang="${g}">Als ${LANGS[g].name}-Portion erstellen</button></p>` : ''; })()}
     <div class="preview-table" role="table" aria-label="Erkannte Vokabeln">
@@ -326,7 +333,7 @@ function createSetFromDraft() {
   const ta = $('#vocab-input'), nm = $('#set-name');
   if (ta) d.text = ta.value;
   if (nm) d.name = nm.value;
-  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang() });
+  const res = parseVocab(d.text, { swap: d.swap, lang: homeLang(), layout: d.layout });
   const rows = res.rows.filter((r) => r.foreign);
   if (!rows.length) {
     toast('Füge zuerst ein paar Vokabeln ein – eine pro Zeile.', 'bad');
@@ -335,7 +342,7 @@ function createSetFromDraft() {
   }
   const name = d.name.trim() || autoName(rows);
   const set = newSet({ name, lang: homeLang(), rows });
-  ui.draft = { text: '', name: '', swap: false };
+  ui.draft = { text: '', name: '', swap: false, layout: '' };
   openSet(set.id);
   startPictureFill(set);
 }
