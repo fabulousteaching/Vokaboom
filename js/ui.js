@@ -38,7 +38,8 @@ const ICONS = {
 const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 
 let flagCounter = 0;
-function flag() {
+function flag(lang = 'en') {
+  if (lang === 'fr') return '<svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><path d="M0,0h20v30h-20z" fill="#002395"/><path d="M20,0h20v30h-20z" fill="#fff"/><path d="M40,0h20v30h-20z" fill="#ED2939"/></svg>';
   const id = 'ukclip' + (++flagCounter);
   return `<svg class="flag" viewBox="0 0 60 30" aria-hidden="true"><clipPath id="${id}"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath><path d="M0,0v30h60v-30z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" clip-path="url(#${id})" stroke="#C8102E" stroke-width="4"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg>`;
 }
@@ -224,40 +225,49 @@ function bindBoom() {
 function viewHome() {
   if (isKid()) return kidHomeHTML();
   const d = ui.draft;
-  const sets = db.sets;
+  const lang = homeLang();
+  const sets = db.sets.filter((s) => langOf(s) === lang);
+  const count = (l) => db.sets.filter((s) => langOf(s) === l).length;
+  const ph = HOME_PLACEHOLDERS[lang];
   return `
   <section class="home">
     <div class="home-intro">
-      <p class="eyebrow">${flag()} Englisch-Vokabeln üben</p>
+      <p class="eyebrow">${flag(lang)} ${LANGS[lang].name}-Vokabeln üben</p>
       <h1>Nimm deine Vokabelliste und ${boomHTML()} werden daraus ganz einfach <mark>Lernkarten, Übungen, Spiele und Tests.</mark></h1>
       <p class="lead">Vokabeln einfügen und fertig. Und Bildvorschläge für die Karten macht dir Vokaboom auch gleich schon.</p>
+    </div>
+    <div class="seg lang-tabs" role="tablist" aria-label="Sprache">
+      ${['en', 'fr'].map((l) => `<button type="button" class="seg-btn" role="tab" data-action="home-lang" data-lang="${l}" aria-selected="${lang === l}" aria-pressed="${lang === l}">${flag(l)}<span>${LANGS[l].name}</span>${count(l) ? `<small class="count">${count(l)}</small>` : ''}</button>`).join('')}
     </div>
     <div class="home-grid">
       <form class="panel new-set" id="new-set-form" autocomplete="off">
         <div class="panel-head">
-          <h2>Neue Vokabelportion</h2>
+          <h2>Neue ${LANGS[lang].name}-Portion</h2>
         </div>
         <label class="field" for="set-name">
           <span class="label">Name der Portion</span>
-          <input id="set-name" type="text" maxlength="80" placeholder="z. B. Unit 3 – Food" value="${esc(d.name)}">
+          <input id="set-name" type="text" maxlength="80" placeholder="${ph[0]}" value="${esc(d.name)}">
         </label>
         <label class="field" for="vocab-input">
           <span class="label">Vokabeln</span>
-          <textarea id="vocab-input" rows="9" spellcheck="false" placeholder="apple – Apfel&#10;the dog – der Hund&#10;to swim – schwimmen&#10;…">${esc(d.text)}</textarea>
+          <textarea id="vocab-input" rows="9" spellcheck="false" placeholder="${ph[1]}">${esc(d.text)}</textarea>
         </label>
-        <p class="hint">Eine Vokabel pro Zeile, zum Beispiel <code>apple – Apfel</code> oder <code>the dog = der Hund</code>. Tabellen aus Word, Excel oder dem Schulbuch kannst du direkt hineinkopieren.</p>
+        <p class="hint">Eine Vokabel pro Zeile, zum Beispiel ${ph[2]}. Tabellen aus Word, Excel oder dem Schulbuch kannst du direkt hineinkopieren.</p>
         <div id="parse-preview" class="parse-preview"></div>
         <button class="btn primary big" type="submit" data-action="create-set">${icon('stack')} Karten erstellen</button>
       </form>
 
       <aside class="panel library" aria-labelledby="lib-title">
-        <div class="lib-head"><h2 id="lib-title">Meine Vokabelportionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
+        <div class="lib-head"><h2 id="lib-title">Meine ${LANGS[lang].name}-Portionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
         ${libraryNote()}
-        ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>` : '<p class="empty">Noch keine Portion gespeichert. Füge links deine Vokabeln ein – sie bleiben in diesem Browser gespeichert.</p>'}
+        ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
       </aside>
     </div>
   </section>`;
 }
+
+const HOME_PLACEHOLDERS = {"en": ["z. B. Unit 3 – Food", "apple – Apfel&#10;the dog – der Hund&#10;to swim – schwimmen&#10;…", "<code>apple – Apfel</code> oder <code>the dog = der Hund</code>"], "fr": ["z. B. Unité 3 – La nourriture", "la pomme – der Apfel&#10;le chien – der Hund&#10;nager – schwimmen&#10;…", "<code>la pomme – der Apfel</code> oder <code>le chien = der Hund</code>"]};
+const homeLang = () => (db.settings.homeLang === 'fr' ? 'fr' : 'en');
 
 function libItem(s) {
   const t = s.progress?.test?.best;
@@ -295,7 +305,7 @@ function renderPreview() {
   const d = ui.draft;
   const res = parseVocab(d.text, { swap: d.swap });
   if (!res.rows.length) { box.innerHTML = ''; return; }
-  const L = 'Englisch';
+  const lang = homeLang(), L = LANGS[lang].name;
   const missing = res.rows.filter((r) => !r.foreign || !r.german).length;
   box.innerHTML = `
     <div class="preview-head">
@@ -304,7 +314,7 @@ function renderPreview() {
     </div>
     ${missing ? `<p class="warn">${missing === 1 ? 'Bei einer Zeile fehlt' : `Bei ${missing} Zeilen fehlt`} die Übersetzung. Trenne die Wörter mit – oder =.</p>` : ''}
     <div class="preview-table" role="table" aria-label="Erkannte Vokabeln">
-      <div class="pt-row pt-head" role="row"><span role="columnheader">${flag()} ${L}</span><span role="columnheader">Deutsch</span></div>
+      <div class="pt-row pt-head" role="row"><span role="columnheader">${flag(lang)} ${L}</span><span role="columnheader">Deutsch</span></div>
       ${res.rows.map((r) => `<div class="pt-row" role="row"><span role="cell" class="${r.foreign ? '' : 'missing'}">${esc(r.foreign) || 'fehlt'}</span><span role="cell" class="${r.german ? '' : 'missing'}">${esc(r.german) || 'fehlt'}</span></div>`).join('')}
     </div>`;
 }
@@ -323,13 +333,13 @@ function createSetFromDraft() {
     return;
   }
   const name = d.name.trim() || autoName(rows);
-  const set = newSet({ name, lang: 'en', rows });
+  const set = newSet({ name, lang: homeLang(), rows });
   ui.draft = { text: '', name: '', swap: false };
   openSet(set.id);
   startPictureFill(set);
 }
 function autoName(rows) {
-  const first = rows.slice(0, 3).map((r) => core(r.foreign, 'en')).join(', ');
+  const first = rows.slice(0, 3).map((r) => core(r.foreign, homeLang())).join(', ');
   return `${first}${rows.length > 3 ? ' …' : ''}`;
 }
 
@@ -375,7 +385,7 @@ function viewSet(set) {
   <section class="set-view ${locked ? 'locked' : ''}">
     <header class="set-head">
       <div class="set-title-wrap">
-        <p class="eyebrow">${flag()} ${L} · ${set.words.length} Vokabeln</p>
+        <p class="eyebrow">${flag(set.lang)} ${L} · ${set.words.length} Vokabeln</p>
         <h1 class="set-title">${esc(set.name)}</h1>
       </div>
       ${locked ? '' : `<div class="set-tools">

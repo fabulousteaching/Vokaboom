@@ -37,7 +37,7 @@ const phCfg = () => ({ passMin: 60, ...(db.settings.phonetic || {}), on: true })
 const phSupported = () => typeof WebAssembly === 'object' && !!navigator.mediaDevices?.getUserMedia && 'caches' in window;
 const phoneticOn = () => phSupported();
 /** Lauterkennung benutzen, sobald sie geladen ist. Bis dahin die Spracherkennung des Browsers (falls vorhanden). */
-const phoneticFor = () => phSupported() && (phState.status === 'ready' || !canListen());
+const phoneticFor = (lang = 'en') => lang === 'en' && phSupported() && (phState.status === 'ready' || !canListen());
 /** Datenpaket der Lauterkennung bei allen automatisch im Hintergrund laden (nicht im Datensparmodus) */
 function phInBackground() {
   if (!phSupported() || phState.engine || phState.loading) return Promise.resolve();

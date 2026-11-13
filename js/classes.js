@@ -187,7 +187,7 @@ function openKidLogin() {
       <button class="btn primary big" type="submit" id="kid-submit">Los geht's ${icon('right')}</button>
     </form>
     <p class="muted small">${icon('image')} Oder scanne den QR-Code auf deinem Kärtchen mit der Kamera.</p>
-    <p class="small"><button type="button" class="link-btn" data-action="login">Ich bin eine Lehrperson</button></p>`, { label: 'Kinder-Login', cls: 'auth-modal kid-modal' });
+    <p class="small"><button type="button" class="link-btn" data-action="login-choose">Zurück</button></p>`, { label: 'Kinder-Login', cls: 'auth-modal kid-modal' });
   renderKidSlots();
   setTimeout(() => $('#kid-user')?.focus(), 60);
   $('#kid-form').addEventListener('submit', (e) => { e.preventDefault(); submitKidLogin(); });
@@ -263,8 +263,8 @@ function kidHomeHTML() {
       const p = s.progress || {};
       const done = steps.filter((k) => p[k]).length;
       return `<li><button class="kid-set" data-action="open-set" data-id="${s.id}">
-        <strong>${esc(s.name)}</strong>
-        <small>${s.words.length} Vokabeln${p.test?.best != null ? ` · Test ${p.test.best} %` : ''}</small>
+        <strong>${flag(s.lang)} ${esc(s.name)}</strong>
+        <small>${LANGS[langOf(s)].name} · ${s.words.length} Vokabeln${p.test?.best != null ? ` · Test ${p.test.best} %` : ''}</small>
         <span class="kid-steps" aria-label="${done} von 5 Übungen gemacht">${steps.map((k) => `<i class="${p[k] ? 'on' : ''}"></i>`).join('')}</span>
       </button></li>`;
     }).join('')}</ul>` : `<div class="panel empty-kid"><p>Deine Lehrperson hat noch keine Portion freigegeben.</p><button class="btn secondary" data-action="kid-refresh">${icon('flip')} Nochmal schauen</button></div>`}
@@ -552,7 +552,7 @@ function classSetsHTML(c) {
     <p class="hint">Die Kinder sehen nur die angehakten Portionen – mit allen Übungen, aber ohne Bearbeiten. Änderst du eine Portion, haben die Kinder die neue Version beim nächsten Öffnen.</p>
     ${sets.length ? `<ul class="set-pick">${sets.map((s) => `<li><label class="set-pick-item">
         <input type="checkbox" data-set="${s.id}" ${(c.set_ids || []).includes(s.id) ? 'checked' : ''}>
-        <span><strong>${esc(s.name)}</strong><small>${s.words.length} Vokabeln${!cloud.synced[s.id] ? ' · wird noch ins Konto gespeichert' : ''}</small></span>
+        <span><strong>${flag(s.lang)} ${esc(s.name)}</strong><small>${LANGS[langOf(s)].name} · ${s.words.length} Vokabeln${!cloud.synced[s.id] ? ' · wird noch ins Konto gespeichert' : ''}</small></span>
       </label></li>`).join('')}</ul>` : '<p class="empty">Du hast noch keine Portion. Erstelle zuerst auf der Startseite eine.</p>'}
     ${missing.length ? `<p class="muted small">${missing.length} freigegebene ${missing.length === 1 ? 'Portion gibt' : 'Portionen gibt'} es nicht mehr. <button class="link-btn" data-action="class-clean-sets">Entfernen</button></p>` : ''}
   </div>`;

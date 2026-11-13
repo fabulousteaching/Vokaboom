@@ -152,6 +152,9 @@ const actions = {
     renderReviewRow(set, w);
   },
 
+  'home-lang': (el) => { db.settings.homeLang = el.dataset.lang === 'fr' ? 'fr' : 'en'; saveDB(); render(); },
+  'login-choose': () => openLoginChooser(),
+
   /* Einstellungen */
   'set-accent': (el) => {
     db.settings.accent = el.dataset.accent; applyTeacherPrefs(); saveDB();
@@ -416,7 +419,7 @@ async function importFromHash() {
     if (existing) { openSet(existing.id); toast(`„${existing.name}“ ist schon da.`); return true; }
     const data = await decodeShare(code);
     if (!data.rows.length) throw new Error('leer');
-    const set = newSet({ name: data.name, lang: 'en', rows: data.rows, picStyle: data.picStyle });
+    const set = newSet({ name: data.name, lang: data.lang, rows: data.rows, picStyle: data.picStyle });
     set.shareId = share;
     if (data.audioOwner) set.audio = { o: data.audioOwner, h: {} };
     set.accent = data.accent; set.passMin = data.passMin;

@@ -40,10 +40,12 @@ const similarity = (a, b) => (!a && !b ? 1 : 1 - lev(a, b) / Math.max(a.length, 
 
 const isFramed = (() => { try { return window.top !== window.self; } catch { return true; } })();
 
-/* ---------------- Sprache: Englisch ---------------- */
+/* ---------------- Sprachen: Englisch und Französisch ---------------- */
 const LANGS = {
   en: { name: 'Englisch', short: 'EN', adj: 'englische' },
+  fr: { name: 'Französisch', short: 'FR', adj: 'französische' },
 };
+const langOf = (set) => (set?.lang === 'fr' ? 'fr' : 'en');
 /* Akzent und nötige Punktzahl bestimmt die Lehrperson (angemeldet). Lernende – mit Kinder-Login, über QR-Code
    oder ohne Anmeldung – bekommen, was in der Portion steht (von der Lehrperson), sonst Britisch und 60 Punkte. */
 const isTeacher = () => typeof cloud === 'object' && !!cloud.uid;
@@ -75,10 +77,11 @@ function applyTeacherPrefs() {
   }
   return changed;
 }
-const langCode = () => (accentNow() === 'us' ? 'en-US' : 'en-GB');
+const langCode = (lang) => (lang === 'fr' ? 'fr-FR' : accentNow() === 'us' ? 'en-US' : 'en-GB');
 
 const ARTICLE_RE = {
   en: /^(?:the|a|an|to)\s+/i,
+  fr: /^(?:(?:le|la|les|un|une|des|du|de la|se)\s+|(?:l|d|s)['’]\s*|de l['’]\s*)/i,
   de: /^(?:der|die|das|den|dem|des|ein|eine|einen|einem|einer|sich)\s+/i,
 };
 
@@ -206,7 +209,27 @@ function spaceNote(pairs) {
 }
 
 /** Bewertet eine geschriebene Antwort: { status: correct | almost | wrong, note } */
-function checkAnswer(input, word) {
+const FR_ART = /^\s*(de la\s+|de l['’]\s*|le\s+|la\s+|les\s+|l['’]\s*|un\s+|une\s+|des\s+|du\s+)/i;
+const frArt = (s) => ((String(s || '').normalize('NFC').match(FR_ART) || [])[1] || '').trim().toLowerCase().replace('’', "'");
+function checkAnswer(input, word, lang = langOf(typeof currentSet === 'function' ? currentSet() : null)) {
+  const r = checkAnswerBase(input, word);
+  if (lang !== 'fr' || !ansKey(input)) return r;
+  const tArt = frArt(answerAlts(word.foreign)[0]), iArt = frArt(input);
+  if (!tArt) return r;
+  // Falscher Artikel (la chien statt le chien) ist falsch, auch wenn nur ein Buchstabe anders ist
+  const sameArt = (a, b) => a.replace(/\s+/g, ' ') === b.replace(/\s+/g, ' ') || a.toLowerCase() === b.toLowerCase();
+  if (iArt && !sameArt(iArt, tArt) && !answerAlts(word.foreign).some((a) => sameArt(frArt(a), iArt))) {
+    return { status: 'wrong', note: `Der Artikel stimmt nicht: „${answerAlts(word.foreign)[0]}“.` };
+  }
+  if (r.status !== 'wrong') return r;
+  const bare = { ...word, foreign: answerAlts(word.foreign).map((a) => a.replace(FR_ART, '')).join(' / ') };
+  const r2 = checkAnswerBase(String(input).replace(FR_ART, ''), bare);
+  if (r2.status === 'wrong') return r;
+  if (!iArt) return { status: 'almost', note: `Fast! Vergiss den Artikel nicht: „${answerAlts(word.foreign)[0]}“.` };
+  if (iArt !== tArt) return { status: 'wrong', note: `Der Artikel stimmt nicht: „${answerAlts(word.foreign)[0]}“.` };
+  return r2;
+}
+function checkAnswerBase(input, word) {
   if (!ansKey(input)) return { status: 'wrong', note: 'Keine Antwort.' };
   const alts = answerAlts(word.foreign);
   if (!alts.length) return { status: 'wrong' };
@@ -357,11 +380,21 @@ function speechTargets(word, lang) {
  * Vergleicht das Erkannte mit dem Zielwort. alternatives.best = { t, conf, final } kommt von listenOnce.
  * Normal zählt nur der wahrscheinlichste erkannte Text; bei schwer zu treffenden Wörtern auch die anderen Vorschläge.
  */
+function frSpeechMatch(h, t) {
+  if (h === t || h.replace(/ /g, '') === t.replace(/ /g, '')) return true;
+  const tol = t.length >= 9 ? 2 : t.length >= 5 ? 1 : 0;
+  return tol > 0 && lev(h, t) <= tol;
+}
 function speechMatch(alternatives, word, lang) {
   const targets = speechTargets(word, lang);
   const best = alternatives.best || { t: alternatives[0] || '', conf: 0, final: false };
   const heard = best.t || alternatives[0] || '';
   if (!normSpeech(heard, lang)) return { ok: false, score: 0, heard: '' };
+  if (lang === 'fr') {
+    const cands = [heard, ...alternatives].map((x) => normSpeech(x, lang)).filter(Boolean);
+    const ok = cands.some((h) => targets.some((t) => frSpeechMatch(h, t)));
+    return { ok, score: ok ? 1 : 0, heard };
+  }
   const hard = targets.some((t) => t.split(' ').some(hardWord));
   const candidates = [heard, ...(hard ? alternatives : [])].map((x) => normSpeech(x, lang)).filter(Boolean);
   const ok = candidates.some((h) => targets.some((t) => tokensMatch(h, t)));
@@ -369,7 +402,8 @@ function speechMatch(alternatives, word, lang) {
 }
 
 /** Text, der vorgelesen wird (Abkürzungen ausgeschrieben) */
-function ttsText(text) {
+function ttsText(text, lang = 'en') {
+  if (lang === 'fr') return stripParens(text).replace(/\.{2,}|…/g, ' ').replace(/\s*\/\s*/g, ', ').replace(/\s+[–—-]\s+/g, ', ').replace(/\s+/g, ' ').trim();
   const s = stripParens(text).replace(/\.{2,}|…/g, ' ')
     .replace(/\bsb\.?'s\b/gi, "somebody's").replace(/\bsb\b\.?/gi, 'somebody')
     .replace(/\bsth\b\.?/gi, 'something').replace(/\bsw\b\.?/gi, 'somewhere');
@@ -457,7 +491,7 @@ function loadDB() {
     db.settings.sound = true; db.settings.autoSpeak = false; // nicht mehr einstellbar: Klänge immer an, automatisches Vorlesen immer aus
     db.sets = (db.sets || []).filter((s) => s && Array.isArray(s.words));
     db.sets.forEach((s) => {
-      s.lang = 'en'; // Vokaboom ist nur noch für Englisch
+      s.lang = s.lang === 'fr' ? 'fr' : 'en'; // Englisch oder Französisch
       s.words.forEach((w) => {
         if (w.picStatus === 'pending') w.picStatus = 'stale';
         if (w.pic && w.pic.kind === 'ai') { w.pic = null; w.picStatus = 'stale'; } // KI-Bilder gibt es nicht mehr
@@ -576,7 +610,7 @@ function localPicture(word, lang = 'en') {
   const { maps } = PICTURES;
   for (const k of deKeys) if (maps.deExact.has(k)) return entryToPic(maps.deExact.get(k));
   for (const k of deKeys) if (maps.de.has(k.toLowerCase())) return entryToPic(maps.de.get(k.toLowerCase()));
-  for (const k of foKeys) {
+  if (lang === 'en') for (const k of foKeys) {
     const low = k.toLowerCase();
     if (maps.en.has(low)) return entryToPic(maps.en.get(low));
   }
@@ -589,7 +623,7 @@ function localPicture(word, lang = 'en') {
   for (const k of deFamily(core(word.german, 'de'))) {
     if (maps.deExact.has(k)) return entryToPic(maps.deExact.get(k));
   }
-  for (const k of enFamily(core(word.foreign, 'en'))) {
+  for (const k of lang === 'en' ? enFamily(core(word.foreign, 'en')) : []) {
     if (maps.en.has(k)) return entryToPic(maps.en.get(k));
   }
   return null;
@@ -897,10 +931,11 @@ function loadImage(src, timeout = 30000) {
 async function autoPicture(word, set) {
   const local = localPicture(word, set.lang);
   if (local && (local.kind === 'color' || local.kind === 'number')) return local;
-  const term = core(word.foreign, 'en').toLowerCase();
-  // Global Symbols nur, wenn die Beschriftung genau passt
+  const term = set.lang === 'fr' ? '' : core(word.foreign, 'en').toLowerCase();
+  // Global Symbols nur, wenn die Beschriftung genau passt (englische Beschriftungen)
   const gsExact = async (t) => (await globalSymbolsSearch(t, 8)).find((x) => x.title.trim().toLowerCase() === t) || null;
   const gs = async () => {
+    if (!term) return null;
     const hit = await gsExact(term);
     if (hit) return hit;
     for (const t of enFamily(term).slice(0, 2)) { const h = await gsExact(t); if (h) return { ...h, via: t }; }
@@ -1041,8 +1076,8 @@ function bestDeviceVoices(lang = 'en') {
   return (exact.length ? exact : all).sort((a, b) => voiceRank(b, want) - voiceRank(a, want));
 }
 /* Frau oder Mann? Browser verraten es nicht – es geht nur über die bekannten Namen. */
-const FEMALE_VOICE = /female|woman|google us english$|kate|serena|stephanie|martha|libby|sonia|maisie|hazel|susan|samantha|ava\b|allison|zoe|nicky|joelle|victoria|aria|jenny|\bana\b|michelle|emma|zira|karen|moira|tessa|fiona|catherine|amy|sara|linda|heather/i;
-const MALE_VOICE = /\bmale\b|daniel|arthur|oliver|ryan|thomas|george|\balex\b|\btom\b|nathan|evan|aaron|\bguy\b|davis|andrew|brian|christopher|eric|roger|steffan|david|mark|james|gordon|\blee\b|rishi|william|noah|tony/i;
+const FEMALE_VOICE = /female|woman|google us english$|google français|amélie|amelie|audrey|aurélie|aurelie|marie|julie|hortense|denise|eloise|vivienne|céline|celine|virginie|chantal|sylvie|brigitte|claire|léa|charlotte|kate|serena|stephanie|martha|libby|sonia|maisie|hazel|susan|samantha|ava\b|allison|zoe|nicky|joelle|victoria|aria|jenny|\bana\b|michelle|emma|zira|karen|moira|tessa|fiona|catherine|amy|sara|linda|heather/i;
+const MALE_VOICE = /\bmale\b|thomas|henri|nicolas|\bpaul\b|rémy|remy|antoine|jacques|jérôme|jerome|alain|claude|gérard|gerard|daniel|arthur|oliver|ryan|thomas|george|\balex\b|\btom\b|nathan|evan|aaron|\bguy\b|davis|andrew|brian|christopher|eric|roger|steffan|david|mark|james|gordon|\blee\b|rishi|william|noah|tony/i;
 function voiceSexOf(v) { return FEMALE_VOICE.test(v.name) ? 'f' : MALE_VOICE.test(v.name) ? 'm' : ''; }
 /** Gerätestimme: die beste Frauen- bzw. Männerstimme im gewählten Akzent (sonst die beste überhaupt) */
 function deviceVoice(lang) {
@@ -1130,9 +1165,9 @@ const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
    - angemeldete Lehrperson und Kinder mit Klassen-Login: immer (gespeicherte Aufnahmen)
    - über QR-Code geteilte Portion einer Lehrperson: deren gespeicherte Aufnahmen
    - alle anderen: sobald die Stimmen im Hintergrund geladen sind (Aufnahmen entstehen dann auf dem Gerät) */
-const useKokoro = (set) => ttsSupported && !!ttsEl && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
+const useKokoro = (set) => ttsSupported && !!ttsEl && langOf(set) === 'en' && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
 /** Darf dieses Gerät Aufnahmen selbst erzeugen? Nur angemeldete Lehrperson, nur eigene Portionen. */
-const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned)
+const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned) && langOf(set) === 'en'
   && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready');
 const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
@@ -1395,7 +1430,7 @@ function speak(text, lang, { slow = false } = {}) {
   stopSpeaking();
   if (!text) return;
   const set = typeof currentSet === 'function' ? currentSet() : null;
-  if (lang === 'de' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
+  if (lang !== 'en' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
   const t = ttsText(text, lang), voice = kokoroVoice();
   const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
   const key = `${voice}|${textHash(t)}`;
@@ -1701,7 +1736,7 @@ async function decodeShare(code) {
     : r[2] === 'none' ? { kind: 'none', src: '', manual: true }
       : r[2] && r[3] ? { kind: String(r[2]), src: String(r[3]), manual: true } : null);
   return {
-    name: String(d.n || 'Vokabeln'), lang: 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(d.s) ? d.s : 'picto',
+    name: String(d.n || 'Vokabeln'), lang: d.l === 'fr' ? 'fr' : 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(d.s) ? d.s : 'picto',
     audioOwner: /^[0-9A-Za-z-]{1,64}$/.test(String(d.o || '')) ? String(d.o) : '',
     accent: d.a === 'us' ? 'us' : 'gb',
     passMin: Number(d.p) >= 30 && Number(d.p) <= 90 ? Number(d.p) : 60,

@@ -72,10 +72,13 @@ create table if not exists public.vokabelwelt_public (
 );
 create index if not exists vokabelwelt_public_updated on public.vokabelwelt_public (updated_at desc);
 
+-- Sprache der Portion (Englisch oder Französisch)
+alter table public.vokabelwelt_public add column if not exists lang text not null default 'en' check (lang in ('en', 'fr'));
+
 alter table public.vokabelwelt_public enable row level security;
 revoke all on public.vokabelwelt_public from anon, authenticated;
 -- Lesen: alle Spalten außer dem Besitzer
-grant select (set_id, name, words, word_count, search, pic_style, created_at, updated_at) on public.vokabelwelt_public to anon, authenticated;
+grant select (set_id, name, words, word_count, search, pic_style, lang, created_at, updated_at) on public.vokabelwelt_public to anon, authenticated;
 -- Der Besitzer braucht seine eigene Spalte zum Speichern
 grant select (user_id) on public.vokabelwelt_public to authenticated;
 grant insert, update, delete on public.vokabelwelt_public to authenticated;

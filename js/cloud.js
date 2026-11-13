@@ -206,7 +206,7 @@ function cleanRemoteSet(d, id) {
     picStatus: w.picStatus === 'pending' ? 'stale' : (w.picStatus || 'stale'),
   }));
   return {
-    ...d, id, lang: 'en', name: String(d.name || 'Vokabeln').slice(0, 200), words,
+    ...d, id, lang: d.lang === 'fr' ? 'fr' : 'en', name: String(d.name || 'Vokabeln').slice(0, 200), words,
     picStyle: ['picto', 'clipart', 'emoji'].includes(d.picStyle) ? d.picStyle : 'picto',
     progress: d.progress && typeof d.progress === 'object' ? d.progress : {},
     updated: Number(d.updated) || 0,
@@ -354,7 +354,7 @@ function accountButtonHTML() {
     return `<button class="account-btn in" data-action="account" title="Konto: ${esc(cloud.user)} (${label})" aria-label="Konto ${esc(cloud.user)}, ${label}">
       ${icon('user')}<span class="account-name">${esc(shortName(cloud.user))}</span><i class="sync-dot ${st}" aria-hidden="true"></i></button>`;
   }
-  return `<button class="account-btn" data-action="login" title="Anmelden, um deine Portionen im Konto zu speichern">${icon('user')}<span>Anmelden</span></button>`;
+  return `<button class="account-btn" data-action="login-choose" title="Anmelden">${icon('user')}<span>Anmelden</span></button>`;
 }
 function renderAccountSlot() {
   const slot = document.getElementById('account-slot');
@@ -377,6 +377,24 @@ function accountStatusText() {
   return '';
 }
 
+/** „Anmelden“: zuerst wählen – Kind (Kärtchen) oder Lehrperson (E-Mail) */
+function openLoginChooser() {
+  if (!cloudConfigured()) { openLogin(); return; }
+  openModal(`
+    <header class="modal-head"><h2>Anmelden</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
+    <div class="role-pick">
+      <button type="button" class="role-tile kid" data-action="kid-login">
+        <span class="role-art" aria-hidden="true">${[0, 5, 8].map((i) => kidPwImg(i)).join('')}</span>
+        <strong>Ich bin ein Kind</strong><small>mit meinem Kärtchen</small>
+      </button>
+      <button type="button" class="role-tile teacher" data-action="login" data-mode="login">
+        <span class="role-art" aria-hidden="true"><span class="role-icon">${icon('user')}</span></span>
+        <strong>Ich bin Lehrperson</strong><small>mit E-Mail und Passwort</small>
+      </button>
+    </div>
+    <p class="small center role-foot">Noch kein Konto? <button type="button" class="link-btn" data-action="login" data-mode="create">Als Lehrperson registrieren</button></p>`, { label: 'Anmelden', cls: 'auth-modal role-modal' });
+}
+
 function openLogin(mode = 'login') {
   if (!cloudConfigured()) {
     openModal(`
@@ -390,11 +408,6 @@ function openLogin(mode = 'login') {
   const prevEmail = $('#auth-email')?.value || '';
   openModal(`
     <header class="modal-head"><h2>${create ? 'Konto erstellen' : 'Anmelden'}</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
-    <button type="button" class="kid-entry" data-action="kid-login"><span class="kid-entry-pics" aria-hidden="true">${[0, 5, 8].map((i) => kidPwImg(i)).join('')}</span><span><strong>Kinder-Login</strong><small>mit deinem Kärtchen</small></span>${icon('right')}</button>
-    <div class="seg auth-seg" role="group" aria-label="Anmelden oder Konto erstellen">
-      <button type="button" class="seg-btn" data-action="login" data-mode="login" aria-pressed="${!create}">Anmelden</button>
-      <button type="button" class="seg-btn" data-action="login" data-mode="create" aria-pressed="${create}">Neues Konto</button>
-    </div>
     <form class="auth-form" id="auth-form" autocomplete="on" novalidate>
       <label class="field" for="auth-email"><span class="label">E-Mail-Adresse</span>
         <input id="auth-email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="200" required autofocus placeholder="name@schule.ch" value="${esc(prevEmail)}"></label>
@@ -408,6 +421,10 @@ function openLogin(mode = 'login') {
       <button class="btn primary big" type="submit" id="auth-submit">${create ? 'Konto erstellen' : 'Anmelden'}</button>
       ${create ? '' : '<button type="button" class="link-btn" data-action="pw-forgot">Passwort vergessen?</button>'}
     </form>
+    <p class="small center role-foot">${create
+      ? 'Schon ein Konto? <button type="button" class="link-btn" data-action="login" data-mode="login">Anmelden</button>'
+      : 'Noch kein Konto? <button type="button" class="link-btn" data-action="login" data-mode="create">Registrieren</button>'}
+      · <button type="button" class="link-btn" data-action="login-choose">Zurück</button></p>
     <p class="muted small">Deine Portionen werden dann in deinem Konto gespeichert und sind auf jedem Gerät da, auf dem du dich anmeldest. Portionen, die schon auf diesem Gerät sind, kommen mit ins Konto.</p>`, { label: create ? 'Konto erstellen' : 'Anmelden', cls: 'auth-modal' });
   const form = $('#auth-form');
   form.addEventListener('submit', async (e) => {
@@ -564,13 +581,15 @@ function publicCopy(set) {
     return code ? [w.foreign, w.german || '', code] : [w.foreign, w.german || ''];
   });
   const search = [set.name, ...words.flatMap(([f, g]) => [f, g])].join(' | ').toLowerCase().slice(0, 20000);
-  return { user_id: cloud.uid, set_id: set.id, name: String(set.name || 'Vokabeln').slice(0, 200), words, search, pic_style: set.picStyle || 'picto' };
+  return { user_id: cloud.uid, set_id: set.id, name: String(set.name || 'Vokabeln').slice(0, 200), words, search, pic_style: set.picStyle || 'picto', lang: langOf(set) };
 }
 async function cloudPublish(sets) {
   const list = [].concat(sets).filter((s) => s && s.published && s.words.some((w) => w.foreign));
   if (!cloud.uid || !list.length) return;
   const c = await cloudClient();
-  const { error } = await c.from(PUBLIC_TABLE).upsert(list.map(publicCopy), { onConflict: 'user_id,set_id' });
+  let { error } = await c.from(PUBLIC_TABLE).upsert(list.map(publicCopy), { onConflict: 'user_id,set_id' });
+  // Spalte „lang“ fehlt noch (SQL nicht neu ausgeführt): ohne Sprache speichern
+  if (error && /lang/i.test(error.message || '')) ({ error } = await c.from(PUBLIC_TABLE).upsert(list.map((s) => { const x = publicCopy(s); delete x.lang; return x; }), { onConflict: 'user_id,set_id' }));
   if (error) throw error;
 }
 async function cloudUnpublish(setId) {
@@ -583,9 +602,13 @@ async function cloudUnpublish(setId) {
 async function publicSearch(q) {
   const c = await cloudClient();
   const terms = String(q || '').toLowerCase().replace(/[%_*(),.:;"'\\|]/g, ' ').split(/\s+/).filter((t) => t.length >= 2).slice(0, 4);
-  let query = c.from(PUBLIC_TABLE).select('set_id,name,words,word_count,pic_style,updated_at').order('updated_at', { ascending: false }).limit(30);
-  terms.forEach((t) => { query = query.or(`name.ilike."*${t}*",search.ilike."*${t}*"`); });
-  const { data, error } = await query;
+  const run = async (cols) => {
+    let query = c.from(PUBLIC_TABLE).select(cols).order('updated_at', { ascending: false }).limit(30);
+    terms.forEach((t) => { query = query.or(`name.ilike."*${t}*",search.ilike."*${t}*"`); });
+    return query;
+  };
+  let { data, error } = await run('set_id,name,words,word_count,pic_style,updated_at,lang');
+  if (error && /lang/i.test(error.message || '')) ({ data, error } = await run('set_id,name,words,word_count,pic_style,updated_at'));
   if (error) throw error;
   return (data || []).filter((r) => r && Array.isArray(r.words) && r.words.length);
 }
@@ -668,11 +691,11 @@ function openPublicPreview(i) {
   if (!r) return;
   closeTopSearch();
   openModal(`
-    <header class="modal-head"><div><p class="eyebrow">${flag()} ${r.word_count || r.words.length} Vokabeln</p><h2>${esc(r.name)}</h2></div>
+    <header class="modal-head"><div><p class="eyebrow">${flag(r.lang)} ${r.word_count || r.words.length} Vokabeln</p><h2>${esc(r.name)}</h2></div>
       <button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
     <div class="preview-table pub-preview" role="table" aria-label="Vokabeln">
-      <div class="pt-row pt-head" role="row"><span role="columnheader">${flag()} Englisch</span><span role="columnheader">Deutsch</span></div>
-      ${r.words.map((w) => `<div class="pt-row" role="row"><span role="cell" lang="en">${esc(w[0])}</span><span role="cell" lang="de">${esc(w[1] || '')}</span></div>`).join('')}
+      <div class="pt-row pt-head" role="row"><span role="columnheader">${flag(r.lang)} ${LANGS[r.lang === 'fr' ? 'fr' : 'en'].name}</span><span role="columnheader">Deutsch</span></div>
+      ${r.words.map((w) => `<div class="pt-row" role="row"><span role="cell" lang="${r.lang === 'fr' ? 'fr' : 'en'}">${esc(w[0])}</span><span role="cell" lang="de">${esc(w[1] || '')}</span></div>`).join('')}
     </div>
     <footer class="modal-foot">
       <button type="button" class="btn ghost" data-action="close-modal">Abbrechen</button>
@@ -687,7 +710,7 @@ function takePublicSet(i) {
   closeModal(true);
   if (existing) { openSet(existing.id); toast(`„${existing.name}“ hast du schon.`); return; }
   const set = newSet({
-    name: r.name, lang: 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(r.pic_style) ? r.pic_style : 'picto',
+    name: r.name, lang: r.lang === 'fr' ? 'fr' : 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(r.pic_style) ? r.pic_style : 'picto',
     rows: r.words.map((w) => ({ foreign: String(w[0] || ''), german: String(w[1] || ''), pic: codeToPic(w[2]) })).filter((x) => x.foreign),
   });
   set.publicRef = ref;

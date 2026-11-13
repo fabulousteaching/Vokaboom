@@ -1057,3 +1057,25 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .voice-prep:empty { display: none; }
 .voice-prep.done { background: var(--green-wash); color: var(--green-ink); }
 .voice-prep.warn { background: var(--amber-wash); color: var(--ink); }
+
+/* Anmelden: Kind oder Lehrperson */
+.role-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: .4rem 0 1rem; }
+.role-tile { min-width: 0; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; padding: 1rem; border-radius: 24px; border: 2px solid var(--line); background: var(--paper-2); color: var(--ink); font: inherit; cursor: pointer; text-align: center; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.role-tile:hover { transform: translateY(-2px); border-color: var(--brand); box-shadow: var(--shadow-card); }
+.role-tile.kid { background: var(--amber-wash); border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
+.role-tile.kid:hover { border-color: var(--amber); }
+.role-tile.teacher { background: var(--brand-wash); }
+.role-tile strong { font-family: var(--font-display); font-size: clamp(1.05rem, 3.6vw, 1.3rem); }
+.role-tile small { color: var(--ink-2); }
+.role-art { display: flex; justify-content: center; margin-bottom: .3rem; }
+.role-art img { width: clamp(34px, 9vw, 46px); height: clamp(34px, 9vw, 46px); margin: 0 -5px; background: var(--paper); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-soft); }
+.role-icon { width: clamp(56px, 15vw, 72px); height: clamp(56px, 15vw, 72px); border-radius: 20px; display: grid; place-items: center; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: var(--on-brand); }
+.role-icon .icon { width: 55%; height: 55%; }
+.role-foot { margin: .4rem 0 0; }
+.center { text-align: center; }
+/* Startseite: Sprache wählen */
+.lang-tabs { margin: 0 0 18px; }
+.lang-tabs .seg-btn { gap: .45rem; padding-inline: 1rem; }
+.lang-tabs .seg-btn .flag { width: 22px; height: auto; border-radius: 3px; }
+.lang-tabs .count { font-size: .75rem; background: var(--sunken-2); border-radius: 99px; padding: 0 .45rem; color: var(--ink-2); }
+.kid-set strong .flag, .set-pick-item .flag { width: 20px; height: auto; border-radius: 3px; vertical-align: -2px; margin-right: .2rem; }

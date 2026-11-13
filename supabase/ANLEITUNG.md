@@ -108,6 +108,15 @@ Vokaboom liest mit zwei Frauenstimmen vor: britisch Emma und amerikanisch Heart 
 - Eine Aufnahme ist ca. 40 KB gross. Der Gratis-Speicher von Supabase (1 GB) reicht für viele tausend Wörter.
 - Dafür braucht es den Speicher: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen.
 
+## Englisch und Französisch
+
+Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder Reiter hat seine eigenen Portionen; neue Portionen bekommen die Sprache des gewählten Reiters. Kinder sehen alle freigegebenen Portionen mit Flagge.
+
+- Französisch liest vorerst die beste französische Stimme des Geräts vor (z. B. Audrey/Amélie/Thomas auf iPhone/iPad, Denise/Henri unter Windows).
+- Beim Schreiben gehört der Artikel dazu: „chien“ statt „le chien“ ist fast richtig (Hinweis auf den Artikel), „la chien“ ist falsch.
+- Die Lauterkennung gibt es nur für Englisch; Französisch prüft die Spracherkennung des Browsers.
+- Damit die Suche weiss, welche Sprache eine Portion hat, `supabase/vokabelwelt.sql` nochmals ganz ausführen (neue Spalte `lang`).
+
 ## Passwort vergessen
 
 - **Mit E-Mail-Versand:** Im Anmelde-Fenster die E-Mail-Adresse eingeben und auf **Passwort vergessen?** klicken. Der Link in der E-Mail öffnet Vokaboom, dort wählt man ein neues Passwort.
