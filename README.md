@@ -95,7 +95,7 @@ Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie stren
 ## Browser
 
 - **Spracherkennung** gibt es in Chrome, Edge und Safari (auch auf iPad/iPhone). Firefox kann das nicht; dort bewerten sich die Kinder selbst (anhören und vergleichen).
-- **Vorlesen** funktioniert in allen aktuellen Browsern. Die Stimme und britisches oder amerikanisches Englisch lassen sich in den Einstellungen wählen.
+- **Vorlesen**: Englisch lesen vier ausgewählte Stimmen von [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) vor (frei nutzbar, Apache-2.0-Lizenz): britisch Emma (Frau) und George (Mann), amerikanisch Heart (Frau) und Michael (Mann). In den Einstellungen wählt man nur noch britisch/amerikanisch und Frau/Mann. Die Stimmen laufen direkt im Browser: Beim ersten Mal lädt jedes Gerät einmalig ca. 90 MB, danach sind sie gespeichert. Die Wörter einer Portion werden beim Öffnen schon vorbereitet. Solange die Stimmen laden – oder auf sehr alten Geräten, wo sie nicht laufen – liest die Stimme des Geräts vor. Deutsche Wörter liest immer die Gerätestimme.
 
 ## Aufbau
 
@@ -116,4 +116,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt:
 | `js/cloud.js` | Anmelden und Speichern im Konto (Supabase) |
 | `js/main.js` | Aktionen und Start |
 | `supabase/` | Tabelle mit Zugriffsregeln (`vokabelwelt.sql`) und Anleitung |
+| `js/tts-worker.js` | Vorlesen mit Kokoro im Hintergrund ([kokoro-js](https://github.com/hexgrad/kokoro), Apache-2.0; Modell Kokoro-82M, Apache-2.0) |
+| `js/classes.js` | Klassen, Kinder-Login, Login-Kärtchen (PDF), Auswertung |
+| `js/kid-pics.js` | Bildchen für Kinder-Logins ([Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji), MIT-Lizenz) |
 | `js/vendor/qrcode.js` | QR-Code-Erzeugung ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator), MIT-Lizenz, Kazuhiko Arase) |

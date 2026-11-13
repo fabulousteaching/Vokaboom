@@ -156,6 +156,16 @@ const actions = {
   'set-accent': (el) => {
     db.settings.accent = el.dataset.accent; saveDB();
     $$('[data-action="set-accent"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.accent === db.settings.accent)));
+    const vs = $('#voice-status'); if (vs) vs.innerHTML = voiceStatusText();
+    speak('Hello! The apple is red.', 'en');
+    if (currentSet()) ttsPrefetch(currentSet().words.map((w) => w.foreign));
+  },
+  'set-voice-sex': (el) => {
+    db.settings.voiceSex = el.dataset.sex; saveDB();
+    $$('[data-action="set-voice-sex"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sex === db.settings.voiceSex)));
+    const vs = $('#voice-status'); if (vs) vs.innerHTML = voiceStatusText();
+    speak('Hello! The apple is red.', 'en');
+    if (currentSet()) ttsPrefetch(currentSet().words.map((w) => w.foreign));
   },
   'voice-test': () => speak('Hello! The apple is red.', 'en'),
   wipe: async (el) => {

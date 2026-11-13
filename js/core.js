@@ -412,7 +412,7 @@ function parseVocab(text, opts = {}) {
 /* ---------------- Speicher ---------------- */
 const MAIN_STORE_KEY = 'vokabelwelt.v1';
 let STORE_KEY = MAIN_STORE_KEY; // angemeldetes Kind: eigener Speicherplatz (js/classes.js)
-const DEFAULT_SETTINGS = { sound: true, autoSpeak: true, accent: 'gb', voice: { en: '' }, rate: 0.9, micId: '', phonetic: { on: false, passMin: 60 } };
+const DEFAULT_SETTINGS = { sound: true, autoSpeak: true, accent: 'gb', voiceSex: 'f', rate: 0.9, micId: '', phonetic: { on: false, passMin: 60 } };
 let db = { sets: [], settings: structuredClone(DEFAULT_SETTINGS) };
 
 function loadDB() {
@@ -422,7 +422,7 @@ function loadDB() {
     const d = JSON.parse(raw);
     db = { ...db, ...d, settings: { ...structuredClone(DEFAULT_SETTINGS), ...(d.settings || {}) } };
     ['speechLevel', 'speechLevelChosen', 'minConf', 'azure'].forEach((k) => delete db.settings[k]); // alte Einstellungen aufräumen
-    db.settings.voice = { en: db.settings.voice?.en || '' };
+    delete db.settings.voice; // frühere Auswahl der Gerätestimme gibt es nicht mehr
     db.sets = (db.sets || []).filter((s) => s && Array.isArray(s.words));
     db.sets.forEach((s) => {
       s.lang = 'en'; // Vokaboom ist nur noch für Englisch
@@ -970,7 +970,12 @@ function fileToDataURL(file, max = 520) {
   });
 }
 
-/* ---------------- Audio: Vorlesen + Klänge ---------------- */
+/* ---------------- Audio: Vorlesen + Klänge ----------------
+   Englisch liest Kokoro vor (vier ausgewählte Stimmen: britisch/amerikanisch, Frau/Mann; js/tts-worker.js).
+   Solange Kokoro noch lädt oder auf alten Geräten nicht läuft, springt die Stimme des Geräts ein.
+   Deutsch (selten gebraucht) liest immer die Gerätestimme. */
+const KOKORO_VOICES = { gb: { f: 'bf_emma', m: 'bm_george' }, us: { f: 'af_heart', m: 'am_michael' } };
+const VOICE_NAMES = { bf_emma: 'Emma', bm_george: 'George', af_heart: 'Heart', am_michael: 'Michael' };
 const tts = { voices: [] };
 function refreshVoices() {
   if (!('speechSynthesis' in window)) return;
@@ -980,46 +985,148 @@ if ('speechSynthesis' in window) {
   refreshVoices();
   speechSynthesis.addEventListener?.('voiceschanged', refreshVoices);
 }
-const canSpeak = () => 'speechSynthesis' in window;
+const ttsSupported = typeof Worker !== 'undefined' && typeof WebAssembly === 'object' && !!(window.AudioContext || window.webkitAudioContext);
+const canSpeak = () => ttsSupported || 'speechSynthesis' in window;
 
-function voicesFor(lang) {
-  const want = langCode(lang).toLowerCase();
+/** Gerätestimme als Ersatz: passender Akzent, möglichst gute Qualität */
+function deviceVoice(lang) {
+  const want = (lang === 'de' ? 'de-DE' : langCode(lang)).toLowerCase();
   const base = want.slice(0, 2);
-  return tts.voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(base))
-    .sort((a, b) => voiceRank(b, want) - voiceRank(a, want));
+  const rank = (v) => {
+    const l = v.lang.toLowerCase().replace('_', '-');
+    let r = l === want ? 10 : 0;
+    if (/natural|neural|premium|enhanced|google/i.test(v.name)) r += 5;
+    if (v.localService) r += 1;
+    return r;
+  };
+  return tts.voices.filter((v) => v.lang.toLowerCase().replace('_', '-').startsWith(base)).sort((a, b) => rank(b) - rank(a))[0] || null;
 }
-function voiceRank(v, want) {
-  let r = 0;
-  const l = v.lang.toLowerCase().replace('_', '-');
-  if (l === want) r += 10;
-  if (/natural|neural|premium|enhanced|google/i.test(v.name)) r += 5;
-  if (/samantha|daniel|serena|kate|arthur|martha/i.test(v.name)) r += 3;
-  if (v.localService) r += 1;
-  return r;
-}
-function pickVoice(lang) {
-  const chosen = db.settings.voice?.[lang];
-  if (chosen) {
-    const v = tts.voices.find((x) => x.name === chosen);
-    if (v) return v;
-  }
-  return voicesFor(lang)[0] || null;
-}
-function speak(text, lang, { slow = false, onend } = {}) {
-  if (!canSpeak() || !text) { onend?.(); return; }
+function deviceSpeak(text, lang, slow) {
+  if (!('speechSynthesis' in window)) return;
   try {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(lang === 'de' ? stripParens(text) : ttsText(text, lang));
     u.lang = lang === 'de' ? 'de-DE' : langCode(lang);
-    const v = lang === 'de' ? null : pickVoice(lang);
+    const v = deviceVoice(lang);
     if (v) u.voice = v;
     u.rate = slow ? 0.55 : (db.settings.rate || 0.9);
-    u.onend = () => onend?.();
-    u.onerror = () => onend?.();
     speechSynthesis.speak(u);
-  } catch { onend?.(); }
+  } catch { /* */ }
 }
-const stopSpeaking = () => { try { canSpeak() && speechSynthesis.cancel(); } catch { /* */ } };
+
+const kokoro = { worker: null, state: 'idle', progress: 0, cache: new Map(), queue: [], busy: null, seq: 0, playId: 0, source: null, listeners: new Set() };
+const kokoroVoice = () => KOKORO_VOICES[db.settings.accent === 'us' ? 'us' : 'gb'][db.settings.voiceSex === 'm' ? 'm' : 'f'];
+const kokoroSpeed = (slow) => (slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9)));
+function kokoroNotify() { kokoro.listeners.forEach((fn) => { try { fn(); } catch { /* */ } }); }
+
+/** Kokoro im Hintergrund laden (einmal pro Gerät ~90 MB, danach aus dem Speicher des Browsers) */
+function kokoroStart() {
+  if (!ttsSupported || kokoro.worker || kokoro.state === 'failed') return;
+  try {
+    const v = typeof APP_VERSION === 'string' && APP_VERSION ? `?v=${APP_VERSION}` : '';
+    kokoro.worker = new Worker(`js/tts-worker.js${v}`, { type: 'module' });
+  } catch { kokoro.state = 'failed'; kokoroNotify(); return; }
+  kokoro.state = 'loading';
+  kokoro.worker.onmessage = (e) => {
+    const m = e.data || {};
+    if (m.type === 'progress' && m.total) { kokoro.progress = Math.min(0.99, m.loaded / m.total); kokoroNotify(); }
+    else if (m.type === 'ready') { kokoro.state = 'ready'; kokoro.progress = 1; kokoroNotify(); kokoroPump(); }
+    else if (m.type === 'audio' && kokoro.busy && kokoro.busy.id === m.id) {
+      const job = kokoro.busy; kokoro.busy = null;
+      const clip = { audio: m.audio, sr: m.sr };
+      kokoro.cache.set(job.key, clip);
+      if (kokoro.cache.size > 400) kokoro.cache.delete(kokoro.cache.keys().next().value);
+      job.done.forEach((d) => d.resolve(clip));
+      kokoroPump();
+    } else if (m.type === 'error') {
+      if (m.id == null) { kokoroFail(); return; }
+      if (kokoro.busy && kokoro.busy.id === m.id) { const job = kokoro.busy; kokoro.busy = null; job.done.forEach((d) => d.reject(new Error(m.error))); kokoroPump(); }
+    }
+  };
+  kokoro.worker.onerror = () => kokoroFail();
+  kokoro.worker.postMessage({ type: 'load' });
+}
+function kokoroFail() {
+  kokoro.state = 'failed';
+  try { kokoro.worker?.terminate(); } catch { /* */ }
+  kokoro.worker = null;
+  [kokoro.busy, ...kokoro.queue].filter(Boolean).forEach((j) => j.done.forEach((d) => d.reject(new Error('tts'))));
+  kokoro.busy = null; kokoro.queue = [];
+  kokoroNotify();
+}
+function kokoroPump() {
+  if (kokoro.busy || kokoro.state !== 'ready' || !kokoro.queue.length) return;
+  const job = kokoro.queue.shift();
+  job.id = ++kokoro.seq;
+  kokoro.busy = job;
+  kokoro.worker.postMessage({ type: 'gen', id: job.id, text: job.text, voice: job.voice, speed: job.speed });
+}
+/** Audio für einen Text holen (aus dem Zwischenspeicher oder neu erzeugen). urgent = vor allen anderen. */
+function kokoroGet(text, { slow = false, urgent = false } = {}) {
+  const voice = kokoroVoice(), speed = kokoroSpeed(slow);
+  const key = `${voice}|${speed}|${text}`;
+  const hit = kokoro.cache.get(key);
+  if (hit) return Promise.resolve(hit);
+  return new Promise((resolve, reject) => {
+    let job = kokoro.busy?.key === key ? kokoro.busy : kokoro.queue.find((j) => j.key === key);
+    if (!job) { job = { key, text, voice, speed, done: [] }; kokoro.queue.push(job); }
+    if (urgent && job !== kokoro.busy) { kokoro.queue = [job, ...kokoro.queue.filter((j) => j !== job)]; }
+    job.done.push({ resolve, reject });
+    kokoroPump();
+  });
+}
+/** Wörter einer Portion schon im Hintergrund vorbereiten, damit sie sofort kommen */
+function ttsPrefetch(texts) {
+  if (!ttsSupported || kokoro.state === 'failed') return;
+  kokoroStart();
+  const seen = new Set();
+  texts.slice(0, 120).forEach((t) => {
+    const x = ttsText(String(t || ''), 'en');
+    if (!x || seen.has(x)) return;
+    seen.add(x);
+    kokoroGet(x).catch(() => {});
+  });
+}
+
+function audioContext() {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+function playClip(clip) {
+  try {
+    const ctx = audioContext();
+    const buf = ctx.createBuffer(1, clip.audio.length, clip.sr);
+    buf.copyToChannel(clip.audio, 0);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start();
+    kokoro.source = src;
+  } catch { /* kein Audio */ }
+}
+
+function speak(text, lang, { slow = false } = {}) {
+  stopSpeaking();
+  if (!text) return;
+  if (lang === 'de' || !ttsSupported || kokoro.state === 'failed') { deviceSpeak(text, lang, slow); return; }
+  try { audioContext(); } catch { /* */ } // im Antippen freischalten (iPhone/iPad)
+  const t = ttsText(text, lang);
+  const voice = kokoroVoice(), speed = kokoroSpeed(slow);
+  const hit = kokoro.cache.get(`${voice}|${speed}|${t}`);
+  if (hit) { playClip(hit); return; }
+  if (kokoro.state !== 'ready') { kokoroStart(); deviceSpeak(text, lang, slow); return; } // lädt noch: Gerätestimme
+  const my = kokoro.playId;
+  kokoroGet(t, { slow, urgent: true })
+    .then((clip) => { if (my === kokoro.playId) playClip(clip); })
+    .catch(() => { if (my === kokoro.playId) deviceSpeak(text, lang, slow); });
+}
+const stopSpeaking = () => {
+  kokoro.playId++;
+  try { kokoro.source?.stop(); } catch { /* */ }
+  kokoro.source = null;
+  try { 'speechSynthesis' in window && speechSynthesis.cancel(); } catch { /* */ }
+};
 
 let audioCtx;
 function tone(freqs, dur = 0.12, type = 'sine', gain = 0.12) {

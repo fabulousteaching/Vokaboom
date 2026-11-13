@@ -337,6 +337,7 @@ function openSet(id) {
   ui.confirmDelete = null;
   go('set', { setId: id });
   const set = getSet(id);
+  if (set) ttsPrefetch(set.words.map((w) => w.foreign));
   if (set && set.words.some((w) => w.picStatus !== 'done' && !(w.pic && w.pic.manual))) startPictureFill(set);
 }
 
@@ -922,13 +923,7 @@ async function drawMissing(set) {
 /* ---------------- Einstellungen ---------------- */
 function openSettings() {
   const s = db.settings;
-  const voiceSelect = (lang) => {
-    const vs = voicesFor(lang);
-    return `<select id="voice-${lang}" data-lang="${lang}">
-      <option value="">Automatisch</option>
-      ${vs.map((v) => `<option value="${esc(v.name)}" ${s.voice?.[lang] === v.name ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}
-    </select>`;
-  };
+  kokoroStart();
   openModal(`
     <header class="modal-head"><h2>Einstellungen</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
     <div class="settings">
@@ -941,7 +936,13 @@ function openSettings() {
         </div>
       </div>
       ${canSpeak() ? `
-      <label class="field" for="voice-en"><span class="label">Stimme</span>${voiceSelect('en')}</label>
+      <div class="field"><span class="label">Stimme</span>
+        <div class="seg" role="group" aria-label="Stimme">
+          <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${s.voiceSex !== 'm'}">Frau</button>
+          <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${s.voiceSex === 'm'}">Mann</button>
+        </div>
+        <p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>
+      </div>
       <label class="field" for="set-rate"><span class="label">Sprechtempo</span><input type="range" id="set-rate" min="0.6" max="1.2" step="0.05" value="${s.rate}"></label>
       <div class="row"><button type="button" class="btn small secondary" data-action="voice-test" data-lang="en">${icon('speaker')} Stimme testen</button></div>`
         : '<p class="warn">Dieser Browser kann nicht vorlesen.</p>'}
@@ -972,7 +973,6 @@ function openSettings() {
     if (t.id === 'set-sound') s.sound = t.checked;
     if (t.id === 'set-autospeak') s.autoSpeak = t.checked;
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
-    if (t.id?.startsWith('voice-')) s.voice = { ...(s.voice || {}), [t.dataset.lang]: t.value };
     if (t.id === 'ph-on' || t.id === 'ph-min') {
       s.phonetic = { ...phCfg(), on: $('#ph-on').checked, passMin: parseInt($('#ph-min').value, 10) || 60 };
       if (t.id === 'ph-on' && t.checked && !phState.engine) loadPhoneticEngine().catch(() => {});
@@ -980,6 +980,15 @@ function openSettings() {
     saveDB();
   });
 }
+
+function voiceStatusText() {
+  const name = VOICE_NAMES[kokoroVoice()] || '';
+  if (!ttsSupported || kokoro.state === 'failed') return 'Die Vokaboom-Stimmen laufen auf diesem Gerät nicht. Es liest die Stimme des Geräts vor.';
+  if (kokoro.state === 'ready') return `${icon('check')} Stimme „${esc(name)}“ ist bereit.`;
+  if (kokoro.state === 'loading') return `<span class="spinner"></span> Stimmen werden geladen${kokoro.progress ? ` … ${Math.round(kokoro.progress * 100)} %` : ' …'} (nur beim ersten Mal, ca. 90 MB). So lange liest die Stimme des Geräts vor.`;
+  return '';
+}
+kokoro.listeners.add(() => { const el = document.getElementById('voice-status'); if (el) el.innerHTML = voiceStatusText(); });
 
 /* ---------- Lauterkennung ---------- */
 function phoneticSettingsHTML(s) {
