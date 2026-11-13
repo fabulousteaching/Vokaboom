@@ -33,9 +33,18 @@ const ARPA_IPA = {
 const ipa = (p) => ARPA_IPA[p] || p.toLowerCase();
 
 const phState = { status: 'idle', progress: 0, error: '', engine: null, loading: null, listeners: new Set() };
-const phCfg = () => ({ on: false, passMin: 60, ...(db.settings.phonetic || {}) });
-const phoneticOn = () => phCfg().on;
-const phoneticFor = () => phoneticOn();
+const phCfg = () => ({ passMin: 60, ...(db.settings.phonetic || {}), on: true });
+const phSupported = () => typeof WebAssembly === 'object' && !!navigator.mediaDevices?.getUserMedia && 'caches' in window;
+const phoneticOn = () => phSupported();
+/** Lauterkennung benutzen, sobald sie geladen ist. Bis dahin die Spracherkennung des Browsers (falls vorhanden). */
+const phoneticFor = () => phSupported() && (phState.status === 'ready' || !canListen());
+/** Datenpaket der Lauterkennung bei allen automatisch im Hintergrund laden (nicht im Datensparmodus) */
+function phInBackground() {
+  if (!phSupported() || phState.engine || phState.loading) return Promise.resolve();
+  const c = navigator.connection;
+  if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return Promise.resolve();
+  return loadPhoneticEngine().catch(() => {});
+}
 
 function phNotify() { phState.listeners.forEach((fn) => { try { fn(phState); } catch { /* */ } }); }
 
@@ -267,7 +276,7 @@ async function assessSpoken(word, { onStart, onLevel, onPhase } = {}) {
     if (!best || best.silent || r.score > best.score) best = { ...r, ref };
   }
   if (!best) throw 'ph-word';
-  let passMin = phCfg().passMin;
+  let passMin = passMinNow();
   // Kurze Wörter (höchstens 3 Laute pro Wort, z. B. he, his, tie) sind schwer zu treffen: 10 Punkte weniger nötig
   if (!best.silent && best.phones && best.phones.length <= 3 * String(best.ref || '').split(/\s+/).filter(Boolean).length) passMin = Math.max(30, passMin - 10);
   if (!best.silent) {

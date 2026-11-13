@@ -927,20 +927,19 @@ function openSettings() {
   openModal(`
     <header class="modal-head"><h2>Einstellungen</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
     <div class="settings">
-      <label class="switch"><input type="checkbox" id="set-sound" ${s.sound ? 'checked' : ''}><span>Klänge bei richtig und falsch</span></label>
-      <label class="switch"><input type="checkbox" id="set-autospeak" ${s.autoSpeak ? 'checked' : ''}><span>Wörter automatisch vorlesen</span></label>
-      <div class="field"><span class="label">Englische Aussprache</span>
+      ${isTeacher() ? `<div class="field"><span class="label">Englische Aussprache</span>
         <div class="seg" role="group" aria-label="Englische Aussprache">
           <button type="button" class="seg-btn" data-action="set-accent" data-accent="gb" aria-pressed="${s.accent !== 'us'}">Britisch</button>
           <button type="button" class="seg-btn" data-action="set-accent" data-accent="us" aria-pressed="${s.accent === 'us'}">Amerikanisch</button>
         </div>
-      </div>
+        <p class="small muted">Gilt auch für deine Klassen und für Portionen, die du per QR-Code teilst.</p>
+      </div>` : ''}
       ${canSpeak() ? `
-      <div class="field" id="voice-field">${voiceFieldHTML()}</div>
+      ${isTeacher() ? `<div class="field" id="voice-field">${voiceFieldHTML()}</div>` : ''}
       <label class="field" for="set-rate"><span class="label">Sprechtempo</span><input type="range" id="set-rate" min="0.6" max="1.2" step="0.05" value="${s.rate}"></label>
       <div class="row"><button type="button" class="btn small secondary" data-action="voice-test" data-lang="en">${icon('speaker')} Stimme testen</button></div>`
         : '<p class="warn">Dieser Browser kann nicht vorlesen.</p>'}
-      ${phoneticSettingsHTML(s)}
+      ${isTeacher() ? phoneticSettingsHTML(s) : ''}
       <div class="field"><span class="label">Mikrofon und Spracherkennung</span>
         ${canListen()
           ? `<label class="field" for="mic-device"><span class="small muted">Mikrofon</span>
@@ -967,70 +966,62 @@ function openSettings() {
     if (t.id === 'set-sound') s.sound = t.checked;
     if (t.id === 'set-autospeak') s.autoSpeak = t.checked;
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
-    if (t.id === 'ph-on' || t.id === 'ph-min') {
-      s.phonetic = { ...phCfg(), on: $('#ph-on').checked, passMin: parseInt($('#ph-min').value, 10) || 60 };
-      if (t.id === 'ph-on' && t.checked && !phState.engine) loadPhoneticEngine().catch(() => {});
+    if (t.id === 'ph-min') {
+      s.phonetic = { ...(s.phonetic || {}), passMin: parseInt(t.value, 10) || 60 };
+      applyTeacherPrefs();
     }
     saveDB();
   });
 }
 
-/** Stimmen-Auswahl: angemeldet (oder Kinder-Login) die vier Vokaboom-Stimmen, sonst die besten Gerätestimmen */
+/** Stimme: angemeldet (oder Kinder-Login, QR-Code einer Lehrperson) die Vokaboom-Stimme, sonst die beste Frauenstimme des Geräts */
 function voiceFieldHTML() {
-  const s = db.settings;
-  if (useKokoro()) {
-    return `<span class="label">Stimme</span>
-      <div class="seg" role="group" aria-label="Stimme">
-        <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${s.voiceSex !== 'm'}">Frau</button>
-        <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${s.voiceSex === 'm'}">Mann</button>
-      </div>
-      <p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>`;
-  }
+  if (useKokoro(currentSet())) return `<span class="label">Stimme</span><p class="small muted voice-status" id="voice-status">${voiceStatusText()}</p>`;
   const v = deviceVoice('en');
-  const want = s.voiceSex === 'm' ? 'm' : 'f';
   const note = !v ? 'Dieses Gerät hat keine englische Stimme gefunden. Es liest mit der Standardstimme vor.'
-    : voiceSexOf(v) && voiceSexOf(v) !== want ? `Auf diesem Gerät gibt es keine passende ${want === 'm' ? 'Männer' : 'Frauen'}stimme. Es liest „${esc(v.name)}“ vor.`
+    : voiceSexOf(v) === 'm' ? `Auf diesem Gerät gibt es keine passende Frauenstimme. Es liest „${esc(v.name)}“ vor.`
       : `Beste Stimme dieses Geräts: „${esc(v.name)}“.`;
   return `<span class="label">Stimme</span>
-    <div class="seg" role="group" aria-label="Stimme">
-      <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="f" aria-pressed="${want === 'f'}">Frau</button>
-      <button type="button" class="seg-btn" data-action="set-voice-sex" data-sex="m" aria-pressed="${want === 'm'}">Mann</button>
-    </div>
-    <p class="small muted">${note}${typeof cloud === 'object' && cloudConfigured() ? ' Mit Anmeldung gibt es die Vokaboom-Stimmen (auf allen Geräten gleich).' : ''}</p>`;
+    <p class="small muted" id="voice-status">${note}${kokoro.state === 'loading' ? ` <br><span class="spinner"></span> Die Vokaboom-Stimme wird im Hintergrund geladen${kokoro.progress ? ` (${Math.round(kokoro.progress * 100)} %)` : ''}. Danach liest Vokaboom mit ihr vor.` : ''}</p>`;
 }
 
 function voiceStatusText() {
   const name = VOICE_NAMES[kokoroVoice()] || '';
   if (!ttsSupported) return 'Dieses Gerät liest mit seiner eigenen Stimme vor.';
-  return `Stimme: <strong>${esc(name)}</strong>. Wörter, für die es noch keine Aufnahme gibt, liest die Stimme des Geräts vor.`;
+  return `Vokaboom-Stimme: <strong>${esc(name)}</strong> (${db.settings.accent === 'us' ? 'amerikanisch' : 'britisch'}). Wörter, für die es noch keine Aufnahme gibt, liest die Stimme des Geräts vor.`;
 }
 /** Zeile in der Portion: Wie viele Aufnahmen sind schon gespeichert? (nur bei eigenen Portionen) */
 function voicePrepHTML(set) {
   if (!set || !mayGenerate(set)) return '';
+  const vname = VOICE_NAMES[kokoroVoice()] || '';
+  if (!teacherIn()) {
+    // Ohne Anmeldung: nur die gewählte Stimme, nur auf diesem Gerät – kurze, ruhige Zeile
+    const { done, total } = audioCounts(set);
+    if (!total || done >= total) return '<p class="voice-prep" id="voice-prep"></p>';
+    return `<p class="voice-prep" id="voice-prep">${prep.running.has(set.id) ? '<span class="spinner"></span>' : icon('speaker')} Vokaboom-Stimme wird vorbereitet: <b>${done} von ${total}</b> Wörtern. Bis dahin liest die Gerätestimme.</p>`;
+  }
   if (prep.note) return `<p class="voice-prep warn" id="voice-prep">${icon('speaker')} ${esc(prep.note)}</p>`;
   const { done, total } = audioCounts(set);
   if (!total) return '<p class="voice-prep" id="voice-prep"></p>';
-  if (done >= total) return `<p class="voice-prep done" id="voice-prep">${icon('speaker')} Alle Wörter sind mit allen 4 Stimmen gespeichert${ownsAudio(set) ? ' – auch die Kinder hören sie sofort' : ''}.</p>`;
+  if (done >= total) return `<p class="voice-prep done" id="voice-prep">${icon('speaker')} Alle Wörter sind mit der Stimme ${esc(vname)} gespeichert${ownsAudio(set) ? ' – auch die Kinder hören sie sofort' : ''}.</p>`;
   const loading = kokoro.state === 'loading' ? ` · Stimmen werden geladen${kokoro.progress ? ` (${Math.round(kokoro.progress * 100)} %)` : ''}, nur beim ersten Mal ca. 90 MB` : '';
   return `<p class="voice-prep" id="voice-prep">${prep.running.has(set.id) ? '<span class="spinner"></span>' : icon('speaker')} Aufnahmen werden vorbereitet: <b>${done} von ${total}</b>${loading}. ${ownsAudio(set) ? 'Einmalig – danach hören alle Kinder die Stimmen sofort.' : 'Melde dich an, damit die Aufnahmen auch für die Kinder gespeichert werden.'} Seite offen lassen.</p>`;
 }
 kokoro.listeners.add(() => {
-  const el = document.getElementById('voice-status'); if (el) el.innerHTML = voiceStatusText();
+  const vf = document.getElementById('voice-field'); if (vf) vf.innerHTML = voiceFieldHTML();
   const vp = document.getElementById('voice-prep');
   if (vp && ui.view === 'set') vp.outerHTML = voicePrepHTML(currentSet()) || '<p class="voice-prep" id="voice-prep"></p>';
 });
 
 /* ---------- Lauterkennung ---------- */
+/** Nur für Lehrpersonen: Ab wie vielen Punkten ein Wort beim Aussprechen zählt (gilt auch für die Kinder) */
 function phoneticSettingsHTML(s) {
-  const c = { on: false, passMin: 60, ...(s.phonetic || {}) };
+  const passMin = Number(s.phonetic?.passMin) || 60;
   return `<div class="field ph-box">
-    <span class="label">Lauterkennung</span>
-    <p class="muted small">Prüft jeden einzelnen Laut statt nur das Wort. So fällt auch auf, wenn ein Wort so ausgesprochen wird, wie es geschrieben ist. Läuft ganz auf diesem Gerät, keine Aufnahme verlässt es. Beim ersten Mal werden ca. ${PH.MB} MB geladen und gespeichert. Auf älteren Handys kann es langsam sein.</p>
-    <label class="switch"><input type="checkbox" id="ph-on" ${c.on ? 'checked' : ''}><span>Lauterkennung einschalten</span></label>
-    <div class="row"><button type="button" class="btn small secondary" data-action="ph-load">${icon('upload')} Jetzt laden</button><span class="small" id="ph-status"></span></div>
-    <div class="ph-progress" id="ph-progress-set" hidden><span id="ph-bar-set"></span></div>
-    <label for="ph-min"><span class="small muted">Ein Wort zählt ab <strong id="ph-min-val">${c.passMin}</strong> von 100 Punkten</span></label>
-    <input type="range" id="ph-min" min="30" max="90" step="5" value="${c.passMin}">
+    <span class="label">Aussprechen: Lauterkennung</span>
+    <label for="ph-min"><span class="small muted">Ein Wort zählt ab <strong id="ph-min-val">${passMin}</strong> von 100 Punkten</span></label>
+    <input type="range" id="ph-min" min="30" max="90" step="5" value="${passMin}">
+    <p class="small muted">Gilt auch für deine Klassen und für Portionen, die du per QR-Code teilst.</p>
   </div>`;
 }
 

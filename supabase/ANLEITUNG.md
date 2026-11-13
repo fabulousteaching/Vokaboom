@@ -100,9 +100,9 @@ Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals
 
 ## Vokaboom-Stimmen (Audio-Speicher)
 
-Angemeldete Lehrpersonen und Kinder mit Klassen-Login hören die vier Vokaboom-Stimmen (britisch Emma/George, amerikanisch Heart/Michael). Wer nicht angemeldet ist, wählt in den Einstellungen eine der besten Stimmen seines Geräts.
+Vokaboom liest mit zwei Frauenstimmen vor: britisch Emma und amerikanisch Heart (Einstellungen: Britisch/Amerikanisch). Angemeldete Lehrpersonen, Kinder mit Klassen-Login und Kinder mit dem QR-Code einer Lehrperson hören die gespeicherten Aufnahmen. Wer sonst nicht angemeldet ist, hört zuerst die beste Frauenstimme des Geräts; die Vokaboom-Stimme lädt im Hintergrund und liest danach vor.
 
-- Die Stimmen werden im Browser erzeugt, das dauert pro Wort ein paar Sekunden. Deshalb passiert es nur **einmal**: Öffnet eine angemeldete Lehrperson eine eigene Portion, erzeugt ihr Gerät im Hintergrund alle Wörter mit allen 4 Stimmen und speichert sie im Supabase-Speicher (Bucket `vokaboom-audio`). Oben in der Portion steht der Fortschritt („Aufnahmen werden vorbereitet: 37 von 120“). Seite offen lassen, bis „Alle Wörter sind … gespeichert“ erscheint.
+- Die Stimmen werden im Browser erzeugt, das dauert pro Wort ein paar Sekunden. Deshalb passiert es nur **einmal**: Öffnet eine angemeldete Lehrperson eine eigene Portion, erzeugt ihr Gerät im Hintergrund alle Wörter mit beiden Stimmen und speichert sie im Supabase-Speicher (Bucket `vokaboom-audio`). Oben in der Portion steht der Fortschritt („Aufnahmen werden vorbereitet: 37 von 120“). Seite offen lassen, bis „Alle Wörter sind … gespeichert“ erscheint.
 - Beim ersten Mal lädt das Gerät der Lehrperson dafür einmalig ca. 90 MB.
 - Kinder-Geräte laden nichts davon: Sie spielen die fertigen Aufnahmen sofort ab. Gibt es für ein Wort noch keine Aufnahme, liest die Gerätestimme.
 - Eine Aufnahme ist ca. 40 KB gross. Der Gratis-Speicher von Supabase (1 GB) reicht für viele tausend Wörter.

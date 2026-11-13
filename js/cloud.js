@@ -257,6 +257,7 @@ async function cloudSync() {
       if (ui.view === 'home') render();
     }
     cloud.status = 'ok'; cloud.error = ''; cloud.lastSync = Date.now();
+    if (applyTeacherPrefs()) saveDB(); // Akzent/Punktzahl der Lehrperson in alle eigenen Portionen
   } catch (e) {
     cloud.status = 'error'; cloud.error = cloudErrorText(e);
     if (e?.status === 401 || e?.code === 'PGRST301') forgetCloudUser();

@@ -44,7 +44,29 @@ const isFramed = (() => { try { return window.top !== window.self; } catch { ret
 const LANGS = {
   en: { name: 'Englisch', short: 'EN', adj: 'englische' },
 };
-const langCode = () => (db.settings.accent === 'us' ? 'en-US' : 'en-GB');
+/* Akzent und nötige Punktzahl bestimmt die Lehrperson (angemeldet). Lernende – mit Kinder-Login, über QR-Code
+   oder ohne Anmeldung – bekommen, was in der Portion steht (von der Lehrperson), sonst Britisch und 60 Punkte. */
+const isTeacher = () => typeof cloud === 'object' && !!cloud.uid;
+const ctxSet = () => (typeof currentSet === 'function' ? currentSet() : null);
+const accentNow = () => (isTeacher() ? (db.settings.accent === 'us' ? 'us' : 'gb') : (ctxSet()?.accent === 'us' ? 'us' : 'gb'));
+const passMinNow = () => {
+  const own = Number(db.settings.phonetic?.passMin) || 60;
+  if (isTeacher()) return own;
+  const v = Number(ctxSet()?.passMin);
+  return v >= 30 && v <= 90 ? v : 60;
+};
+/** Einstellungen der Lehrperson in ihre eigenen Portionen schreiben (Kinder bekommen sie so mit). Liefert true bei Änderung. */
+function applyTeacherPrefs() {
+  if (!isTeacher()) return false;
+  const accent = db.settings.accent === 'us' ? 'us' : 'gb', passMin = Number(db.settings.phonetic?.passMin) || 60;
+  let changed = false;
+  for (const s of db.sets) {
+    if (s.shareId || s.assigned) continue;
+    if (s.accent !== accent || s.passMin !== passMin) { s.accent = accent; s.passMin = passMin; s.updated = Date.now(); changed = true; }
+  }
+  return changed;
+}
+const langCode = () => (accentNow() === 'us' ? 'en-US' : 'en-GB');
 
 const ARTICLE_RE = {
   en: /^(?:the|a|an|to)\s+/i,
@@ -423,6 +445,7 @@ function loadDB() {
     db = { ...db, ...d, settings: { ...structuredClone(DEFAULT_SETTINGS), ...(d.settings || {}) } };
     ['speechLevel', 'speechLevelChosen', 'minConf', 'azure'].forEach((k) => delete db.settings[k]); // alte Einstellungen aufräumen
     delete db.settings.voice; // frühere Auswahl der Gerätestimme gibt es nicht mehr
+    db.settings.sound = true; db.settings.autoSpeak = true; // nicht mehr einstellbar: immer an
     db.sets = (db.sets || []).filter((s) => s && Array.isArray(s.words));
     db.sets.forEach((s) => {
       s.lang = 'en'; // Vokaboom ist nur noch für Englisch
@@ -467,6 +490,7 @@ function newSet({ name, lang, rows, picStyle = 'picto' }) {
     progress: {},
   };
   db.sets.unshift(set);
+  applyTeacherPrefs(); // angemeldet: Akzent und Punktzahl der Lehrperson
   saveDB();
   return set;
 }
@@ -971,10 +995,10 @@ function fileToDataURL(file, max = 520) {
 }
 
 /* ---------------- Audio: Vorlesen + Klänge ----------------
-   Englisch liest Kokoro vor (vier ausgewählte Stimmen: britisch/amerikanisch, Frau/Mann; js/tts-worker.js).
+   Englisch liest Kokoro vor (zwei Frauenstimmen: britisch Emma, amerikanisch Heart; js/tts-worker.js).
    Solange Kokoro noch lädt oder auf alten Geräten nicht läuft, springt die Stimme des Geräts ein.
    Deutsch (selten gebraucht) liest immer die Gerätestimme. */
-const KOKORO_VOICES = { gb: { f: 'bf_emma', m: 'bm_george' }, us: { f: 'af_heart', m: 'am_michael' } };
+const KOKORO_VOICES = { gb: 'bf_emma', us: 'af_heart' };
 const VOICE_NAMES = { bf_emma: 'Emma', bm_george: 'George', af_heart: 'Heart', am_michael: 'Michael' };
 const tts = { voices: [] };
 function refreshVoices() {
@@ -1015,7 +1039,7 @@ function voiceSexOf(v) { return FEMALE_VOICE.test(v.name) ? 'f' : MALE_VOICE.tes
 function deviceVoice(lang) {
   const list = bestDeviceVoices(lang);
   if (lang === 'de') return list[0] || null;
-  const want = db.settings.voiceSex === 'm' ? 'm' : 'f';
+  const want = 'f'; // nur Frauenstimmen
   return list.find((v) => voiceSexOf(v) === want) || list[0] || null;
 }
 function deviceSpeak(text, lang, slow) {
@@ -1033,11 +1057,11 @@ function deviceSpeak(text, lang, slow) {
 
 /* ---------- Audio-Speicher ----------
    Kokoro braucht im Browser 2–5 Sekunden pro Wort. Deshalb wird jedes Wort nur EINMAL erzeugt:
-   auf dem Gerät der Lehrperson im Hintergrund, mit allen vier Stimmen. Die Tondateien kommen in den
+   auf dem Gerät der Lehrperson im Hintergrund, mit beiden Stimmen. Die Tondateien kommen in den
    Supabase-Speicher (Bucket „vokaboom-audio“, Ordner = Konto der Lehrperson) und auf dem Gerät in die
    IndexedDB. In der Portion steht, welche Aufnahmen es gibt (set.audio = { o: Konto, h: { Stimme: { Kennung: 1 } } }).
    Kinder-Geräte laden kein Modell: Sie spielen die fertigen Dateien ab; fehlt eine, liest die Gerätestimme. */
-const ALL_VOICES = ['bf_emma', 'bm_george', 'af_heart', 'am_michael'];
+const ALL_VOICES = ['bf_emma', 'af_heart'];
 const AUDIO_BUCKET = 'vokaboom-audio';
 /** Kurze Kennung eines Textes (für Dateinamen) */
 function textHash(t) {
@@ -1088,19 +1112,25 @@ function wavBlob(f32, sr) {
 }
 
 const kokoro = { worker: null, state: 'idle', progress: 0, queue: [], busy: null, seq: 0, playId: 0, listeners: new Set() };
-const kokoroVoice = () => KOKORO_VOICES[db.settings.accent === 'us' ? 'us' : 'gb'][db.settings.voiceSex === 'm' ? 'm' : 'f'];
+const kokoroVoice = () => KOKORO_VOICES[accentNow()];
 function kokoroNotify() { kokoro.listeners.forEach((fn) => { try { fn(); } catch { /* */ } }); }
 const kidDevice = () => typeof isKid === 'function' && isKid();
 const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
 /** Kokoro nur für angemeldete Lehrpersonen und Kinder mit Klassen-Login; alle anderen hören die beste Gerätestimme. */
-const useKokoro = () => ttsSupported && !!ttsEl && (kidDevice() || teacherIn());
+/* Wer hört die Vokaboom-Stimmen?
+   - angemeldete Lehrperson und Kinder mit Klassen-Login: immer (gespeicherte Aufnahmen)
+   - über QR-Code geteilte Portion einer Lehrperson: deren gespeicherte Aufnahmen
+   - alle anderen: sobald die Stimmen im Hintergrund geladen sind (Aufnahmen entstehen dann auf dem Gerät) */
+const useKokoro = (set) => ttsSupported && !!ttsEl && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
 /** Darf dieses Gerät Aufnahmen selbst erzeugen? Nur angemeldete Lehrperson, nur eigene Portionen. */
-const mayGenerate = (set) => useKokoro() && !kidDevice() && teacherIn() && kokoro.state !== 'failed' && !(set && (set.shareId || set.assigned));
+const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned)
+  && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready');
 const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
 /** Kokoro im Hintergrund laden (einmal pro Gerät ~90 MB, danach aus dem Speicher des Browsers) */
 function kokoroStart() {
-  if (!ttsSupported || kidDevice() || !teacherIn() || kokoro.worker || kokoro.state === 'failed') return;
+  if (!ttsSupported || kidDevice() || kokoro.worker || kokoro.state === 'failed') return;
+  bgLoadMark(+1);
   try {
     const v = typeof APP_VERSION === 'string' && APP_VERSION ? `?v=${APP_VERSION}` : '';
     kokoro.worker = new Worker(`js/tts-worker.js${v}`, { type: 'module' });
@@ -1109,7 +1139,11 @@ function kokoroStart() {
   kokoro.worker.onmessage = (e) => {
     const m = e.data || {};
     if (m.type === 'progress' && m.total) { kokoro.progress = Math.min(0.99, m.loaded / m.total); kokoroNotify(); }
-    else if (m.type === 'ready') { kokoro.state = 'ready'; kokoro.progress = 1; kokoroNotify(); kokoroPump(); }
+    else if (m.type === 'ready') {
+      kokoro.state = 'ready'; kokoro.progress = 1; bgLoadMark(0); kokoroNotify(); kokoroPump();
+      const cur = typeof currentSet === 'function' ? currentSet() : null;
+      if (cur && !teacherIn()) audioForSet(cur);
+    }
     else if (m.type === 'audio' && kokoro.busy && kokoro.busy.id === m.id) {
       const job = kokoro.busy; kokoro.busy = null;
       const blob = wavBlob(m.audio, m.sr);
@@ -1123,6 +1157,27 @@ function kokoroStart() {
   kokoro.worker.onerror = () => kokoroFail();
   kokoro.worker.postMessage({ type: 'load' });
 }
+/* Laden im Hintergrund: Wird es zweimal nicht fertig (z. B. Seite auf einem alten iPad abgestürzt),
+   versucht es dieses Gerät nicht mehr von selbst. */
+const BG_KEY = 'vokaboom.voiceLoad';
+function bgLoadMark(delta) {
+  try {
+    if (delta === 0) { localStorage.removeItem(BG_KEY); return; }
+    const n = (parseInt(localStorage.getItem(BG_KEY) || '0', 10) || 0) + delta;
+    localStorage.setItem(BG_KEY, String(n));
+  } catch { /* */ }
+}
+function voicesInBackground() {
+  if (!ttsSupported || kidDevice() || kokoro.worker) return;
+  const c = navigator.connection;
+  if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return; // Datensparmodus / langsames Netz
+  if (navigator.deviceMemory && navigator.deviceMemory < 3) return;
+  let tries = 0;
+  try { tries = parseInt(localStorage.getItem(BG_KEY) || '0', 10) || 0; } catch { /* */ }
+  if (tries >= 2) return;
+  kokoroStart();
+}
+
 function kokoroFail() {
   kokoro.state = 'failed';
   try { kokoro.worker?.terminate(); } catch { /* */ }
@@ -1247,14 +1302,16 @@ function markClip(set, voice, h) {
   kokoroNotify();
 }
 
-/* Im Hintergrund alle Wörter einer eigenen Portion mit allen vier Stimmen vorbereiten */
+/* Im Hintergrund alle Wörter einer eigenen Portion mit beiden Stimmen vorbereiten */
 const prep = { running: new Set(), note: '' };
 function setTexts(set) { return [...new Set(set.words.slice(0, 150).map((w) => ttsText(String(w.foreign || ''), 'en')).filter(Boolean))]; }
+/** Welche Stimmen werden vorbereitet? Lehrperson alle vier (für die Kinder), sonst nur die gewählte. */
+const prepVoices = () => [kokoroVoice()]; // nur die Stimme des gewählten Akzents – spart Daten
 function audioCounts(set) {
-  const texts = setTexts(set);
-  const total = texts.length * ALL_VOICES.length;
+  const texts = setTexts(set), voices = prepVoices();
+  const total = texts.length * voices.length;
   let done = 0;
-  for (const v of ALL_VOICES) for (const t of texts) if (set.audio?.h?.[v]?.[textHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${textHash(t)}`))) done++;
+  for (const v of voices) for (const t of texts) if (set.audio?.h?.[v]?.[textHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${textHash(t)}`))) done++;
   return { done, total };
 }
 async function audioPrepare(set) {
@@ -1262,7 +1319,7 @@ async function audioPrepare(set) {
   prep.running.add(set.id);
   try {
     const texts = setTexts(set);
-    const voices = [kokoroVoice(), ...ALL_VOICES.filter((v) => v !== kokoroVoice())];
+    const voices = prepVoices();
     for (const v of voices) {
       for (const t of texts) {
         if (!getSet(set.id) || kokoro.state === 'failed') return;
@@ -1278,7 +1335,7 @@ async function audioPrepare(set) {
 }
 /** Aufnahmen der aktuellen Stimme schon laden (Kinder-Geräte und alle anderen), damit sie sofort kommen */
 async function audioWarm(set) {
-  if (!set || !useKokoro()) return;
+  if (!set || !useKokoro(set)) return;
   const v = kokoroVoice();
   const texts = setTexts(set);
   for (let i = 0; i < texts.length; i += 4) await Promise.all(texts.slice(i, i + 4).map((t) => findClip(t, v, set).catch(() => null)));
@@ -1328,8 +1385,8 @@ function playClipURL(url, rate) {
 function speak(text, lang, { slow = false } = {}) {
   stopSpeaking();
   if (!text) return;
-  if (lang === 'de' || !useKokoro()) { deviceSpeak(text, lang, slow); return; }
   const set = typeof currentSet === 'function' ? currentSet() : null;
+  if (lang === 'de' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
   const t = ttsText(text, lang), voice = kokoroVoice();
   const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
   const key = `${voice}|${textHash(t)}`;
@@ -1605,6 +1662,8 @@ async function encodeShare(set, { lite = false } = {}) {
   const data = {
     v: 2, n: set.name, l: set.lang, s: set.picStyle,
     ...(set.audio?.o || (typeof cloud === 'object' && cloud.uid && !set.shareId && !set.assigned) ? { o: set.audio?.o || cloud.uid } : {}), // Audio-Speicher der Lehrperson
+    ...(set.accent === 'us' ? { a: 'us' } : {}),
+    ...(set.passMin && set.passMin !== 60 ? { p: set.passMin } : {}),
     w: set.words.map((w) => {
       let code = picToCode(w.pic);
       if (lite && /^[fus]/.test(code)) code = '';
@@ -1634,7 +1693,9 @@ async function decodeShare(code) {
       : r[2] && r[3] ? { kind: String(r[2]), src: String(r[3]), manual: true } : null);
   return {
     name: String(d.n || 'Vokabeln'), lang: 'en', picStyle: ['picto', 'clipart', 'emoji'].includes(d.s) ? d.s : 'picto',
-    audioOwner: /^[0-9a-f-]{36}$/i.test(String(d.o || '')) ? String(d.o) : '',
+    audioOwner: /^[0-9A-Za-z-]{1,64}$/.test(String(d.o || '')) ? String(d.o) : '',
+    accent: d.a === 'us' ? 'us' : 'gb',
+    passMin: Number(d.p) >= 30 && Number(d.p) <= 90 ? Number(d.p) : 60,
     rows: (d.w || []).map((r) => ({
       foreign: String(r[0] || ''), german: String(r[1] || ''),
       pic: d.v === 2 ? codeToPic(r[2]) : v1pic(r),

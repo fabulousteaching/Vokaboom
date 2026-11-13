@@ -154,7 +154,7 @@ const actions = {
 
   /* Einstellungen */
   'set-accent': (el) => {
-    db.settings.accent = el.dataset.accent; saveDB();
+    db.settings.accent = el.dataset.accent; applyTeacherPrefs(); saveDB();
     $$('[data-action="set-accent"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.accent === db.settings.accent)));
     const vf = $('#voice-field'); if (vf) vf.innerHTML = voiceFieldHTML();
     speak('Hello! The apple is red.', 'en');
@@ -419,6 +419,7 @@ async function importFromHash() {
     const set = newSet({ name: data.name, lang: 'en', rows: data.rows, picStyle: data.picStyle });
     set.shareId = share;
     if (data.audioOwner) set.audio = { o: data.audioOwner, h: {} };
+    set.accent = data.accent; set.passMin = data.passMin;
     saveDB();
     openSet(set.id);
     toast(`Neue Vokabelportion „${set.name}“ geladen.`);
@@ -465,5 +466,7 @@ async function boot() {
   if (isKid()) kidRefresh().catch(() => { kid.status = 'error'; renderAccountSlot(); });
   else cloudInit();
   setTimeout(checkForUpdate, 1500);
+  // Datenpakete im Hintergrund: zuerst die Lauterkennung (für alle), danach die Stimmen (ohne Anmeldung)
+  setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => phInBackground().then(() => voicesInBackground())), 3000);
 }
 boot();
