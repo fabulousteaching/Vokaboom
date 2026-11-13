@@ -522,49 +522,70 @@ function guessForeignLang(rows) {
   if (en >= Math.max(2, n * 0.4) && en > fr * 2) return 'en';
   return '';
 }
-/** Bester Schnitt einer Zeile ohne Trennzeichen: [links, rechts, Punkte] */
-function bestSplit(line, lang) {
+/** Wie deutsch ist eine Zeile? (> 0 deutsch, < 0 Fremdsprache) */
+function lineVote(line) {
+  return String(line || '').split(/\s+/).filter(Boolean).reduce((sum, w) => sum + tokVote(w), 0);
+}
+/** Bester Schnitt einer Zeile ohne Trennzeichen: [links, rechts, Punkte].
+    Nur wenn links und rechts wirklich verschiedene Sprachen sind (sonst Punkte −∞). */
+function bestSplit(line, relaxed = false) {
   const t = line.split(/\s+/).filter(Boolean);
   if (t.length < 2) return [line, '', -Infinity];
-  const votes = t.map((w, i) => tokVote(w, lang) - (i === 0 && /^[A-Z]/.test(w) ? 1 : 0)); // Satzanfang gross zählt nicht
+  const votes = t.map((w, i) => tokVote(w) - (i === 0 && /^[A-Z]/.test(w) ? 1 : 0)); // Satzanfang gross zählt nicht
   let best = null;
   for (let k = 1; k < t.length; k++) {
     // Ein Artikel gehört zum Wort danach: nie direkt nach „der“, „the“, „la“ … schneiden
-    if (/^(der|die|das|den|dem|des|ein|eine|einen|mein|meine|the|a|an|to|my|le|la|les|un|une|des|du|se|mon|ma|mes)$/i.test(t[k - 1])) continue;
-    const left = votes.slice(0, k).reduce((x, y) => x + y, 0), right = votes.slice(k).reduce((x, y) => x + y, 0);
+    if (/^(der|die|das|den|dem|des|ein|eine|einen|mein|meine|the|a|an|to|my|le|la|les|un|une|du|se|mon|ma|mes)$/i.test(t[k - 1])) continue;
+    const L = votes.slice(0, k).reduce((x, y) => x + y, 0), Rv = votes.slice(k).reduce((x, y) => x + y, 0);
+    // Deutsch braucht deutliche Hinweise (≥ 1.5): ein grosser Name allein („Nathalie“) reicht nicht
+    // relaxed (jede Zeile enthält sicher ein ganzes Paar): jeder Sprachwechsel zählt
+    const opposite = relaxed ? (L * Rv < 0 || (L !== Rv && t.length === 2))
+      : (L <= -0.5 && Rv >= 1) || (L >= 1 && Rv <= -0.5) || (Math.abs(L) < 0.5 && Math.abs(Rv) >= 1.5) || (Math.abs(Rv) < 0.5 && Math.abs(L) >= 1.5);
+    if (!opposite) continue;
     const startsDe = /^[A-ZÄÖÜ]/.test(t[k]) || DE_ART_START.test(t.slice(k).join(' ')); // Schnitt vor deutschem Nomen/Artikel bevorzugen
-    const sc = Math.abs(right - left) + (startsDe && right > left ? 0.6 : 0) - Math.abs(k - t.length / 2) * 0.05;
-    if (!best || sc > best[2]) best = [t.slice(0, k).join(' '), t.slice(k).join(' '), sc];
+    const afterSentence = /[.!?…]["»”]?$/.test(t[k - 1]) ? 3 : 0; // Satzende: danach beginnt die Übersetzung
+    const sc = Math.min(Math.abs(L), Math.abs(Rv)) + Math.abs(Rv - L) * 0.25 + (startsDe && Rv > L ? 0.6 : 0) + afterSentence - Math.abs(k - t.length / 2) * 0.05;
+    if (!best || sc > best[2]) best = [t.slice(0, k).join(' '), t.slice(k).join(' '), sc, L, Rv];
   }
-  return best || [line, '', -Infinity];
+  return best || [line, '', -Infinity, 0, 0];
 }
-/** Zeilen ohne Trennzeichen: als Paare untereinander oder je Zeile geteilt? */
-function pairUp(lines, blocks, lang) {
+/** Steht in der Zeile eindeutig beides (Wort und Übersetzung)? */
+const strongSplit = (line) => { const r = bestSplit(line); return r[1] && Math.abs(r[3]) >= 1 && Math.abs(r[4]) >= 1; };
+/** Untereinander geschrieben? Abwechselnd (Wort, Übersetzung, …) oder spaltenweise (erst alle Wörter, dann alle Übersetzungen).
+    Liefert Paare oder null. Die obere/erste gehört immer zur zugehörigen unteren – es wird nichts vermischt. */
+function stackedPairs(lines, blocks) {
+  const n = lines.length;
+  if (blocks.length >= 2 && blocks.every((bl) => bl.length === 2)) return { pairs: blocks.map((bl) => [bl[0], bl[1]]), fit: 1 };
+  if (n < 2 || n % 2) return null;
+  const v = lines.map(lineVote), m = n / 2;
+  // Eine Zeile, die schon beide Sprachen enthält, ist keine Hälfte eines untereinander stehenden Paars
+  const mixed = lines.map(strongSplit);
+  const opp = (i, j) => {
+    if (mixed[i] || mixed[j]) return false;
+    const a = Math.abs(v[i]), b = Math.abs(v[j]);
+    return (v[i] * v[j] < 0 && Math.min(a, b) >= 0.5) || (Math.min(a, b) < 0.5 && Math.max(a, b) >= 1.5);
+  };
+  let alt = 0, half = 0;
+  for (let k = 0; k < m; k++) { if (opp(2 * k, 2 * k + 1)) alt++; if (opp(k, k + m)) half++; }
+  const pairsAlt = () => Array.from({ length: m }, (_, k) => [lines[2 * k], lines[2 * k + 1]]);
+  const pairsHalf = () => Array.from({ length: m }, (_, k) => [lines[k], lines[k + m]]);
+  // Nur einzelne Wörter: sicher untereinander
+  if (lines.every((l) => !/\s/.test(l.trim()))) return { pairs: half > alt ? pairsHalf() : pairsAlt(), fit: 1 };
+  if (alt >= half) return { pairs: pairsAlt(), fit: alt / m };
+  return { pairs: pairsHalf(), fit: half / m };
+}
+/** Zeilen ohne Trennzeichen: untereinander (Paare) oder je Zeile geteilt? */
+function pairUp(lines, blocks) {
   if (lines.length < 2) return null;
-  const single = lines.filter((l) => !/\s/.test(l.trim())).length;
-  const pairsOk = lines.length % 2 === 0;
-  const twoBlocks = blocks.length >= 2 && blocks.every((b) => b.length === 2);
-  let usePairs = false;
-  if (twoBlocks) usePairs = true;
-  else if (pairsOk) {
-    if (single / lines.length >= 0.5) usePairs = true;
-    else {
-      let o1 = 0, o2 = 0;
-      for (let i = 0; i < lines.length; i += 2) {
-        const a = lines[i], b = lines[i + 1];
-        o1 += deScore(b) + foScore(a, lang); o2 += deScore(a) + foScore(b, lang);
-      }
-      const pairAvg = Math.max(o1, o2) / (lines.length / 2);
-      const splitAvg = lines.reduce((s, l) => s + Math.max(0, bestSplit(l, lang)[2]), 0) / lines.length;
-      usePairs = pairAvg > splitAvg + 1;
-    }
-  }
-  if (usePairs && (pairsOk || twoBlocks)) {
-    const out = [];
-    for (let i = 0; i + 1 < lines.length; i += 2) out.push([lines[i], lines[i + 1]]);
-    return out;
-  }
-  return lines.map((l) => { const [a, b] = bestSplit(l, lang); return b ? [a, b] : [l, '']; });
+  const stacked = stackedPairs(lines, blocks);
+  const sameLine = lines.filter(strongSplit).length / lines.length;
+  if (stacked && stacked.fit >= 0.6 && stacked.fit >= sameLine) return stacked.pairs;
+  // Gleiche Zeile: wo eindeutig die Sprache wechselt; sonst an der wahrscheinlichsten Stelle (jede Zeile ist ein Paar)
+  return lines.map((l) => {
+    let [x, y, sc] = bestSplit(l);
+    if (!(y && sc > -Infinity)) [x, y, sc] = bestSplit(l, true);
+    return y && sc > -Infinity ? [x, y] : [l, ''];
+  });
 }
 
 /** Liefert { rows: [{foreign, german}], germanFirst } */
@@ -579,14 +600,14 @@ function parseVocab(text, opts = {}) {
   // Keine Trennzeichen (bei den meisten Zeilen): gleiche Zeile teilen oder Zeilenpaare bilden
   const noSep = rows.filter((r) => r[0] && !r[1]).length;
   if (noSep >= 2 && noSep >= rows.length * 0.6 && noSep === rows.length) {
-    rows = pairUp(raw, blocks, lang).map((r) => r.map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
+    rows = pairUp(raw, blocks).map((r) => r.map((s) => s.trim().replace(/^["„“]|["“”]$/g, '')));
   }
   rows = rows.filter((r) => r[0] || r[1]);
 
   // Einzelne Zeilen ohne Trennzeichen zwischen anderen: selbst teilen („die Katze le chat“)
   rows = rows.map((r) => {
     if (r[1] || !/\s/.test((r[0] || '').trim())) return r;
-    const [a, b, sc] = bestSplit(r[0], lang);
+    const [a, b, sc] = bestSplit(r[0]);
     return b && sc >= 1.5 ? [a, b] : r;
   });
   // Zwei Zeilen ohne Übersetzung hintereinander: untereinander geschriebenes Paar („nager“ / „schwimmen“)
