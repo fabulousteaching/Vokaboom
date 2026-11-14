@@ -435,6 +435,7 @@ async function importFromHash() {
     if (data.audioOwner) set.audio = { o: data.audioOwner, h: {} };
     set.accent = data.accent; set.passMin = data.passMin;
     if (data.gamesOff?.length) set.gamesOff = data.gamesOff;
+    if (data.noPics) set.noPics = true;
     saveDB();
     openSet(set.id);
     toast(`Neue Vokabelportion „${set.name}“ geladen.`);

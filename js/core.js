@@ -1198,7 +1198,15 @@ async function fillPictures(set, { force = false, onProgress } = {}) {
 
 /* Bilder, die im Browser nicht geladen werden konnten → Ersatzbild */
 const brokenPics = new Set();
+/** Lehrperson hat „nur Wörter“ gewählt: in Übungen und Spielen keine Bilder (in der eigenen Kartenübersicht schon) */
+function picsHidden(word) {
+  const s = ctxSet();
+  if (!s || !s.noPics) return false;
+  if (isOwnSet(s) && typeof ui === 'object' && ['set', 'edit', 'pics'].includes(ui.view)) return false;
+  return s.words.includes(word);
+}
 function effectivePic(word, lang) {
+  if (picsHidden(word)) return null;
   const p = word.pic;
   if (p && p.kind === 'none') return null;
   if (p && !(p.src && brokenPics.has(p.src))) return p;
@@ -1930,6 +1938,7 @@ async function encodeShare(set, { lite = false } = {}) {
     ...(set.accent === 'us' ? { a: 'us' } : {}),
     ...(set.passMin && set.passMin !== 60 ? { p: set.passMin } : {}),
     ...(set.gamesOff?.length ? { g: set.gamesOff } : {}),
+    ...(set.noPics ? { np: 1 } : {}),
     w: set.words.map((w) => {
       let code = picToCode(w.pic);
       if (lite && /^[fus]/.test(code)) code = '';
@@ -1963,6 +1972,7 @@ async function decodeShare(code) {
     accent: d.a === 'us' ? 'us' : 'gb',
     passMin: Number(d.p) >= 30 && Number(d.p) <= 90 ? Number(d.p) : 60,
     gamesOff: Array.isArray(d.g) ? d.g.filter((x) => typeof x === 'string').slice(0, 20) : [],
+    noPics: d.np === 1,
     rows: (d.w || []).map((r) => ({
       foreign: String(r[0] || ''), german: String(r[1] || ''),
       pic: d.v === 2 ? codeToPic(r[2]) : v1pic(r),

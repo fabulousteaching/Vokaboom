@@ -1103,7 +1103,12 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .game-tile strong { font-family: var(--font-display); font-size: 1.25rem; }
 .game-tile small { color: var(--ink-2); }
 .game-best { position: absolute; top: .8rem; right: .9rem; font-size: .75rem; padding: .1rem .5rem; border-radius: 99px; background: var(--amber-wash); color: var(--ink); }
-.games-settings { margin: 1rem 0; padding: .8rem 1rem; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); }
+.kids-settings { margin: 1.2rem 0; padding: 1rem 1.1rem; border-radius: 20px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow-soft); }
+.kids-settings h2 { display: flex; align-items: center; gap: .45rem; margin: 0 0 .7rem; font-size: 1.15rem; }
+.ks-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.ks-label { font-weight: 600; }
+.ks-pic-hint { margin: .4rem 0 .6rem; }
+.games-settings { margin: .4rem 0; padding: .7rem .9rem; border-radius: 14px; background: var(--sunken); border: 1px solid var(--line); }
 .games-settings summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: .4rem; }
 .games-toggles { display: grid; gap: .4rem; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin: .8rem 0 .4rem; }
 .game-area { display: grid; gap: 1rem; }

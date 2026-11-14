@@ -520,7 +520,7 @@ function renderMatchChoice(set) {
         <button class="choose-tile" data-action="match-variant" data-variant="pic" ${withPic.length >= 2 ? '' : 'disabled'}>
           <span class="choose-demo" aria-hidden="true">${sample(withPic, (w) => `<span class="cd-row">${picHTML(w, set.lang, 'mini')}<i></i><b lang="en">${esc(w.foreign)}</b></span>`)}</span>
           <strong>${icon('image')} Bild ↔ ${L}</strong>
-          <small>${withPic.length >= 2 ? 'Finde zu jedem Bild das englische Wort.' : 'Dafür brauchen mindestens zwei Karten ein Bild.'}</small>
+          <small>${withPic.length >= 2 ? 'Finde zu jedem Bild das englische Wort.' : set.noPics ? 'Diese Portion ist ohne Bilder.' : 'Dafür brauchen mindestens zwei Karten ein Bild.'}</small>
         </button>
         <button class="choose-tile" data-action="match-variant" data-variant="de" ${withDe.length >= 2 ? '' : 'disabled'}>
           <span class="choose-demo" aria-hidden="true">${sample(withDe, (w) => `<span class="cd-row"><b lang="en">${esc(w.foreign)}</b><i></i><b lang="de">${esc(w.german)}</b></span>`)}</span>

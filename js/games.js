@@ -849,15 +849,26 @@ function duelTap(el) {
   }
 }
 
-/* ---------- Einstellung: Spiele für die Kinder ein-/ausschalten (eigene Portion) ---------- */
+/* ---------- Bereich „Für die Kinder“ (eigene Portion): Bilder ja/nein und welche Spiele ---------- */
 function gamesSettingsHTML(set) {
   if (!set || !isOwnSet(set)) return '';
   const off = new Set(set.gamesOff || []);
-  return `<details class="games-settings">
-    <summary>${icon('sliders')} Spiele für die Kinder ein- und ausschalten <small class="muted">(${GAMES.length - off.size} von ${GAMES.length} an)</small></summary>
-    <div class="games-toggles">${GAMES.map((g) => `<label class="switch"><input type="checkbox" data-game-toggle="${g.id}" ${off.has(g.id) ? '' : 'checked'}><span>${g.art} ${esc(g.name)}</span></label>`).join('')}</div>
-    <p class="hint">Gilt auch für deine Klassen und für Portionen, die du per Link oder QR-Code teilst. Spiele zählen nicht für die Auswertung.</p>
-  </details>`;
+  return `<section class="kids-settings" aria-labelledby="ks-title">
+    <h2 id="ks-title">${icon('sliders')} Für die Kinder</h2>
+    <div class="ks-row">
+      <span class="ks-label">Vokabeln zeigen</span>
+      <div class="seg small" role="group" aria-label="Mit Bildern oder nur Wörter">
+        <button class="seg-btn" data-action="kids-pics" data-on="1" aria-pressed="${!set.noPics}">${icon('image')}<span>Mit Bildern</span></button>
+        <button class="seg-btn" data-action="kids-pics" data-on="0" aria-pressed="${!!set.noPics}"><span>Aa</span><span>Nur Wörter</span></button>
+      </div>
+    </div>
+    <p class="hint ks-pic-hint">${set.noPics ? 'Lernkarten, Übungen, Spiele und Test zeigen keine Bilder. Du siehst sie hier unten in deiner Kartenübersicht weiterhin.' : 'Die Bilder helfen beim Merken und kommen in Lernkarten, Übungen, Spielen und Test vor.'}</p>
+    <details class="games-settings">
+      <summary>Welche Spiele? <small class="muted">(${GAMES.length - off.size} von ${GAMES.length} an)</small></summary>
+      <div class="games-toggles">${GAMES.map((g) => `<label class="switch"><input type="checkbox" data-game-toggle="${g.id}" ${off.has(g.id) ? '' : 'checked'}><span>${g.art} ${esc(g.name)}</span></label>`).join('')}</div>
+    </details>
+    <p class="hint">Gilt für deine Klassen und für Portionen, die du per Link oder QR-Code teilst. Einzelne Kinder kannst du unter „Klassen“ ausnehmen. Spiele zählen nicht für die Auswertung.</p>
+  </section>`;
 }
 document.addEventListener('change', (e) => {
   const id = e.target?.dataset?.gameToggle;
@@ -875,6 +886,17 @@ document.addEventListener('change', (e) => {
 const gameActions = {
   games: () => { stopGame(); openGames(); },
   'game-open': (el) => openGame(el.dataset.game),
+  'kids-pics': (el) => {
+    const set = currentSet();
+    if (!set || !isOwnSet(set)) return;
+    const noPics = el.dataset.on === '0';
+    if (!!set.noPics === noPics) return;
+    if (noPics) set.noPics = true; else delete set.noPics;
+    set.updated = Date.now();
+    saveDB();
+    render();
+    toast(noPics ? 'Die Kinder sehen nur die Wörter.' : 'Die Kinder sehen die Bilder.');
+  },
   'game-again': () => { stopGame(); renderGame(); },
   'blitz-answer': (el) => blitzAnswer(el.dataset.v === '1'),
   'blitz-level': (el) => blitzBegin(currentSet(), +el.dataset.level),
