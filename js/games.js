@@ -102,67 +102,156 @@ function renderGame() {
 
 /* =========================================================
    Blitzrunde: Wort richtig oder falsch geschrieben? 60 Sekunden
+   Stufe 1: wischen (rechts = richtig, links = falsch). Stufe 2: Fehlerstelle antippen oder „richtig“ anhaken.
    ========================================================= */
-/** Eine glaubwürdig falsche Schreibweise */
-function misspell(word, lang) {
-  const w = word;
-  // Artikel (the, to, le, la, l' …) bleibt richtig – falsch geschrieben wird nur das eigentliche Wort
-  const art = (w.match(/^(the |a |an |to |le |la |les |un |une |des |du |se |l['’]|d['’])/i) || [''])[0].length;
-  const idx = [...w].map((c, i) => (i >= art && /\p{L}/u.test(c) ? i : -1)).filter((i) => i >= 0);
-  const tries = [];
-  const vowels = lang === 'fr' ? 'aeiouéèê' : 'aeiou';
-  // zwei Buchstaben vertauschen
-  for (const i of idx) if (idx.includes(i + 1) && w[i] !== w[i + 1]) tries.push(w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2));
-  // Buchstabe verdoppeln / weglassen
-  for (const i of idx) {
-    if (/[bcdfgklmnprst]/i.test(w[i]) && w[i + 1] !== w[i] && w[i - 1] !== w[i]) tries.push(w.slice(0, i + 1) + w[i] + w.slice(i + 1));
-    if (w[i] === w[i + 1]) tries.push(w.slice(0, i) + w.slice(i + 1));
-  }
-  // Selbstlaut tauschen
-  for (const i of idx) if (vowels.includes(w[i].toLowerCase())) for (const v of vowels) if (v !== w[i].toLowerCase()) tries.push(w.slice(0, i) + v + w.slice(i + 1));
-  // Französisch: Akzent weg oder falsch
-  if (lang === 'fr') for (const i of idx) { const c = w[i]; if (/[éèê]/.test(c)) for (const r of ['e', 'é', 'è', 'ê']) if (r !== c) tries.push(w.slice(0, i) + r + w.slice(i + 1)); }
-  if (lang === 'en' && /ie|ei/.test(w)) tries.push(w.replace(/ie|ei/, (m) => (m === 'ie' ? 'ei' : 'ie')));
-  const bad = shuffle(tries).find((t) => t !== w && t.toLowerCase() !== w.toLowerCase() && t.length >= 2);
-  return bad || null;
+/* Typische Fehler (zuerst die häufigen, wie sie Deutschschweizer Kinder machen), dann seltenere.
+   Jede Regel: [Muster, Ersatz] – ersetzt eine Stelle im Wort. */
+const TYPO_RULES = {
+  en: {
+    common: [
+      [/([bcdfglmnprstz])\1/g, '$1'],          // Doppelbuchstabe vergessen: dinner → diner
+      [/([aeiou])([bdglmnprt])(?=[aeiouy])/g, '$1$2$2'], // Doppelbuchstabe zu viel: later → latter
+      [/ie/g, 'ei'], [/ei/g, 'ie'],
+      [/^kn/g, 'n'], [/^wr/g, 'r'], [/mb$/g, 'm'], [/^wh/g, 'w'], [/ght/g, 'gt'], [/gh$/g, ''],
+      [/sh/g, 'sch'], [/ck/g, 'k'], [/ph/g, 'f'], [/th/g, 't'],
+      [/^v/g, 'w'], [/([aeiou])v/g, '$1w'], [/^w(?=[aeiou])/g, 'v'],
+      [/ea/g, 'ee'], [/ee/g, 'ea'], [/ou/g, 'ow'], [/ow/g, 'ou'], [/oo/g, 'u'],
+      [/y$/g, 'i'], [/ey$/g, 'y'], [/c(?=[aou])/g, 'k'], [/([aeiou])s(?=[aeiou])/g, '$1z'], [/qu/g, 'kw'],
+      [/er$/g, 'a'], [/ture$/g, 'tscher'], [/tion$/g, 'shion'], [/e$/g, ''],
+    ],
+    rare: [[/a/g, 'e'], [/e/g, 'a'], [/i/g, 'e'], [/o/g, 'u'], [/u/g, 'o']],
+  },
+  fr: {
+    common: [
+      [/é/g, 'e'], [/é/g, 'è'], [/è/g, 'é'], [/ê/g, 'e'], [/ê/g, 'è'], [/à/g, 'a'], [/â/g, 'a'], [/ç/g, 'c'], [/î/g, 'i'], [/ô/g, 'o'], [/û/g, 'u'],
+      [/e(?=[^aeiouéèê\s]*$)/g, 'é'],          // Akzent zu viel
+      [/([^aeiouéèê\s])$/g, ''],                 // stumme Endung vergessen: chat → cha
+      [/e$/g, ''], [/s$/g, ''], [/([ai])$/g, '$1e'],
+      [/eau/g, 'au'], [/eau/g, 'o'], [/au/g, 'o'], [/ou/g, 'u'], [/oi/g, 'oa'], [/ai/g, 'è'], [/ai/g, 'ä'],
+      [/an/g, 'en'], [/en/g, 'an'], [/qu/g, 'k'], [/ch/g, 'sch'], [/gn/g, 'nj'], [/ph/g, 'f'], [/ill/g, 'ij'],
+      [/([lmnprst])\1/g, '$1'], [/([aeiouéè])([lmnprst])(?=[aeiouée])/g, '$1$2$2'],
+      [/c(?=[aou])/g, 'k'], [/g(?=[ei])/g, 'j'], [/x$/g, 's'],
+    ],
+    rare: [[/a/g, 'e'], [/i/g, 'e'], [/o/g, 'u'], [/u/g, 'ou']],
+  },
+};
+const ARTICLE_START = /^(the |a |an |to |le |la |les |un |une |des |du |se |l['’]|d['’])/i;
+/** Welche Stelle ist anders? [Anfang, Ende] im neuen Wort (Anfang = Ende: Buchstabe fehlt dort) */
+function diffRange(a, b) {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  let j = 0;
+  while (j < a.length - i && j < b.length - i && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
+  return [i, b.length - j];
 }
+/** Fehler einbauen: { shown, hs, he } (falsche Stelle im gezeigten Wort) oder null */
+function misspellPro(word, lang, rareShare = 0.25) {
+  const art = (word.match(ARTICLE_START) || [''])[0].length;
+  const body = word.slice(art);
+  const rules = TYPO_RULES[lang === 'fr' ? 'fr' : 'en'];
+  const cands = (list) => {
+    const out = [];
+    for (const [re, rep] of list) {
+      for (const m of body.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+        const r = m[0].replace(new RegExp(re.source, re.flags.replace('g', '')), rep);
+        if (r === m[0]) continue;
+        const i = m.index;
+        const nb = body.slice(0, i) + r + body.slice(i + m[0].length);
+        if (!/\p{L}/u.test(nb) || nb.length < 2 || nb === body) continue;
+        const [a, b] = diffRange(body, nb); // genau die geänderte Stelle
+        out.push({ shown: word.slice(0, art) + nb, hs: art + a, he: art + b });
+      }
+    }
+    return out;
+  };
+  // seltenere Fehler: zwei Buchstaben vertauschen oder Selbstlaut tauschen
+  const rareSwap = () => {
+    const out = [];
+    for (let i = 0; i < body.length - 1; i++) {
+      if (/\p{L}/u.test(body[i]) && /\p{L}/u.test(body[i + 1]) && body[i] !== body[i + 1]) {
+        out.push({ shown: word.slice(0, art) + body.slice(0, i) + body[i + 1] + body[i] + body.slice(i + 2), hs: art + i, he: art + i + 2 });
+      }
+    }
+    return out;
+  };
+  const ok = (c) => c.shown.toLowerCase() !== word.toLowerCase();
+  const common = cands(rules.common).filter(ok);
+  const rare = [...cands(rules.rare), ...rareSwap()].filter(ok);
+  const pickFrom = Math.random() < rareShare && rare.length ? rare : (common.length ? common : rare);
+  return pickFrom.length ? pickFrom[Math.floor(Math.random() * pickFrom.length)] : null;
+}
+/** Kurzform für andere Spiele: nur der falsche Text */
+const misspell = (word, lang) => misspellPro(word, lang)?.shown || null;
+
 function startBlitz(set) {
-  const words = shuffle(gameWords(set).map(gameForm).filter((f) => f.length >= 2 && f.length <= 30));
-  Object.assign(G.s, { words, score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false });
+  G.s.level = G.s.level || 0;
+  $('#view').innerHTML = gameShell('Blitzrunde', `<div class="test-card setup choose-card">
+    <h2>Welche Stufe?</h2>
+    <div class="choose-grid">
+      <button class="choose-tile" data-action="blitz-level" data-level="1"><span class="choose-demo big-emoji" aria-hidden="true">👈 👉</span>
+        <strong>Stufe 1: Richtig oder falsch?</strong><small>Richtig geschrieben → nach rechts wischen. Falsch geschrieben → nach links.</small></button>
+      <button class="choose-tile" data-action="blitz-level" data-level="2"><span class="choose-demo big-emoji" aria-hidden="true">🔍</span>
+        <strong>Stufe 2: Wo ist der Fehler?</strong><small>Tippe auf die falsche Stelle im Wort – oder hake „richtig geschrieben“ an.</small></button>
+    </div></div>`);
+}
+function blitzBegin(set, level) {
+  const words = gameWords(set).map(gameForm).filter((f) => f.length >= 2 && f.length <= 30);
+  Object.assign(G.s, { level, words, queue: [], score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0 });
   $('#view').innerHTML = gameShell('Blitzrunde', `
     <div class="blitz-top"><span class="blitz-score" id="blitz-score">0 Punkte</span><span class="blitz-time" id="blitz-time">60</span></div>
     <div class="progress"><div class="progress-fill" id="blitz-bar" style="width:100%"></div></div>
-    <p class="hint center">Richtig geschrieben → nach <strong>rechts</strong> wischen. Falsch geschrieben → nach <strong>links</strong>.</p>
+    <p class="hint center">${level === 1 ? 'Richtig geschrieben → nach <strong>rechts</strong> wischen. Falsch geschrieben → nach <strong>links</strong>.' : 'Tippe auf die <strong>falsche Stelle</strong> im Wort – oder auf <strong>„Richtig geschrieben“</strong>.'}</p>
     <div class="blitz-stage" id="blitz-stage"></div>
-    <div class="blitz-buttons">
-      <button class="btn big blitz-no" data-action="blitz-answer" data-v="0">${icon('left')} Falsch</button>
-      <button class="btn big blitz-yes" data-action="blitz-answer" data-v="1">Richtig ${icon('right')}</button>
+    <div class="blitz-buttons ${level === 2 ? 'one' : ''}">
+      ${level === 1 ? `<button class="btn big blitz-no" data-action="blitz-answer" data-v="0">${icon('left')} Falsch</button>` : ''}
+      <button class="btn big blitz-yes" data-action="blitz-answer" data-v="1">${level === 1 ? `Richtig ${icon('right')}` : `${icon('check')} Richtig geschrieben`}</button>
     </div>`);
-  G.keys = (e) => { if (e.key === 'ArrowLeft') blitzAnswer(false); if (e.key === 'ArrowRight') blitzAnswer(true); };
+  G.keys = (e) => { if (G.s.level === 1 && e.key === 'ArrowLeft') blitzAnswer(false); if (e.key === 'ArrowRight' || (G.s.level === 2 && e.key === 'Enter')) blitzAnswer(true); };
   document.addEventListener('keydown', G.keys);
   gEvery(() => {
     const left = Math.max(0, G.s.end - Date.now());
     const t = $('#blitz-time'), b = $('#blitz-bar');
     if (t) t.textContent = Math.ceil(left / 1000);
     if (b) b.style.width = `${(left / 600).toFixed(1)}%`;
-    if (!left) blitzFinish(set);
+    if (!left && !G.s.busy) blitzFinish(set);
   }, 200);
   blitzNext(set);
+}
+/** Gute Mischung: etwa halb-halb, aber nie mehr als zwei Mal hintereinander gleich */
+function blitzNextIsRight() {
+  const h = G.s.hist;
+  if (h.length >= 2 && h[h.length - 1] === h[h.length - 2]) return !h[h.length - 1];
+  const rights = h.filter(Boolean).length;
+  const bias = h.length ? 0.5 + (h.length / 2 - rights) * 0.08 : 0.5; // zieht Richtung 50 %
+  return Math.random() < Math.min(0.8, Math.max(0.2, bias));
 }
 function blitzNext(set) {
   const s = G.s;
   if (s.done) return;
-  if (!s.queue || !s.queue.length) s.queue = shuffle(s.words.slice());
+  if (Date.now() >= s.end) { blitzFinish(set); return; }
+  if (!s.queue.length) s.queue = shuffle(s.words.slice());
   const right = s.queue.pop();
-  const fake = Math.random() < 0.5 ? misspell(right, set.lang) : null;
-  s.card = { right, shown: fake || right, ok: !fake };
+  let wantRight = blitzNextIsRight();
+  // Zuerst häufige Fehler, später ab und zu auch seltenere
+  const err = wantRight ? null : misspellPro(right, set.lang, s.fresh < 6 ? 0.1 : 0.3);
+  if (!err) wantRight = true;
+  s.hist.push(wantRight);
+  s.fresh++;
+  s.card = { right, shown: err ? err.shown : right, ok: wantRight, hs: err?.hs ?? -1, he: err?.he ?? -1 };
   s.busy = false;
   const st = $('#blitz-stage');
   if (!st) return;
-  st.innerHTML = `<div class="blitz-card" id="blitz-card" lang="${set.lang}">${esc(s.card.shown)}</div>`;
+  const letters = [...s.card.shown];
+  st.innerHTML = `<div class="blitz-card ${s.level === 2 ? 'tap' : ''}" id="blitz-card" lang="${set.lang}">${s.level === 2
+    ? letters.map((c, i) => (c === ' ' ? '<span class="bl-gap"> </span>' : `<button class="bl-ch" data-action="blitz-tap" data-i="${i}">${esc(c)}</button>`)).join('')
+    : esc(s.card.shown)}</div><div class="blitz-fix" id="blitz-fix"></div>`;
+  if (s.level === 1) bindBlitzSwipe();
+}
+function bindBlitzSwipe() {
   const el = $('#blitz-card');
+  if (!el) return;
   let x0 = null, dx = 0;
-  el.addEventListener('pointerdown', (e) => { x0 = e.clientX; dx = 0; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); });
+  el.addEventListener('pointerdown', (e) => { if (G.s.busy) return; x0 = e.clientX; dx = 0; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); });
   el.addEventListener('pointermove', (e) => {
     if (x0 == null) return;
     dx = e.clientX - x0;
@@ -171,37 +260,65 @@ function blitzNext(set) {
   });
   const up = () => {
     if (x0 == null) return;
-    x0 = null; el.classList.remove('dragging');
+    x0 = null; el.classList.remove('dragging', 'tint-yes', 'tint-no');
+    el.style.transform = '';
     if (Math.abs(dx) > 80) blitzAnswer(dx > 0);
-    else { el.style.transform = ''; el.classList.remove('tint-yes', 'tint-no'); }
   };
   el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+}
+/** Auflösung zeigen: richtiges Wort leuchtet grün; falsches Wort: Fehlerstelle rot, darunter das richtige Wort grün */
+function blitzShow(good) {
+  const s = G.s, c = s.card;
+  const el = $('#blitz-card'), fix = $('#blitz-fix');
+  if (!el) return;
+  if (c.ok) {
+    el.innerHTML = esc(c.shown);
+    el.className = 'blitz-card shown right';
+    if (fix) fix.innerHTML = good ? '' : '<span class="muted">Das war richtig geschrieben.</span>';
+  } else {
+    const t = c.shown;
+    const a = Math.max(0, Math.min(c.hs, t.length)), b = Math.max(a, Math.min(c.he, t.length));
+    // Buchstabe fehlt: rote Markierung genau an der Lücke; sonst die falschen Buchstaben rot
+    el.innerHTML = b > a ? `${esc(t.slice(0, a))}<mark class="bl-err">${esc(t.slice(a, b))}</mark>${esc(t.slice(b))}`
+      : `${esc(t.slice(0, a))}<mark class="bl-err bl-missing" title="Hier fehlt etwas">‸</mark>${esc(t.slice(a))}`;
+    el.className = 'blitz-card shown wrongword';
+    if (fix) fix.innerHTML = `<span class="bl-correct" lang="${currentSet().lang}">${esc(c.right)}</span>`;
+  }
+}
+function blitzScore(good) {
+  const s = G.s;
+  if (good) { s.score++; sfx.good(); } else { s.wrong++; sfx.bad(); }
+  const sc = $('#blitz-score'); if (sc) sc.textContent = `${s.score} ${s.score === 1 ? 'Punkt' : 'Punkte'}`;
+  blitzShow(good);
+  gLater(() => blitzNext(currentSet()), good ? (G.s.card.ok ? 650 : 1100) : 1700);
 }
 function blitzAnswer(saysRight) {
   const s = G.s;
   if (!s.card || s.busy || s.done) return;
   s.busy = true;
-  const el = $('#blitz-card');
-  const good = saysRight === s.card.ok;
-  if (good) { s.score++; sfx.good(); } else { s.wrong++; sfx.bad(); }
-  const sc = $('#blitz-score'); if (sc) sc.textContent = `${s.score} ${s.score === 1 ? 'Punkt' : 'Punkte'}`;
-  if (el) {
-    el.style.transform = `translateX(${saysRight ? 140 : -140}%) rotate(${saysRight ? 18 : -18}deg)`;
-    el.classList.add('flying', good ? 'good' : 'bad');
-  }
-  const st = $('#blitz-stage');
-  if (!good && st) st.insertAdjacentHTML('beforeend', `<p class="blitz-fix">${s.card.ok ? 'Das war richtig geschrieben:' : 'Richtig ist:'} <strong>${esc(s.card.right)}</strong></p>`);
-  gLater(() => blitzNext(currentSet()), good ? 260 : 1300);
+  blitzScore(saysRight === s.card.ok);
+}
+/** Stufe 2: Buchstabe angetippt */
+function blitzTap(i) {
+  const s = G.s;
+  if (!s.card || s.busy || s.done) return;
+  s.busy = true;
+  const c = s.card;
+  // Getroffen, wenn die angetippte Stelle im Fehler liegt (bei weggelassenem Buchstaben auch direkt daneben)
+  const hit = !c.ok && (c.he > c.hs ? i >= c.hs && i < c.he : i >= c.hs - 1 && i <= c.hs);
+  $(`.bl-ch[data-i="${i}"]`)?.classList.add(hit ? 'hit' : 'miss');
+  blitzScore(hit);
 }
 function blitzFinish(set) {
   const s = G.s;
   if (s.done) return;
   s.done = true;
   stopGame();
-  const rec = gameRecord(set, 'blitz', s.score);
+  const key = s.level === 2 ? 'blitz2' : 'blitz';
+  const rec = gameRecord(set, key, s.score);
   sfx.win(); if (rec && s.score) confetti();
   const a = $('#game-area');
-  if (a) a.innerHTML = gameEndHTML(rec && s.score ? 'Neuer Rekord!' : 'Zeit um!', `${s.score} richtig, ${s.wrong} daneben. Dein Rekord: ${set.progress.games.blitz.best}.`);
+  if (a) a.innerHTML = gameEndHTML(rec && s.score ? 'Neuer Rekord!' : 'Zeit um!', `${s.score} richtig, ${s.wrong} daneben. Dein Rekord in Stufe ${s.level}: ${set.progress.games[key].best}.`);
 }
 
 /* =========================================================
@@ -242,7 +359,6 @@ function scrambleWord(set) {
     <div id="scr-fb" class="feedback" aria-live="polite"></div>
   </div>`;
   scrambleDraw();
-  gLater(() => speak(w.foreign, set.lang), 250);
 }
 function scrambleDraw() {
   const s = G.s;
@@ -442,7 +558,6 @@ function rocketGuess(k) {
     rocketDraw();
     $('#rk-rocket')?.classList.add('launch');
     sfx.win();
-    speak(s.w.foreign, currentSet().lang);
     gLater(() => { s.i++; rocketWord(currentSet()); }, 2200);
   }
 }
@@ -487,8 +602,7 @@ function startSearch(set) {
     <div class="ws-side">
       <p class="label">Finde diese Wörter (auf ${LANGS[set.lang].name}):</p>
       <ul class="ws-list" id="ws-list">${puzzle.placed.map((p, i) => `<li data-i="${i}">${hasPicture(p.w, set.lang) ? picHTML(p.w, set.lang, 'mini') : ''}<span lang="de">${esc(p.w.german || '?')}</span><b lang="${set.lang}"></b></li>`).join('')}</ul>
-      <p class="hint">Zieh mit dem Finger über das Wort – oder tippe auf den ersten und den letzten Buchstaben. Die Wörter stehen von links nach rechts oder von oben nach unten.</p>
-      <button class="btn secondary" data-action="ws-pdf" id="ws-pdf">${icon('down')} Als PDF zum Ausdrucken</button>
+      <p class="ws-done" id="ws-done"></p>
     </div>
   </div>`);
   bindSearch(set);
@@ -537,11 +651,10 @@ function wsCheck(set, cells) {
   const li = $(`#ws-list li[data-i="${i}"]`);
   if (li) { li.classList.add('done'); $('b', li).textContent = gameForm(s.puzzle.placed[i].w); }
   sfx.good();
-  speak(s.puzzle.placed[i].w.foreign, set.lang);
   if (s.found.size === s.puzzle.placed.length) {
     gameRecord(set, 'search', s.found.size);
     sfx.win(); confetti();
-    gLater(() => { const a = $('.ws-side .hint'); if (a) a.innerHTML = `<strong>Alle Wörter gefunden! 🎉</strong> <button class="btn small primary" data-action="game-again">Neues Gitter</button>`; }, 600);
+    gLater(() => { const a = $('#ws-done'); if (a) a.innerHTML = `<strong>Alle Wörter gefunden! 🎉</strong> <button class="btn small primary" data-action="game-again">Neues Gitter</button>`; }, 600);
   }
 }
 /** Wortsuchsel als PDF: Seite 1 Rätsel, Seite 2 Lösung */
@@ -695,6 +808,8 @@ const gameActions = {
   'game-open': (el) => openGame(el.dataset.game),
   'game-again': () => { stopGame(); renderGame(); },
   'blitz-answer': (el) => blitzAnswer(el.dataset.v === '1'),
+  'blitz-level': (el) => blitzBegin(currentSet(), +el.dataset.level),
+  'blitz-tap': (el) => blitzTap(+el.dataset.i),
   'scr-play': (el) => { const w = G.s.w; if (w) speak(w.foreign, currentSet().lang, { slow: !!el.dataset.slow }); },
   'scr-tile': (el) => scrambleTile(+el.dataset.id),
   'scr-slot': (el) => scrambleSlot(+el.dataset.k),

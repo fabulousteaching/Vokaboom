@@ -228,7 +228,6 @@ const actions = {
     const w = speakWord(set);
     revealSpeakWord();
     speakM.results.set(w.id, 'retry');
-    speak(w.foreign, set.lang);
     updateSpeakZone();
   },
   'speak-skip': () => { const set = currentSet(); const w = speakWord(set); if (w && !speakM.results.has(w.id)) speakM.results.set(w.id, 'skip'); nextSpeak(); },
@@ -296,7 +295,6 @@ const actions = {
       sfx.good(); nextSpeak();
     } else {
       speakM.results.set(w.id, 'retry');
-      speak(w.foreign, set.lang, { slow: true });
     }
   },
   'speak-again': (el) => {

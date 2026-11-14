@@ -911,7 +911,7 @@ function renderDictation() {
   </section>`;
   $('#d-form').addEventListener('submit', (e) => { e.preventDefault(); dict.checked ? nextDict() : checkDict(); });
   setTimeout(() => $('#d-answer')?.focus(), 60);
-  setTimeout(() => { if (ui.view === 'dictation' && dictWord(set) === w && !dict.checked) speak(w.foreign, set.lang); }, 300);
+  // Nicht automatisch vorlesen: Das Kind tippt selbst auf den Lautsprecher
 }
 
 function checkDict(giveUp = false) {
@@ -1083,7 +1083,6 @@ function renderTest() {
     form.addEventListener('submit', (e) => { e.preventDefault(); test.checked ? nextQuestion() : checkTyped(); });
     setTimeout(() => $('#t-answer')?.focus(), 60);
   }
-  if (q.type === 'listen') setTimeout(() => speak(w.foreign, set.lang), 250);
 }
 
 const fmtPoints = (p) => String(p).replace('.', ',');

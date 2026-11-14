@@ -1108,13 +1108,13 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 /* Blitzrunde */
 .blitz-top { display: flex; justify-content: space-between; font-family: var(--font-display); font-size: 1.3rem; }
 .blitz-time { font-variant-numeric: tabular-nums; }
-.blitz-stage { position: relative; min-height: 190px; display: grid; place-items: center; overflow: hidden; }
+.blitz-stage { position: relative; min-height: 230px; display: grid; place-items: center; align-content: center; overflow: hidden; }
 .blitz-card { user-select: none; touch-action: none; cursor: grab; padding: 1.6rem 2.4rem; min-width: min(80%, 360px); text-align: center; font-family: var(--font-word); font-size: clamp(2rem, 7vw, 3rem); background: var(--paper); border: 3px solid var(--line); border-radius: 26px; box-shadow: var(--shadow-card); transition: transform .25s, border-color .15s, background .15s; }
 .blitz-card.dragging { transition: none; cursor: grabbing; }
 .blitz-card.tint-yes { border-color: var(--green); background: var(--green-wash); }
 .blitz-card.tint-no { border-color: var(--red); background: var(--red-wash); }
 .blitz-card.flying { opacity: 0; transition: transform .3s, opacity .3s; }
-.blitz-fix { position: absolute; bottom: .2rem; left: 0; right: 0; text-align: center; color: var(--ink-2); }
+.blitz-fix { position: static; text-align: center; color: var(--ink-2); }
 .blitz-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .blitz-no { background: var(--red-wash); color: var(--red); border: 2px solid var(--red); }
 .blitz-yes { background: var(--green-wash); color: var(--green-ink); border: 2px solid var(--green); }
@@ -1244,3 +1244,18 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .bingo-cell.on { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
 .bingo-cell.line { background: var(--green); border-color: var(--green); color: #fff; }
 .bingo-btn { font-size: 1.6rem; letter-spacing: .05em; }
+/* Blitzrunde: Auflösung und Stufe 2 */
+.blitz-card.shown.right { border-color: var(--green); background: var(--green-wash); color: var(--green-ink); box-shadow: 0 0 0 6px color-mix(in srgb, var(--green) 25%, transparent), var(--shadow-card); }
+.blitz-card.shown.wrongword { border-color: var(--red); }
+.bl-err { background: var(--red); color: #fff; border-radius: 6px; padding: 0 2px; }
+.bl-missing { font-style: normal; padding: 0 3px; margin: 0 1px; }
+.blitz-fix { min-height: 2.6rem; text-align: center; margin-top: .6rem; }
+.bl-correct { display: inline-block; font: 700 clamp(1.6rem, 6vw, 2.3rem) var(--font-word); color: var(--green-ink); background: var(--green-wash); border: 2px solid var(--green); border-radius: 16px; padding: .2rem 1rem; }
+.blitz-card.tap { cursor: default; padding: 1.2rem 1.4rem; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.bl-ch { min-width: clamp(30px, 8vw, 44px); height: clamp(44px, 11vw, 60px); border: 2px solid var(--line); border-radius: 10px; background: var(--paper-2); font: inherit; color: var(--ink); cursor: pointer; }
+.bl-ch:hover { border-color: var(--brand); }
+.bl-ch.hit { background: var(--green); border-color: var(--green); color: #fff; }
+.bl-ch.miss { background: var(--red-wash); border-color: var(--red); }
+.bl-gap { width: 14px; }
+.blitz-buttons.one { grid-template-columns: 1fr; }
+.big-emoji { font-size: 2.4rem; justify-content: center; }
