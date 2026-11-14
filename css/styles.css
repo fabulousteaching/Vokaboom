@@ -1136,7 +1136,7 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .blitz-time { font-variant-numeric: tabular-nums; }
 .blitz-time-wrap { position: relative; display: inline-block; }
 .blitz-bonus { position: absolute; right: 0; top: -1.1rem; font-size: .95rem; font-weight: 800; color: var(--green-ink); opacity: 0; white-space: nowrap; }
-.blitz-bonus.show { animation: bonus 1.1s ease-out; }
+.blitz-bonus.show { animation: bonus 1.6s ease-out; }
 @keyframes bonus { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
 @media (hover: none) { .blitz-buttons .btn:hover { filter: none; transform: none; } }
 .blitz-stage { position: relative; min-height: 230px; display: grid; place-items: center; align-content: center; overflow: hidden; }

@@ -196,7 +196,7 @@ function startBlitz(set) {
 }
 function blitzBegin(set, level) {
   const words = gameWords(set).map(gameForm).filter((f) => f.length >= 2 && f.length <= 30);
-  Object.assign(G.s, { level, words, queue: [], score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0 });
+  Object.assign(G.s, { level, words, queue: [], score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0, streak: 0, pauseAt: 0 });
   $('#view').innerHTML = gameShell('Blitzrunde', `
     <div class="blitz-top"><span class="blitz-score" id="blitz-score">0 Punkte</span><span class="blitz-time-wrap"><span class="blitz-time" id="blitz-time">60</span><span class="blitz-bonus" id="blitz-bonus" aria-live="polite"></span></span></div>
     <div class="progress"><div class="progress-fill" id="blitz-bar" style="width:100%"></div></div>
@@ -287,15 +287,18 @@ function blitzShow(good) {
     if (fix) fix.innerHTML = `<span class="bl-correct" lang="${currentSet().lang}">${esc(c.right)}</span>`;
   }
 }
-const BLITZ_BONUS = 2000; // jede richtige Antwort: 2 Sekunden mehr
+const BLITZ_BONUS = 2000; // je 3 richtige Antworten hintereinander: 2 Sekunden mehr
 function blitzScore(good) {
   const s = G.s;
   document.activeElement?.blur?.();
   if (good) {
     s.score++; sfx.good();
-    s.end += BLITZ_BONUS;
-    const bo = $('#blitz-bonus'); if (bo) { bo.textContent = '+2 s'; bo.classList.remove('show'); void bo.offsetWidth; bo.classList.add('show'); }
-  } else { s.wrong++; sfx.bad(); }
+    s.streak = (s.streak || 0) + 1;
+    if (s.streak % 3 === 0) { // 3, 6, 9 … richtig in Folge
+      s.end += BLITZ_BONUS;
+      const bo = $('#blitz-bonus'); if (bo) { bo.textContent = '3 in Folge: +2 s'; bo.classList.remove('show'); void bo.offsetWidth; bo.classList.add('show'); }
+    }
+  } else { s.wrong++; s.streak = 0; sfx.bad(); }
   const sc = $('#blitz-score'); if (sc) sc.textContent = `${s.score} ${s.score === 1 ? 'Punkt' : 'Punkte'}`;
   blitzShow(good);
   s.pauseAt = Date.now(); // die Auflösung kostet keine Zeit
