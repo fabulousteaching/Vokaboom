@@ -6,9 +6,9 @@ function startMode(mode, opts = {}) {
   if (!set) return;
   if (mode === 'cards') startCards(set, opts);
   if (mode === 'match') {
+    match.covered = !!db.settings.memCovered;
     if (opts.variant) startMatch(set, opts.variant);
     else match.choosing = true; // zuerst wählen: Bild ↔ Englisch oder Englisch ↔ Deutsch
-    match.covered = !!db.settings.memCovered;
   }
   if (mode === 'speak') startSpeak(set, opts.ids);
   if (mode === 'dictation') startDictation(set, opts.ids);
@@ -206,6 +206,16 @@ const actions = {
   /* Zuordnen */
   'match-variant': (el) => { startMatch(currentSet(), el.dataset.variant); renderMatch(); },
   'mem-tap': (el) => memTap(+el.dataset.i),
+  'mem-players': (el) => {
+    match.players = +el.dataset.n === 2 ? 2 : 1;
+    if (match.players === 1) match.covered = !!db.settings.memCovered;
+    if (match.choosing) {
+      $$('[data-action="mem-players"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)));
+      const c = $('#mem-cover-choice'); if (c) c.hidden = match.players === 2;
+      return;
+    }
+    startMatch(currentSet(), match.variant); renderMatch();
+  },
   'mem-mode': (el) => {
     match.covered = el.dataset.covered === '1';
     db.settings.memCovered = match.covered; saveDB();

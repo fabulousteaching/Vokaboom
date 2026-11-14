@@ -254,7 +254,8 @@ function cardAnswer(known) {
 /* =========================================================
    2 · ZUORDNEN (wie Memory: zwei Kärtchen antippen, die zusammengehören)
    ========================================================= */
-const match = { variant: 'pic', covered: false, rounds: [], round: 0, tiles: [], sel: null, open: [], busy: false, mistakes: 0, found: 0, total: 0, finished: false, choosing: false, t0: 0, elapsed: 0, tick: null, best: null, newBest: false };
+const match = { variant: 'pic', covered: false, rounds: [], round: 0, tiles: [], sel: null, open: [], busy: false, mistakes: 0, found: 0, total: 0, finished: false, choosing: false, t0: 0, elapsed: 0, tick: null, best: null, newBest: false, players: 1, turn: 0, pts: [0, 0] };
+const MEM_PLAYERS = [{ name: 'Blau', dot: '🔵' }, { name: 'Lila', dot: '🟣' }];
 const MEM_PER_ROUND = 6; // Paare pro Runde → 12 Kärtchen
 
 const fmtTime = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -263,6 +264,7 @@ const matchTimeKey = () => match.variant + (match.covered ? '-verdeckt' : '');
 function startMatch(set, variant) {
   match.choosing = false;
   match.variant = variant;
+  if (match.players === 2) match.covered = true; // zu zweit immer verdeckt, abwechselnd
   const seen = new Set();
   let pool = set.words.filter((w) => {
     if (!w.foreign) return false;
@@ -280,7 +282,7 @@ function startMatch(set, variant) {
   match.rounds = [];
   for (let i = 0; i < pool.length; i += size) match.rounds.push(pool.slice(i, i + size).map((w) => w.id));
   clearInterval(match.tick);
-  Object.assign(match, { round: 0, mistakes: 0, found: 0, total: pool.length, finished: false, tiles: [], sel: null, open: [], busy: false, t0: 0, elapsed: 0, newBest: false });
+  Object.assign(match, { round: 0, mistakes: 0, found: 0, total: pool.length, finished: false, tiles: [], sel: null, open: [], busy: false, t0: 0, elapsed: 0, newBest: false, turn: 0, pts: [0, 0] });
   dealRound();
 }
 
@@ -323,10 +325,10 @@ function renderMatch() {
           <button class="seg-btn" data-action="match-variant" data-variant="pic" aria-pressed="${match.variant === 'pic'}">${icon('image')}<span>Bild ↔ ${L}</span></button>
           <button class="seg-btn" data-action="match-variant" data-variant="de" aria-pressed="${match.variant === 'de'}"><span>${L} ↔ Deutsch</span></button>
         </div>
-        <div class="seg small" role="group" aria-label="Kärtchen offen oder verdeckt">
+        ${match.players === 1 ? `<div class="seg small" role="group" aria-label="Kärtchen offen oder verdeckt">
           <button class="seg-btn" data-action="mem-mode" data-covered="0" aria-pressed="${!match.covered}">${icon('eye')}<span>Offen</span></button>
           <button class="seg-btn" data-action="mem-mode" data-covered="1" aria-pressed="${match.covered}">${icon('grid')}<span>Verdeckt</span></button>
-        </div>
+        </div>` : ''}
       </div>
     </div>`;
 
@@ -336,6 +338,20 @@ function renderMatch() {
       <p class="result-line">${match.variant === 'pic' ? 'Gib den Karten in der Übersicht ein Bild – oder spiele die andere Variante.' : 'Ergänze die deutschen Wörter unter „Bearbeiten“.'}</p>
       <div class="row center"><button class="btn primary" data-action="match-variant" data-variant="${match.variant === 'pic' ? 'de' : 'pic'}">Andere Variante</button>
       <button class="btn secondary" data-action="open-set" data-id="${set.id}">Zur Übersicht</button></div></div></section>`;
+    return;
+  }
+
+  if (match.finished && match.players === 2) {
+    const [a, b] = match.pts, win = a === b ? -1 : a > b ? 0 : 1;
+    v.innerHTML = `<section class="mode match-mode">${bar}
+      <div class="result">
+        <h2>${win < 0 ? 'Unentschieden!' : `${MEM_PLAYERS[win].dot} ${MEM_PLAYERS[win].name} gewinnt!`}</h2>
+        <div class="mem-score final">${memScoreHTML(true)}</div>
+        <div class="row center">
+          <button class="btn primary" data-action="match-variant" data-variant="${match.variant}">${icon('shuffle')} Nochmal</button>
+          <button class="btn secondary" data-action="mem-players" data-n="1">Allein spielen</button>
+        </div>
+      </div></section>`;
     return;
   }
 
@@ -359,15 +375,23 @@ function renderMatch() {
 
   v.innerHTML = `<section class="mode match-mode">${bar}
     ${progressBar(match.found / match.total, 'Gefundene Paare')}
+    ${match.players === 2 ? `<div class="mem-score" id="mem-score">${memScoreHTML()}</div>` : ''}
     <p class="progress-label"><span>${match.found} von ${match.total} Paaren${match.rounds.length > 1 ? ` · Runde ${match.round + 1} von ${match.rounds.length}` : ''}</span>
-      <span class="tally"><b class="mem-clock" id="mem-time">${icon('clock')} ${fmtTime(match.t0 ? Date.now() - match.t0 : 0)}</b><b class="bad" id="mem-miss">${icon('x')} ${match.mistakes}</b></span></p>
-    <p class="mode-hint mem-hint">${match.covered ? 'Decke zwei Kärtchen auf. Gehören sie zusammen, verschwinden sie. Merk dir, wo was liegt!' : 'Tippe zwei Kärtchen an, die zusammengehören. Dann verschwinden sie.'} Die Uhr läuft ab dem ersten Tippen.</p>
+      ${match.players === 2 ? '' : `<span class="tally"><b class="mem-clock" id="mem-time">${icon('clock')} ${fmtTime(match.t0 ? Date.now() - match.t0 : 0)}</b><b class="bad" id="mem-miss">${icon('x')} ${match.mistakes}</b></span>`}</p>
+    <p class="mode-hint mem-hint">${match.players === 2 ? 'Abwechselnd zwei Kärtchen aufdecken. Wer ein Paar findet, bekommt einen Punkt und darf nochmal.' : match.covered ? 'Decke zwei Kärtchen auf. Gehören sie zusammen, verschwinden sie. Merk dir, wo was liegt!' : 'Tippe zwei Kärtchen an, die zusammengehören. Dann verschwinden sie.'}${match.players === 2 ? '' : ' Die Uhr läuft ab dem ersten Tippen.'}</p>
     <div class="mem-grid ${match.covered ? 'covered' : ''} ${match.variant === 'pic' ? 'is-pic' : 'is-words'}" id="mem-grid" style="--cols:${memCols(match.tiles.length)}">
       ${match.tiles.map((t, i) => memTileHTML(set, t, i)).join('')}
     </div>
   </section>`;
-  if (match.t0) startMatchClock();
+  if (match.t0 && match.players === 1) startMatchClock();
 }
+
+/** Punktestand zu zweit: wer dran ist, leuchtet */
+function memScoreHTML(final) {
+  return MEM_PLAYERS.map((p, k) => `<span class="mem-player p${k} ${!final && match.turn === k ? 'turn' : ''}">
+    <span class="mp-name">${p.dot} ${p.name}</span><b class="mp-pts">${match.pts[k]}</b>${!final && match.turn === k ? '<small>ist dran</small>' : '<small>&nbsp;</small>'}</span>`).join('');
+}
+function updateMemScore() { const el = $('#mem-score'); if (el) el.innerHTML = memScoreHTML(); }
 
 /** Spalten: 12 Kärtchen → 4 (Handy 3), weniger entsprechend */
 const memCols = (n) => (n <= 4 ? 2 : n <= 6 ? 3 : n <= 9 ? 3 : 4);
@@ -387,7 +411,7 @@ function memTap(i) {
   const set = currentSet();
   const t = match.tiles[i];
   if (!t || t.gone || match.busy || match.finished) return;
-  if (!match.t0) { match.t0 = Date.now(); startMatchClock(); }
+  if (!match.t0) { match.t0 = Date.now(); if (match.players === 1) startMatchClock(); }
   if (match.covered) {
     if (match.open.includes(i)) return;
     match.open.push(i);
@@ -403,7 +427,8 @@ function memTap(i) {
       setTimeout(() => {
         [a, b].forEach((k) => memEl(k)?.classList.remove('open'));
         match.open = []; match.busy = false;
-      }, 1000);
+        if (match.players === 2) { match.turn = 1 - match.turn; updateMemScore(); }
+      }, match.players === 2 ? 1400 : 1000);
     }
     return;
   }
@@ -434,6 +459,7 @@ function memMatched(set, a, b) {
   [a, b].forEach((k) => { match.tiles[k].gone = true; const el = memEl(k); if (el) { el.classList.remove('selected'); el.classList.add('matched'); el.disabled = true; } });
   match.found++;
   match.open = [];
+  if (match.players === 2) { match.pts[match.turn]++; updateMemScore(); } // Paar gefunden: Punkt, gleiche Person nochmal
   // Memory ist ein Spiel: zählt nicht für die Auswertung
   sfx.good();
   if (w && db.settings.autoSpeak) speak(w.foreign, set.lang);
@@ -463,6 +489,7 @@ function matchStars() {
 function finishMatch(set) {
   clearInterval(match.tick);
   match.finished = true;
+  if (match.players === 2) { sfx.win(); confetti(); renderMatch(); return; }
   match.elapsed = match.t0 ? Date.now() - match.t0 : 0;
   const st = matchStars();
   const prev = set.progress?.match || {};
@@ -502,6 +529,13 @@ function renderMatchChoice(set) {
         </button>
       </div>
       <div class="choose-mode">
+        <span class="label-inline">Wie viele spielen?</span>
+        <div class="seg small" role="group" aria-label="Anzahl Spielende">
+          <button class="seg-btn" data-action="mem-players" data-n="1" aria-pressed="${match.players === 1}">👤<span>Allein</span></button>
+          <button class="seg-btn" data-action="mem-players" data-n="2" aria-pressed="${match.players === 2}">👥<span>Zu zweit</span></button>
+        </div>
+      </div>
+      <div class="choose-mode" id="mem-cover-choice" ${match.players === 2 ? 'hidden' : ''}>
         <span class="label-inline">Kärtchen:</span>
         <div class="seg small" role="group" aria-label="Kärtchen offen oder verdeckt">
           <button class="seg-btn" data-action="mem-mode" data-covered="0" aria-pressed="${!match.covered}">${icon('eye')}<span>Offen</span></button>
