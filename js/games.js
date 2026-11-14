@@ -424,73 +424,142 @@ function scrambleHint() {
 
 /* =========================================================
    Ballon-Platzen
+   Stufe 1: das passende Wort finden. Stufe 2: die richtige Schreibweise finden (die anderen Ballone haben Fehler).
+   Tempo: beginnt langsam, jeder Treffer macht schneller, jeder Fehler wieder etwas langsamer.
    ========================================================= */
-const BALLOON_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6'];
+const BALLOON_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+const BALLOON_SLOW = 11, BALLOON_FAST = 3.2; // Sekunden, bis ein Ballon oben ist
+function popSound() { tone([880, 330], 0.07, 'square', 0.06); }
 function startBalloon(set) {
+  const b = G.s.bcount || 4;
+  $('#view').innerHTML = gameShell('Ballon-Platzen', `<div class="test-card setup choose-card">
+    <h2>Welche Stufe?</h2>
+    <div class="choose-grid">
+      <button class="choose-tile" data-action="bl-level" data-level="1"><span class="choose-demo big-emoji" aria-hidden="true">🎈🖼️</span>
+        <strong>Stufe 1: Wort finden</strong><small>Tippe den Ballon mit dem passenden Wort an.</small></button>
+      <button class="choose-tile" data-action="bl-level" data-level="2"><span class="choose-demo big-emoji" aria-hidden="true">🎈✍️</span>
+        <strong>Stufe 2: Richtig geschrieben</strong><small>Nur ein Ballon ist richtig geschrieben – finde ihn!</small></button>
+    </div>
+    <div class="field center-field"><span class="label">Wie viele Ballone?</span>
+      <div class="seg" role="group" aria-label="Anzahl Ballone">${[3, 4, 5].map((n) => `<button class="seg-btn" data-action="bl-count" data-n="${n}" aria-pressed="${b === n}">${n}</button>`).join('')}</div></div>
+  </div>`);
+}
+function balloonBegin(set, level) {
   const words = gameWords(set);
-  Object.assign(G.s, { words, score: 0, lives: 3, level: 0, round: 0, done: false });
+  Object.assign(G.s, { level, words, score: 0, streak: 0, lives: 3, round: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
   $('#view').innerHTML = gameShell('Ballon-Platzen', `
-    <div class="balloon-top"><span id="bl-score">0 Punkte</span><span id="bl-lives" aria-label="Leben">❤️❤️❤️</span></div>
+    <div class="balloon-top"><span id="bl-score" class="bl-score">0 Punkte</span><span class="bl-speed" id="bl-speed" title="Tempo">🐢</span><span id="bl-lives" aria-label="Leben">❤️❤️❤️</span></div>
     <div class="balloon-prompt" id="bl-prompt"></div>
-    <div class="balloon-sky" id="bl-sky"></div>`);
+    <div class="balloon-sky" id="bl-sky">
+      <span class="bl-sun" aria-hidden="true"></span><span class="bl-cloud c1" aria-hidden="true"></span><span class="bl-cloud c2" aria-hidden="true"></span><span class="bl-cloud c3" aria-hidden="true"></span>
+      <div class="bl-layer" id="bl-layer"></div>
+    </div>`);
   balloonRound(set);
+}
+function balloonOptions(set, w) {
+  const s = G.s, n = s.bcount;
+  if (s.level === 2) {
+    const right = gameForm(w);
+    const seen = new Set([right.toLowerCase(), ...s.words.map((x) => gameForm(x).toLowerCase())]); // keine echten Wörter als Fehler
+    const wrong = [];
+    for (let t = 0; t < 60 && wrong.length < n - 1; t++) {
+      const m = misspellPro(right, set.lang, t > 20 ? 0.5 : 0.2);
+      if (m && !seen.has(m.shown.toLowerCase())) { seen.add(m.shown.toLowerCase()); wrong.push(m.shown); }
+    }
+    return shuffle([{ text: right, ok: true }, ...wrong.map((x) => ({ text: x, ok: false }))]);
+  }
+  const others = shuffle(s.words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, n - 1);
+  return shuffle([{ text: gameForm(w), ok: true }, ...others.map((x) => ({ text: gameForm(x), ok: false }))]);
+}
+/** Schriftgrösse nach längstem Wortteil, damit Wörter nicht mitten drin umbrechen */
+function balloonFont(t) {
+  const L = Math.max(...String(t).split(/\s+/).map((x) => x.length), 1);
+  return L <= 5 ? 1 : L <= 7 ? 0.86 : L <= 9 ? 0.72 : L <= 12 ? 0.6 : 0.5;
 }
 function balloonRound(set) {
   const s = G.s;
   if (s.done) return;
-  const sky = $('#bl-sky'), pr = $('#bl-prompt');
-  if (!sky || !pr) return;
+  const layer = $('#bl-layer'), pr = $('#bl-prompt');
+  if (!layer || !pr) return;
   const w = shuffle(s.words)[0];
-  const count = s.level >= 4 ? 4 : 3;
-  const others = shuffle(s.words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, count - 1);
-  const opts = shuffle([w, ...others]);
-  const dur = Math.max(3.5, 8 - s.level * 0.6);
+  const opts = balloonOptions(set, w);
   s.cur = { w, settled: false };
-  pr.innerHTML = gamePrompt(set, w);
+  pr.innerHTML = s.level === 2
+    ? `<div class="g-prompt">${hasPicture(w, set.lang) ? picHTML(w, set.lang, 'card-pic') : ''}<span class="g-de big" lang="de">${esc(w.german || '')}</span><span class="small muted">Welcher Ballon ist richtig geschrieben?</span></div>`
+    : gamePrompt(set, w);
   const lanes = shuffle([...Array(opts.length).keys()]);
-  sky.innerHTML = opts.map((o, k) => `<button class="balloon" data-action="bl-pop" data-ok="${o === w ? 1 : 0}" lang="${set.lang}"
-      style="--lane:${lanes[k]};--lanes:${opts.length};--c:${BALLOON_COLORS[(s.round + k) % BALLOON_COLORS.length]};--dur:${dur}s;--delay:${(k * 0.35).toFixed(2)}s">
-      <span>${esc(gameForm(o))}</span></button>`).join('');
-  const ok = $('.balloon[data-ok="1"]', sky);
-  ok?.addEventListener('animationend', () => { if (!s.cur.settled) { s.cur.settled = true; balloonMiss(set, 'weggeflogen'); } });
+  const sp = $('#bl-speed'); if (sp) sp.textContent = s.dur > 8 ? '🐢' : s.dur > 5.5 ? '🐇' : '🚀';
+  layer.innerHTML = opts.map((o, k) => {
+    const c = BALLOON_COLORS[(s.round * 3 + k) % BALLOON_COLORS.length];
+    const drift = (Math.random() * 30 - 15).toFixed(0);
+    return `<button class="balloon" data-action="bl-pop" data-ok="${o.ok ? 1 : 0}" lang="${set.lang}"
+      style="--lane:${lanes[k]};--lanes:${opts.length};--c:${c};--dur:${s.dur.toFixed(2)}s;--delay:${(k * 0.45 + Math.random() * 0.3).toFixed(2)}s;--drift:${drift}px">
+      <span class="bl-body"><span class="bl-text" style="--fs:${balloonFont(o.text)}">${esc(o.text)}</span></span>
+      <svg class="bl-string" viewBox="0 0 20 60" aria-hidden="true"><path d="M10 0 C 2 15, 18 30, 10 45 S 6 58, 10 60" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>`;
+  }).join('');
+  const ok = $('.balloon[data-ok="1"]', layer);
+  ok?.addEventListener('animationend', (e) => { if (e.animationName === 'bl-rise' && !s.cur.settled && G.s.cur === s.cur) { s.cur.settled = true; balloonMiss(set, true); } });
   s.round++;
+}
+/** Ballon zerplatzt: Fetzen fliegen, „POP!“ */
+function burst(el, good) {
+  const sky = $('#bl-sky');
+  if (!sky || !el) return;
+  const r = el.getBoundingClientRect(), sr = sky.getBoundingClientRect();
+  const x = r.left - sr.left + r.width / 2, y = r.top - sr.top + r.height * 0.4;
+  const color = getComputedStyle(el).getPropertyValue('--c') || '#f00';
+  const fx = document.createElement('div');
+  fx.className = 'bl-burst';
+  fx.style.left = `${x}px`; fx.style.top = `${y}px`;
+  fx.innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2, d = 50 + Math.random() * 40;
+    return `<i style="--x:${(Math.cos(a) * d).toFixed(0)}px;--y:${(Math.sin(a) * d).toFixed(0)}px;--r:${Math.floor(Math.random() * 360)}deg;background:${color}"></i>`;
+  }).join('') + `<b class="${good ? '' : 'bad'}">${good ? 'POP!' : 'Oh!'}</b>`;
+  sky.appendChild(fx);
+  setTimeout(() => fx.remove(), 900);
+  el.classList.add('popped');
 }
 function balloonPop(el) {
   const s = G.s;
   const set = currentSet();
   if (!s.cur || s.cur.settled || el.classList.contains('popped')) return;
+  popSound();
   if (el.dataset.ok === '1') {
     s.cur.settled = true;
-    el.classList.add('popped');
-    s.score += 10 + s.level * 2;
-    s.level++;
+    burst(el, true);
+    s.streak++;
+    s.score += 10 + Math.round((BALLOON_SLOW - s.dur) * 3) + (s.streak >= 3 ? 5 : 0);
+    s.dur = Math.max(BALLOON_FAST, s.dur * 0.9); // schneller
     sfx.good();
-    const sc = $('#bl-score'); if (sc) sc.textContent = `${s.score} Punkte`;
-    $$('.balloon:not(.popped)').forEach((b) => b.classList.add('fade'));
-    gLater(() => balloonRound(set), 650);
+    const sc = $('#bl-score'); if (sc) { sc.textContent = `${s.score} Punkte`; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
+    $$('.balloon:not(.popped)').forEach((b) => b.classList.add('fly-off'));
+    gLater(() => balloonRound(set), 700);
   } else {
-    el.classList.remove('wiggle'); void el.offsetWidth; el.classList.add('wiggle', 'wrong');
-    el.disabled = true;
-    balloonMiss(set, 'falsch', true);
+    burst(el, false);
+    balloonMiss(set, false);
   }
 }
-function balloonMiss(set, why, keepRound = false) {
+function balloonMiss(set, escaped) {
   const s = G.s;
   s.lives--;
+  s.streak = 0;
+  s.dur = Math.min(BALLOON_SLOW, s.dur * 1.12); // wieder etwas langsamer
   sfx.bad();
   const lv = $('#bl-lives'); if (lv) lv.textContent = '❤️'.repeat(Math.max(0, s.lives)) + '🤍'.repeat(3 - Math.max(0, s.lives));
   if (s.lives <= 0) {
-    s.done = true; s.cur.settled = true;
+    s.done = true; if (s.cur) s.cur.settled = true;
     stopGame();
-    const rec = gameRecord(set, 'balloon', s.score);
+    const key = s.level === 2 ? 'balloon2' : 'balloon';
+    const rec = gameRecord(set, key, s.score);
     gLater(() => {
       const a = $('#game-area');
-      if (a) a.innerHTML = gameEndHTML(rec && s.score ? 'Neuer Rekord!' : 'Alle Ballone weg!', `${s.score} Punkte. Das richtige Wort war „${esc(gameForm(s.cur.w))}“. Rekord: ${set.progress.games.balloon.best}.`);
+      if (a) a.innerHTML = gameEndHTML(rec && s.score ? 'Neuer Rekord!' : 'Alle Ballone weg!', `${s.score} Punkte. Gesucht war „${esc(gameForm(s.cur.w))}“. Rekord in Stufe ${s.level}: ${set.progress.games[key].best}.`);
       if (rec && s.score) confetti();
-    }, 500);
+    }, 600);
     return;
   }
-  if (!keepRound) gLater(() => balloonRound(set), 500);
+  if (escaped) gLater(() => balloonRound(set), 500);
 }
 
 /* =========================================================
@@ -816,6 +885,8 @@ const gameActions = {
   'scr-hint': () => scrambleHint(),
   'scr-skip': () => { G.s.i++; scrambleWord(currentSet()); },
   'bl-pop': (el) => balloonPop(el),
+  'bl-level': (el) => balloonBegin(currentSet(), +el.dataset.level),
+  'bl-count': (el) => { G.s.bcount = +el.dataset.n; $$('[data-action="bl-count"]').forEach((x) => x.setAttribute('aria-pressed', String(x === el))); },
   'rk-key': (el) => rocketGuess(el.dataset.k),
   'ws-pdf': () => searchPDF(),
   'duel-tap': (el) => duelTap(el),
