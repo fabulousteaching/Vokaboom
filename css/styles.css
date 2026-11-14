@@ -1152,13 +1152,20 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .rocket-tank i { display: block; width: 100%; background: linear-gradient(var(--amber), var(--orange)); transition: height .3s; }
 .rocket { font-size: 3.4rem; transform: rotate(-45deg); transition: transform 1.6s cubic-bezier(.5, 0, .9, .4); }
 .rocket.launch { transform: translateY(-120vh) rotate(-45deg); }
-.rk-word { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.rk-l { width: clamp(30px, 7vw, 42px); height: 46px; border-bottom: 4px solid var(--brand); display: grid; place-items: center; font: 700 1.6rem var(--font-word); }
+.rk-word { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; }
+.rk-group { display: inline-flex; gap: 5px; white-space: nowrap; }
+.rk-l { width: clamp(22px, 7vw, 42px); height: 46px; border-bottom: 4px solid var(--brand); display: grid; place-items: center; font: 700 clamp(1.2rem, 5vw, 1.6rem) var(--font-word); }
 .rk-fix { font: 700 1.6rem var(--font-word); min-width: 12px; }
-.rk-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
-.rk-key { height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); font: 600 1.15rem var(--font-word); cursor: pointer; }
-.rk-key.hit { background: var(--green-wash); border-color: var(--green); }
-.rk-key.miss { background: var(--sunken); color: var(--ink-3); }
+/* ganzes Alphabet in Reihen (Handy 7, Tablet/Computer 9–13 pro Reihe) */
+.rk-keys { justify-self: stretch; width: 100%; max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+@media (min-width: 560px) { .rk-keys { grid-template-columns: repeat(9, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .rk-keys { grid-template-columns: repeat(13, minmax(0, 1fr)); } }
+.rk-key { position: relative; height: 46px; border-radius: 10px; border: 2px solid var(--line); background: var(--paper); font: 700 1.2rem var(--font-word); cursor: pointer; }
+.rk-key:disabled { cursor: default; }
+/* schon gewählt: Treffer grün mit Häkchen, daneben rot durchgestrichen */
+.rk-key.hit { background: var(--green); border-color: var(--green); color: #fff; }
+.rk-key.hit::after { content: '✓'; position: absolute; top: 1px; right: 4px; font-size: .65rem; }
+.rk-key.miss { background: var(--red-wash); border-color: var(--red); color: var(--red); text-decoration: line-through; text-decoration-thickness: 2px; opacity: .8; }
 /* Wortsuchsel */
 .search-wrap { display: grid; gap: 1.2rem; align-items: start; }
 @media (min-width: 860px) { .search-wrap { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }

@@ -11,7 +11,7 @@ const GAMES = [
   { id: 'blitz', name: 'Blitzrunde', art: '⚡', text: 'Richtig oder falsch geschrieben? Wisch nach rechts oder links!', min: 2 },
   { id: 'scramble', name: 'Buchstabensalat', art: '🔤', text: 'Hör dir das Wort an und leg die Buchstaben in die Felder.', min: 1 },
   { id: 'search', name: 'Wortsuchsel', art: '🔍', text: 'Finde die Wörter im Buchstabengitter.', min: 3 },
-  { id: 'rocket', name: 'Rakete starten', art: '🚀', text: 'Errate das Wort Buchstabe für Buchstabe.', min: 1 },
+  { id: 'rocket', name: 'Rakete starten', art: '🚀', text: 'Errate das Wort Buchstabe für Buchstabe – nur die Striche sind vorgegeben.', min: 1 },
   { id: 'duel', name: 'Duell zu zweit', art: '⚔️', text: 'Zwei Kinder, ein Gerät: Wer tippt schneller?', min: 4 },
 ];
 const GAME_BY_ID = Object.fromEntries(GAMES.map((g) => [g.id, g]));
@@ -405,7 +405,7 @@ function rocketWord(set) {
   box.innerHTML = `<div class="test-card rocket-card">
     <p class="progress-label"><span>Rakete ${s.i + 1} von ${s.words.length}</span><span id="rk-stars"></span></p>
     <div class="rocket-wrap"><div class="rocket-tank"><i id="rk-fuel"></i></div><div class="rocket" id="rk-rocket" aria-hidden="true">🚀</div></div>
-    ${gamePrompt(set, w, 'small')}
+    <p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an.</p>
     <div class="rk-word" id="rk-word" lang="${set.lang}"></div>
     <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>
   </div>`;
@@ -419,8 +419,10 @@ function rocketDraw() {
   const s = G.s;
   const wd = $('#rk-word');
   if (!wd) return;
-  wd.innerHTML = [...s.target].map((c) => (!/\p{L}/u.test(c) ? `<span class="rk-fix">${c === ' ' ? '&nbsp;' : esc(c)}</span>`
-    : `<span class="rk-l ${s.got.has(baseLetter(c)) || s.launched ? 'shown' : ''}">${s.got.has(baseLetter(c)) || s.launched ? esc(c) : ''}</span>`)).join('');
+  // Jedes Wort bleibt zusammen (kein Umbruch mitten im Wort)
+  const cell = (c) => (!/\p{L}/u.test(c) ? `<span class="rk-fix">${esc(c)}</span>`
+    : `<span class="rk-l ${s.got.has(baseLetter(c)) || s.launched ? 'shown' : ''}">${s.got.has(baseLetter(c)) || s.launched ? esc(c) : ''}</span>`);
+  wd.innerHTML = s.target.split(' ').map((part) => `<span class="rk-group">${[...part].map(cell).join('')}</span>`).join('');
   const f = $('#rk-fuel'); if (f) f.style.height = `${(100 * s.got.size / Math.max(1, s.need.size)).toFixed(0)}%`;
   const st = $('#rk-stars'); if (st) st.textContent = '⭐'.repeat(rocketStars()) + '☆'.repeat(3 - rocketStars());
   $$('.rk-key').forEach((b) => {
