@@ -88,7 +88,7 @@ Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Kla
 1. **Klasse anlegen**, z. B. „5a Englisch“.
 2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
 3. Jedes Kind bekommt automatisch einen eigenen **Benutzernamen** (z. B. `Baum34`, nie doppelt vergeben) und ein **Bilder-Passwort** aus 3 Bildern.
-4. **Portionen**: anhaken, welche Portionen die Klasse sieht. Kinder sehen nur diese – mit allen Übungen, aber ohne Bearbeiten.
+4. **Portionen**: anhaken, welche Portionen die Klasse sieht. Kinder sehen nur diese – mit allen Übungen, aber ohne Bearbeiten. Unter jeder angehakten Portion gibt es **„Für einzelne Kinder anpassen“**: Häkchen weg bei „Sieht die Portion“ = dieses Kind bekommt die Portion nicht; Häkchen weg bei einem Spiel = dieses Kind bekommt das Spiel in dieser Portion nicht. In der Auswertung steht dann „ausgenommen“.
 5. **Kärtchen**: als PDF herunterladen (10 pro A4-Seite), ausdrucken, ausschneiden.
 6. **Auswertung**: pro Kind und Portion der Anteil richtiger Antworten, wie viele Wörter und Übungen gemacht sind und der beste Test. Antippen eines Kindes zeigt seine schwierigsten Wörter; unten stehen die schwierigsten Wörter der ganzen Klasse.
 
@@ -97,6 +97,8 @@ Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Kla
 **Kärtchen verloren?** Beim Kind auf das Symbol mit den gekreuzten Pfeilen tippen: Es bekommt neue Bilder, das alte Kärtchen gilt nicht mehr.
 
 Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
+
+- **Neu: Ausnahmen für einzelne Kinder** brauchen die Spalte `rules`. Dafür `supabase/vokabelwelt.sql` nochmals ganz ausführen. Bis dahin funktionieren die Klassen wie bisher, nur das Anpassen für einzelne Kinder ist noch nicht möglich (Vokaboom zeigt dann einen Hinweis).
 
 ## Vokaboom-Stimmen (Audio-Speicher)
 
@@ -119,7 +121,12 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 
 ## Vokabelspiele und Live in der Klasse
 
-**Vokabelspiele** (Schritt 2 jeder Portion): Memory, Ballon-Platzen, Blitzrunde, Buchstabensalat, Wortsuchsel (auch als PDF mit Lösung), Rakete starten und Duell zu zweit. Alle sind eingeschaltet; in der eigenen Portion lassen sie sich unter „Spiele für die Kinder ein- und ausschalten“ einzeln abschalten. Das gilt auch für Klassen und Portionen, die per Link oder QR-Code geteilt werden. Spiele zählen nicht für die Auswertung.
+**Vokabelspiele** (Schritt 2 jeder Portion): Memory (allein oder zu zweit), Ballon-Platzen (2 Stufen), Blitzrunde (2 Stufen), Buchstabensalat, Wortsuchsel, Rakete starten und Duell zu zweit. Spiele zählen nicht für die Auswertung. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
+
+**Für die Kinder** (Bereich in der eigenen Portion, unter den Übungen):
+- **Vokabeln zeigen: Mit Bildern / Nur Wörter.** Bei „Nur Wörter“ zeigen Lernkarten, Übungen, Spiele und Test keine Bilder. In der eigenen Kartenübersicht bleiben die Bilder sichtbar.
+- **Welche Spiele?** Einzelne Spiele für diese Portion ausschalten.
+- Beides gilt für Klassen und für Portionen, die per Link oder QR-Code geteilt werden. Einzelne Kinder lassen sich zusätzlich unter **Klassen → Portionen → Für einzelne Kinder anpassen** ausnehmen.
 
 **Live in der Klasse** (nur angemeldete Lehrperson, in der eigenen Portion):
 - **Quiz:** Die Fragen erscheinen am Beamer, die Kinder antworten auf ihren Geräten. Schnelle richtige Antworten geben mehr Punkte, am Schluss gibt es eine Rangliste.

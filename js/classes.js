@@ -85,6 +85,8 @@ async function kidRefresh() {
     s.progress = localDirty ? o.progress : (prog.get(r.set_id) || {});
     if (!localDirty) kid.sent[r.set_id] = setHash(s.progress);
     s.assigned = true;
+    const gOff = data.games_off && Array.isArray(data.games_off[r.set_id]) ? data.games_off[r.set_id].filter((x) => typeof x === 'string') : [];
+    if (gOff.length) s.gamesOff = [...new Set([...(s.gamesOff || []), ...gOff])];
     if (o) s.words.forEach((w) => { const ow = o.words.find((x) => x.id === w.id); if (ow && w.picStatus !== 'done' && ow.picStatus === 'done' && ow.foreign === w.foreign) { w.pic = ow.pic; w.picStatus = 'done'; } });
     return s;
   }).filter(Boolean);
@@ -285,13 +287,19 @@ async function loadClasses() {
   klass.loading = (async () => {
     try {
       const c = await cloudClient();
-      const [cl, st] = await Promise.all([
-        c.from('vokaboom_classes').select('id,name,set_ids,created_at').order('created_at'),
+      const [cl0, st] = await Promise.all([
+        c.from('vokaboom_classes').select('id,name,set_ids,rules,created_at').order('created_at'),
         c.from('vokaboom_students').select('id,class_id,first_name,last_initial,username,pics,created_at').order('first_name'),
       ]);
+      let cl = cl0;
+      klass.noRules = false;
+      if (cl.error && /rules/.test(cl.error.message || '')) { // Datenbank noch ohne Spalte „rules“ (SQL-Skript nicht neu ausgeführt)
+        klass.noRules = true;
+        cl = await c.from('vokaboom_classes').select('id,name,set_ids,created_at').order('created_at');
+      }
       if (cl.error) throw cl.error;
       if (st.error) throw st.error;
-      klass.list = cl.data || [];
+      klass.list = (cl.data || []).map((x) => ({ ...x, rules: x.rules && typeof x.rules === 'object' && !Array.isArray(x.rules) ? x.rules : {} }));
       klass.students = {};
       (st.data || []).forEach((s) => { (klass.students[s.class_id] = klass.students[s.class_id] || []).push(s); });
       klass.loaded = true; klass.error = '';
@@ -554,17 +562,90 @@ function classSetsHTML(c) {
     ${sets.length ? `<ul class="set-pick">${sets.map((s) => `<li><label class="set-pick-item">
         <input type="checkbox" data-set="${s.id}" ${(c.set_ids || []).includes(s.id) ? 'checked' : ''}>
         <span><strong>${flag(s.lang)} ${esc(s.name)}</strong><small>${LANGS[langOf(s)].name} · ${s.words.length} Vokabeln${!cloud.synced[s.id] ? ' · wird noch ins Konto gespeichert' : ''}</small></span>
-      </label></li>`).join('')}</ul>` : '<p class="empty">Du hast noch keine Portion. Erstelle zuerst auf der Startseite eine.</p>'}
+      </label>${(c.set_ids || []).includes(s.id) ? kidRulesHTML(c, s) : ''}</li>`).join('')}</ul>` : '<p class="empty">Du hast noch keine Portion. Erstelle zuerst auf der Startseite eine.</p>'}
     ${missing.length ? `<p class="muted small">${missing.length} freigegebene ${missing.length === 1 ? 'Portion gibt' : 'Portionen gibt'} es nicht mehr. <button class="link-btn" data-action="class-clean-sets">Entfernen</button></p>` : ''}
   </div>`;
 }
+/* ---------- Ausnahmen: Portion oder einzelne Spiele für einzelne Kinder ausschalten ---------- */
+const kidRule = (c, kidId) => (c.rules || {})[kidId] || {};
+const kidHidesSet = (c, kidId, setId) => (kidRule(c, kidId).h || []).includes(setId);
+const kidGamesOff = (c, kidId, setId) => kidRule(c, kidId).g?.[setId] || [];
+function kidRulesHTML(c, set) {
+  const kids = studentsOf(c.id);
+  if (!kids.length) return '';
+  if (klass.noRules) return `<p class="muted small kid-rules-note">Einzelne Kinder ausnehmen: Bitte zuerst das SQL-Skript in Supabase nochmals ausführen (siehe Anleitung).</p>`;
+  const games = typeof gamesOn === 'function' ? gamesOn(set) : [];
+  const hidden = kids.filter((k) => kidHidesSet(c, k.id, set.id)).length;
+  const fewer = kids.filter((k) => !kidHidesSet(c, k.id, set.id) && kidGamesOff(c, k.id, set.id).some((g) => games.some((x) => x.id === g))).length;
+  const sum = [hidden ? `${hidden} ohne diese Portion` : '', fewer ? `${fewer} mit weniger Spielen` : ''].filter(Boolean).join(' · ') || 'alle Kinder haben alles';
+  return `<details class="kid-rules" data-set="${set.id}" ${klass.openRules?.has(set.id) ? 'open' : ''}>
+    <summary>${icon('sliders')} Für einzelne Kinder anpassen <small class="muted">(${sum})</small></summary>
+    <div class="kr-scroll"><table class="kr-table">
+      <thead><tr><th scope="col">Kind</th><th scope="col">Sieht die Portion</th>${games.map((g) => `<th scope="col" class="kr-game" title="${esc(g.name)}"><span aria-hidden="true">${g.art}</span><small>${esc(g.name)}</small></th>`).join('')}</tr></thead>
+      <tbody>${kids.map((k) => {
+        const hid = kidHidesSet(c, k.id, set.id), off = new Set(kidGamesOff(c, k.id, set.id));
+        return `<tr class="${hid ? 'kr-hidden' : ''}"><th scope="row">${kidWordImg(k.username, 'kid-mini')}${esc(kidName(k))}</th>
+          <td><input type="checkbox" class="kr-cb" data-kr="h" data-kid="${k.id}" data-set="${set.id}" ${hid ? '' : 'checked'} aria-label="${esc(kidName(k))} sieht ${esc(set.name)}"></td>
+          ${games.map((g) => `<td><input type="checkbox" class="kr-cb" data-kr="g" data-game="${g.id}" data-kid="${k.id}" data-set="${set.id}" ${off.has(g.id) ? '' : 'checked'} ${hid ? 'disabled' : ''} aria-label="${esc(kidName(k))}: ${esc(g.name)}"></td>`).join('')}
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    <p class="hint">Häkchen weg = dieses Kind bekommt die Portion bzw. dieses Spiel nicht. ${games.length < (typeof GAMES === 'object' ? GAMES.length : 0) ? 'Spiele, die du für die ganze Portion ausgeschaltet hast, fehlen hier.' : ''}</p>
+  </details>`;
+}
+function setKidRule(c, kidId, fn) {
+  const rules = structuredClone(c.rules || {});
+  const r = rules[kidId] || {};
+  fn(r);
+  if (!r.h?.length) delete r.h;
+  if (r.g) { Object.keys(r.g).forEach((sid) => { if (!r.g[sid]?.length) delete r.g[sid]; }); if (!Object.keys(r.g).length) delete r.g; }
+  if (Object.keys(r).length) rules[kidId] = r; else delete rules[kidId];
+  c.rules = rules;
+}
+let rulesTimer = null;
+function saveClassRulesSoon(c) {
+  clearTimeout(rulesTimer);
+  rulesTimer = setTimeout(async () => {
+    try {
+      const cl = await cloudClient();
+      const { error } = await cl.from('vokaboom_classes').update({ rules: c.rules || {} }).eq('id', c.id);
+      if (error) throw error;
+      toast('Gespeichert.');
+    } catch (e) { toast(classErrorText(e), 'bad'); }
+  }, 500);
+}
+function bindKidRules(c) {
+  $$('.kid-rules').forEach((d) => d.addEventListener('toggle', () => {
+    klass.openRules = klass.openRules || new Set();
+    if (d.open) klass.openRules.add(d.dataset.set); else klass.openRules.delete(d.dataset.set);
+  }));
+  $$('.kr-cb').forEach((cb) => cb.addEventListener('change', () => {
+    const { kr, kid, set, game } = cb.dataset;
+    setKidRule(c, kid, (r) => {
+      if (kr === 'h') {
+        const h = new Set(r.h || []);
+        if (cb.checked) h.delete(set); else h.add(set);
+        r.h = [...h];
+      } else {
+        r.g = r.g || {};
+        const g = new Set(r.g[set] || []);
+        if (cb.checked) g.delete(game); else g.add(game);
+        r.g[set] = [...g];
+      }
+    });
+    saveClassRulesSoon(c);
+    if (kr === 'h') render();
+    else { const sm = cb.closest('.kid-rules')?.querySelector('summary small'); const st = getSet(set); if (sm && st) sm.outerHTML = kidRulesHTML(c, st).match(/<small class="muted">[^<]*<\/small>/)[0]; }
+  }));
+}
 function bindClassSets(c) {
-  $$('.set-pick input').forEach((cb) => cb.addEventListener('change', async () => {
+  bindKidRules(c);
+  $$('.set-pick-item > input').forEach((cb) => cb.addEventListener('change', async () => {
     const ids = new Set(c.set_ids || []);
     if (cb.checked) ids.add(cb.dataset.set); else ids.delete(cb.dataset.set);
     const order = [...db.sets.map((s) => s.id).filter((id) => ids.has(id)), ...[...ids].filter((id) => !getSet(id))];
     await saveClassSets(c, order);
     if (cb.checked && !cloud.synced[cb.dataset.set]) cloudSync();
+    if (ui.view === 'class' && klass.tab === 'sets') render(); // Bereich für einzelne Kinder ein-/ausblenden
   }));
 }
 async function saveClassSets(c, ids) {
@@ -861,6 +942,7 @@ function classStatsHTML(c, kids) {
       <th scope="row"><button class="link-btn kid-link" data-action="stats-kid" data-id="${st.id}">${kidWordImg(st.username, 'kid-mini')}${esc(kidName(st))}</button></th>
       ${sets.map((set) => {
         const k = kidSetStats(prog[st.id]?.[set.id], set);
+        if (kidHidesSet(c, st.id, set.id)) return '<td class="cell empty" title="Für dieses Kind ausgeschaltet"><small>ausgenommen</small></td>';
         if (!k || !k.n) return '<td class="cell empty">–</td>';
         return `<td class="cell ${accClass(k.acc)}" title="${k.n} Antworten, ${k.bad} falsch">
           <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/4 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small><small class="muted">${fmtDay(k.last)}</small></td>`;

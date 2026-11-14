@@ -1017,6 +1017,18 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 @media (max-width: 460px) { .kid-pw { display: none; } }
 .set-pick { list-style: none; margin: 1rem 0; padding: 0; display: grid; gap: 6px; }
 .set-pick-item { display: flex; align-items: center; gap: .8rem; padding: .7rem .9rem; border-radius: 16px; background: var(--paper-2); border: 1px solid var(--line); cursor: pointer; }
+.kid-rules { margin: 4px 0 6px 2.2rem; padding: .5rem .8rem; border-radius: 14px; background: var(--paper); border: 1px dashed var(--line); }
+.kid-rules summary { cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.kid-rules-note { margin: 4px 0 6px 2.2rem; }
+.kr-scroll { overflow-x: auto; margin: .6rem 0 .3rem; }
+.kr-table { border-collapse: collapse; font-size: .92rem; min-width: 100%; }
+.kr-table th, .kr-table td { padding: .35rem .5rem; text-align: center; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.kr-table th[scope=row] { text-align: left; font-weight: 600; }
+.kr-table th[scope=row] > * { vertical-align: middle; margin-right: .35rem; }
+.kr-game span { display: block; font-size: 1.2rem; }
+.kr-game small { display: block; font-weight: 500; font-size: .7rem; color: var(--ink-2, #64748b); }
+.kr-table input { width: 20px; height: 20px; accent-color: var(--brand); }
+.kr-hidden th[scope=row] { opacity: .55; text-decoration: line-through; }
 .set-pick-item:has(input:checked) { border-color: var(--brand); background: var(--brand-wash); }
 .set-pick-item input { width: 22px; height: 22px; accent-color: var(--brand); flex: none; }
 .set-pick-item span { display: grid; }

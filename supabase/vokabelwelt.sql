@@ -126,6 +126,11 @@ create table if not exists public.vokaboom_classes (
   created_at timestamptz not null default now()
 );
 create index if not exists vokaboom_classes_teacher on public.vokaboom_classes (teacher_id);
+-- Ausnahmen für einzelne Kinder: {"<Kind-ID>": {"h": [Portionen, die das Kind nicht sieht], "g": {"<Portion>": [ausgeschaltete Spiele]}}}
+alter table public.vokaboom_classes add column if not exists rules jsonb not null default '{}';
+alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_rules_check;
+alter table public.vokaboom_classes add constraint vokaboom_classes_rules_check
+  check (jsonb_typeof(rules) = 'object' and octet_length(rules::text) <= 200000);
 
 create table if not exists public.vokaboom_students (
   id uuid primary key default gen_random_uuid(),
@@ -174,7 +179,7 @@ alter table public.vokaboom_login_fails enable row level security;
 revoke all on public.vokaboom_classes, public.vokaboom_students, public.vokaboom_usernames,
   public.vokaboom_sessions, public.vokaboom_progress, public.vokaboom_login_fails from anon, authenticated;
 grant select, insert, delete on public.vokaboom_classes to authenticated;
-grant update (name, set_ids) on public.vokaboom_classes to authenticated;
+grant update (name, set_ids, rules) on public.vokaboom_classes to authenticated;
 grant select, delete on public.vokaboom_students to authenticated;
 grant update (first_name, last_initial, pics) on public.vokaboom_students to authenticated;
 grant select on public.vokaboom_progress to authenticated;
@@ -272,17 +277,20 @@ create or replace function public.vokaboom_student_data(p_token uuid)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  st public.vokaboom_students; cl public.vokaboom_classes;
+  st public.vokaboom_students; cl public.vokaboom_classes; mine jsonb;
 begin
   select s.* into st from public.vokaboom_sessions x join public.vokaboom_students s on s.id = x.student_id where x.token = p_token;
   if not found then raise exception 'session_invalid' using errcode = 'P0001'; end if;
   update public.vokaboom_sessions set last_seen = now() where token = p_token;
   select * into cl from public.vokaboom_classes c where c.id = st.class_id;
+  mine := coalesce(cl.rules -> st.id::text, '{}'::jsonb); -- Ausnahmen nur für dieses Kind
   return jsonb_build_object(
     'student', jsonb_build_object('first', st.first_name, 'initial', st.last_initial, 'username', st.username),
     'class', jsonb_build_object('name', cl.name),
     'sets', coalesce((select jsonb_agg(jsonb_build_object('set_id', v.set_id, 'data', v.data - 'progress') order by array_position(cl.set_ids, v.set_id))
-      from public.vokabelwelt_sets v where v.user_id = cl.teacher_id and v.set_id = any (cl.set_ids)), '[]'::jsonb),
+      from public.vokabelwelt_sets v where v.user_id = cl.teacher_id and v.set_id = any (cl.set_ids)
+        and not coalesce(mine -> 'h', '[]'::jsonb) ? v.set_id), '[]'::jsonb),
+    'games_off', case when jsonb_typeof(mine -> 'g') = 'object' then mine -> 'g' else '{}'::jsonb end,
     'progress', coalesce((select jsonb_agg(jsonb_build_object('set_id', p.set_id, 'data', p.data))
       from public.vokaboom_progress p where p.student_id = st.id), '[]'::jsonb)
   );
@@ -298,7 +306,8 @@ declare
 begin
   select s.* into st from public.vokaboom_sessions x join public.vokaboom_students s on s.id = x.student_id where x.token = p_token;
   if not found then raise exception 'session_invalid' using errcode = 'P0001'; end if;
-  if not exists (select 1 from public.vokaboom_classes c where c.id = st.class_id and p_set_id = any (c.set_ids)) then
+  if not exists (select 1 from public.vokaboom_classes c where c.id = st.class_id and p_set_id = any (c.set_ids)
+      and not coalesce(c.rules -> st.id::text -> 'h', '[]'::jsonb) ? p_set_id) then
     raise exception 'not_assigned' using errcode = 'P0001';
   end if;
   insert into public.vokaboom_progress as pr (student_id, set_id, data, updated_at) values (st.id, p_set_id, p_data, now())
