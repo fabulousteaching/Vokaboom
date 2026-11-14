@@ -56,7 +56,7 @@ const ui = {
   reviewCands: {},
 };
 const currentSet = () => getSet(ui.setId);
-const MODE_NAMES = { cards: 'Lernkarten', match: 'Zuordnen', speak: 'Aussprechen', dictation: 'Hören & Schreiben', test: 'Test', pics: 'Bilder prüfen' };
+const MODE_NAMES = { cards: 'Lernkarten', match: 'Memory', games: 'Vokabelspiele', live: 'Live in der Klasse', speak: 'Aussprechen', dictation: 'Hören & Schreiben', test: 'Test', pics: 'Bilder prüfen' };
 
 /* ---------------- Rahmen ---------------- */
 function renderShell() {
@@ -86,20 +86,25 @@ function renderCrumbs() {
   if (ui.view === 'classes' || ui.view === 'class') { el.innerHTML = classesCrumbs(); return; }
   if (!set || ui.view === 'home') { el.innerHTML = ''; return; }
   let html = `<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="open-set" data-id="${set.id}">${flag(set.lang)}<span>${esc(set.name)}</span></button>`;
-  if (MODE_NAMES[ui.view]) html += `<span class="crumb-sep sep-current" aria-hidden="true">/</span><span class="crumb current">${MODE_NAMES[ui.view]}</span>`;
+  if (['match', 'game'].includes(ui.view)) html += '<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="games"><span>Vokabelspiele</span></button>';
+  const cur = ui.view === 'game' ? GAME_BY_ID[ui.game]?.name : MODE_NAMES[ui.view];
+  if (cur) html += `<span class="crumb-sep sep-current" aria-hidden="true">/</span><span class="crumb current">${esc(cur)}</span>`;
   el.innerHTML = html;
 }
 
 function render() {
   const v = $('#view');
   const set = currentSet();
-  if (!['home', 'classes', 'class'].includes(ui.view) && !set) ui.view = 'home';
+  if (!['home', 'classes', 'class', 'live'].includes(ui.view) && !set) ui.view = 'home';
   if (isKid() && ['classes', 'class', 'pics'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
   switch (ui.view) {
     case 'set': v.innerHTML = viewSet(set); break;
     case 'cards': renderCards(); break;
     case 'match': renderMatch(); break;
+    case 'games': renderGames(); break;
+    case 'game': renderGame(); break;
+    case 'live': renderLive(); break;
     case 'speak': renderSpeak(); break;
     case 'dictation': renderDictation(); break;
     case 'test': renderTest(); break;
@@ -111,6 +116,7 @@ function render() {
 }
 
 function go(view, extra = {}) {
+  if (ui.view === 'live' && view !== 'live' && typeof liveStop === 'function') liveStop(); // Live-Spiel verlassen
   stopModes();
   Object.assign(ui, extra);
   ui.view = view;
@@ -120,6 +126,7 @@ function go(view, extra = {}) {
 }
 
 function stopModes() {
+  if (typeof stopGame === 'function') stopGame();
   stopListening(true);
   stopMeter();
   stopSpeaking();
@@ -235,6 +242,7 @@ function viewHome() {
       <p class="eyebrow">${flag(lang)} ${LANGS[lang].name}-Vokabeln üben</p>
       <h1>Nimm deine Vokabelliste und ${boomHTML()} werden daraus ganz einfach <mark>Lernkarten, Übungen, Spiele und Tests.</mark></h1>
       <p class="lead">Vokabeln einfügen und fertig. Und Bildvorschläge für die Karten macht dir Vokaboom auch gleich schon.</p>
+      ${isTeacher() ? '' : `<button class="btn small secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>`}
     </div>
     <div class="seg lang-tabs" role="tablist" aria-label="Sprache">
       ${['en', 'fr'].map((l) => `<button type="button" class="seg-btn" role="tab" data-action="home-lang" data-lang="${l}" aria-selected="${lang === l}" aria-pressed="${lang === l}">${flag(l)}<span>${LANGS[l].name}</span>${count(l) ? `<small class="count">${count(l)}</small>` : ''}</button>`).join('')}
@@ -367,6 +375,7 @@ function progressInfo(set) {
     match: (p.match && (p.match.pic != null || p.match.de != null || p.match.times))
       ? [['pic', 'Bild'], ['de', 'Deutsch']].map(([k, t]) => (p.match[k] != null || p.match.times?.[k]
         ? `${t} ${p.match[k] != null ? stars(p.match[k]) : ''}${p.match.times?.[k] ? ` ${fmtTime(p.match.times[k])}` : ''}` : '')).join(' ') : 'Noch nicht gespielt',
+    games: (() => { const n = Object.keys(p.games || {}).length + (p.match ? 1 : 0); return n ? `${n} ${n === 1 ? 'Spiel' : 'Spiele'} gespielt` : 'Noch nicht gespielt'; })(),
     speak: p.speak ? `${p.speak.correct} von ${p.speak.total} gleich richtig` : 'Noch nicht geübt',
     dictation: p.dictation ? `${p.dictation.correct} von ${p.dictation.total} gleich richtig` : 'Noch nicht geübt',
     test: p.test ? `Bestes Ergebnis ${p.test.best} %` : 'Noch kein Test',
@@ -406,8 +415,8 @@ function viewSet(set) {
     <ol class="path" aria-label="Lernweg">
       ${step(1, 'Lernkarten', 'Karten umdrehen und merken.', info.cards,
         `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>`, !!p.cards, 'stack')}
-      ${step(2, 'Zuordnen', 'Verbinde, was zusammengehört.', info.match,
-        `<button class="btn primary" data-action="mode" data-mode="match">Zuordnen üben</button>`, !!p.match, 'link')}
+      ${step(2, 'Vokabelspiele', gamesOn(set).length ? gamesOn(set).map((g) => g.art).join(' ') + ' Spielend festigen.' : 'Für diese Portion ausgeschaltet.', info.games,
+        gamesOn(set).length ? `<button class="btn primary" data-action="games">Spiele öffnen</button>` : '', !!(p.games || p.match), 'sparkle')}
       ${step(3, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,
         `<button class="btn primary" data-action="mode" data-mode="speak">Aussprache üben</button>`, !!p.speak, 'mic')}
       ${step(4, 'Hören & Schreiben', 'Hör das Wort und schreib es auf.', info.dictation,
@@ -415,6 +424,8 @@ function viewSet(set) {
       ${step(5, 'Test', 'Zeig, was du kannst.', info.test,
         `<button class="btn primary" data-action="mode" data-mode="test">Test starten</button>`, !!p.test, 'pencil2')}
     </ol>
+    ${typeof liveStartHTML === 'function' ? liveStartHTML(set) : ''}
+    ${locked ? '' : gamesSettingsHTML(set)}
 
     ${locked ? '' : `<section class="deck" aria-labelledby="deck-title">
       <div class="deck-head">

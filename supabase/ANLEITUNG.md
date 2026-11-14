@@ -117,6 +117,16 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 - Die Lauterkennung gibt es nur für Englisch; Französisch prüft die Spracherkennung des Browsers.
 - Damit die Suche weiss, welche Sprache eine Portion hat, `supabase/vokabelwelt.sql` nochmals ganz ausführen (neue Spalte `lang`).
 
+## Vokabelspiele und Live in der Klasse
+
+**Vokabelspiele** (Schritt 2 jeder Portion): Memory, Ballon-Platzen, Blitzrunde, Buchstabensalat, Wortsuchsel (auch als PDF mit Lösung), Rakete starten und Duell zu zweit. Alle sind eingeschaltet; in der eigenen Portion lassen sie sich unter „Spiele für die Kinder ein- und ausschalten“ einzeln abschalten. Das gilt auch für Klassen und Portionen, die per Link oder QR-Code geteilt werden. Spiele zählen nicht für die Auswertung.
+
+**Live in der Klasse** (nur angemeldete Lehrperson, in der eigenen Portion):
+- **Quiz:** Die Fragen erscheinen am Beamer, die Kinder antworten auf ihren Geräten. Schnelle richtige Antworten geben mehr Punkte, am Schluss gibt es eine Rangliste.
+- **Hör-Bingo:** Jedes Kind bekommt 9 Wortkarten. Die Lehrperson liest mit „Nächstes Wort“ vor; wer drei in einer Reihe hat, drückt BINGO, und Vokaboom prüft, ob alle Wörter schon vorgelesen wurden.
+- Die Kinder machen mit dem QR-Code oder über „Live-Spiel beitreten“ mit dem 5-stelligen Code mit (mit Kinder-Login automatisch mit Namen, sonst mit Vorname).
+- Dafür nutzt Vokaboom Supabase Realtime („Broadcast“). Das ist bei Supabase standardmässig eingeschaltet, es braucht keine Tabelle, und es wird nichts gespeichert.
+
 ## Passwort vergessen
 
 - **Mit E-Mail-Versand:** Im Anmelde-Fenster die E-Mail-Adresse eingeben und auf **Passwort vergessen?** klicken. Der Link in der E-Mail öffnet Vokaboom, dort wählt man ein neues Passwort.

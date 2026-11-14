@@ -317,7 +317,7 @@ function renderMatch() {
   if (match.choosing) { renderMatchChoice(set); return; }
   const bar = `
     <div class="mode-bar">
-      <h1 class="mode-title">Zuordnen</h1>
+      <h1 class="mode-title">Memory</h1>
       <div class="mode-controls">
         <div class="seg small" role="group" aria-label="Was zusammengehört">
           <button class="seg-btn" data-action="match-variant" data-variant="pic" aria-pressed="${match.variant === 'pic'}">${icon('image')}<span>Bild ↔ ${L}</span></button>
@@ -434,7 +434,7 @@ function memMatched(set, a, b) {
   [a, b].forEach((k) => { match.tiles[k].gone = true; const el = memEl(k); if (el) { el.classList.remove('selected'); el.classList.add('matched'); el.disabled = true; } });
   match.found++;
   match.open = [];
-  if (w) trackWord(set, w.id, 'match', match.missed?.has(w.id) ? 'wrong' : 'correct');
+  // Memory ist ein Spiel: zählt nicht für die Auswertung
   sfx.good();
   if (w && db.settings.autoSpeak) speak(w.foreign, set.lang);
   const pf = $('.match-mode .progress-fill'), pl = $('.match-mode .progress-label span');
@@ -486,7 +486,7 @@ function renderMatchChoice(set) {
   const withDe = set.words.filter((w) => w.foreign && w.german);
   const sample = (list, fn) => list.slice(0, 2).map(fn).join('');
   $('#view').innerHTML = `<section class="mode match-mode">
-    <div class="mode-bar"><h1 class="mode-title">Zuordnen</h1></div>
+    <div class="mode-bar"><h1 class="mode-title">Memory</h1></div>
     <div class="test-card setup choose-card">
       <h2>Was gehört zusammen?</h2>
       <div class="choose-grid">

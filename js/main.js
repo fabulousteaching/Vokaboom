@@ -366,6 +366,8 @@ const actions = {
 };
 
 Object.assign(actions, classActions); // Klassen und Kinder-Login (js/classes.js)
+Object.assign(actions, gameActions); // Vokabelspiele (js/games.js)
+if (typeof liveActions === 'object') Object.assign(actions, liveActions); // Quiz und Hör-Bingo (js/live.js)
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
@@ -404,6 +406,7 @@ document.addEventListener('keydown', (e) => {
 /* ---------------- Start ---------------- */
 async function importFromHash() {
   if (await kidLoginFromHash()) return true;
+  if (liveFromHash()) return true;
   const m = location.hash.match(/^#v=([A-Za-z0-9_-]+)$/);
   if (!m) return false;
   if (isKid()) {
@@ -423,6 +426,7 @@ async function importFromHash() {
     set.shareId = share;
     if (data.audioOwner) set.audio = { o: data.audioOwner, h: {} };
     set.accent = data.accent; set.passMin = data.passMin;
+    if (data.gamesOff?.length) set.gamesOff = data.gamesOff;
     saveDB();
     openSet(set.id);
     toast(`Neue Vokabelportion „${set.name}“ geladen.`);

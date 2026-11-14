@@ -1929,6 +1929,7 @@ async function encodeShare(set, { lite = false } = {}) {
     ...(set.audio?.o || (typeof cloud === 'object' && cloud.uid && !set.shareId && !set.assigned) ? { o: set.audio?.o || cloud.uid } : {}), // Audio-Speicher der Lehrperson
     ...(set.accent === 'us' ? { a: 'us' } : {}),
     ...(set.passMin && set.passMin !== 60 ? { p: set.passMin } : {}),
+    ...(set.gamesOff?.length ? { g: set.gamesOff } : {}),
     w: set.words.map((w) => {
       let code = picToCode(w.pic);
       if (lite && /^[fus]/.test(code)) code = '';
@@ -1961,6 +1962,7 @@ async function decodeShare(code) {
     audioOwner: /^[0-9A-Za-z-]{1,64}$/.test(String(d.o || '')) ? String(d.o) : '',
     accent: d.a === 'us' ? 'us' : 'gb',
     passMin: Number(d.p) >= 30 && Number(d.p) <= 90 ? Number(d.p) : 60,
+    gamesOff: Array.isArray(d.g) ? d.g.filter((x) => typeof x === 'string').slice(0, 20) : [],
     rows: (d.w || []).map((r) => ({
       foreign: String(r[0] || ''), german: String(r[1] || ''),
       pic: d.v === 2 ? codeToPic(r[2]) : v1pic(r),

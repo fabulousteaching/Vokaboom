@@ -257,7 +257,8 @@ function kidHomeHTML() {
   return `<section class="home kid-home">
     <div class="kid-hello">
       <span class="kid-hello-pic" aria-hidden="true">${kidWordImg(kid.username)}</span>
-      <div><p class="eyebrow">${esc(kid.cls)}</p><h1>Hallo ${esc(kid.first)}!</h1><p class="lead">Wähle eine Portion und leg los.</p></div>
+      <div><p class="eyebrow">${esc(kid.cls)}</p><h1>Hallo ${esc(kid.first)}!</h1><p class="lead">Wähle eine Portion und leg los.</p>
+        <button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button></div>
     </div>
     ${db.sets.length ? `<ul class="kid-sets">${db.sets.map((s) => {
       const p = s.progress || {};
@@ -265,7 +266,7 @@ function kidHomeHTML() {
       return `<li><button class="kid-set" data-action="open-set" data-id="${s.id}">
         <strong>${flag(s.lang)} ${esc(s.name)}</strong>
         <small>${LANGS[langOf(s)].name} · ${s.words.length} Vokabeln${p.test?.best != null ? ` · Test ${p.test.best} %` : ''}</small>
-        <span class="kid-steps" aria-label="${done} von 5 Übungen gemacht">${steps.map((k) => `<i class="${p[k] ? 'on' : ''}"></i>`).join('')}</span>
+        <span class="kid-steps" aria-label="${done} von 5 Übungen gemacht">${steps.map((k) => `<i class="${p[k] || (k === 'match' && p.games) ? 'on' : ''}"></i>`).join('')}</span>
       </button></li>`;
     }).join('')}</ul>` : `<div class="panel empty-kid"><p>Deine Lehrperson hat noch keine Portion freigegeben.</p><button class="btn secondary" data-action="kid-refresh">${icon('flip')} Nochmal schauen</button></div>`}
   </section>`;
@@ -814,7 +815,7 @@ function kidSetStats(p, set) {
     if (!s || !s.n) return;
     words++; n += s.n; bad += s.bad || 0; almost += s.almost || 0; last = Math.max(last, s.t || 0);
   });
-  const steps = ['cards', 'match', 'speak', 'dictation', 'test'].filter((k) => p[k]).length;
+  const steps = ['cards', 'speak', 'dictation', 'test'].filter((k) => p[k]).length; // Spiele (auch Memory) zählen nicht
   return { n, bad, words, total: set ? set.words.length : words, acc: n ? (n - bad - almost * 0.5) / n : null, test: p.test?.best ?? null, steps, last: last || Date.parse(p._at || '') || 0 };
 }
 const pctTxt = (x) => (x == null ? '–' : `${Math.round(x * 100)} %`);
@@ -862,7 +863,7 @@ function classStatsHTML(c, kids) {
         const k = kidSetStats(prog[st.id]?.[set.id], set);
         if (!k || !k.n) return '<td class="cell empty">–</td>';
         return `<td class="cell ${accClass(k.acc)}" title="${k.n} Antworten, ${k.bad} falsch">
-          <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/5 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small><small class="muted">${fmtDay(k.last)}</small></td>`;
+          <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/4 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small><small class="muted">${fmtDay(k.last)}</small></td>`;
       }).join('')}
     </tr>`).join('')}</tbody></table></div>
     <p class="muted small">Prozent = Anteil richtiger Antworten in allen Übungen (fast richtig zählt halb). Tippe auf ein Kind für seine schwierigsten Wörter.</p>`;
@@ -878,7 +879,7 @@ function classStatsHTML(c, kids) {
         const hard = set.words.map((w) => ({ w, s: p.words?.[w.id] })).filter((x) => x.s && x.s.bad)
           .sort((a, b) => b.s.bad / b.s.n - a.s.bad / a.s.n || b.s.bad - a.s.bad).slice(0, 8);
         return `<div class="kd-set"><h4>${esc(set.name)} <span class="pill ${accClass(k.acc)}">${pctTxt(k.acc)}</span></h4>
-          <p class="small muted">${k.words} von ${k.total} Wörtern geübt · ${k.steps} von 5 Übungen${k.test != null ? ` · bester Test ${k.test} %` : ''}</p>
+          <p class="small muted">${k.words} von ${k.total} Wörtern geübt · ${k.steps} von 4 Übungen${k.test != null ? ` · bester Test ${k.test} %` : ''}</p>
           ${hard.length ? `<ul class="hw-list">${hard.map(({ w, s }) => `<li class="hw"><span class="hw-word"><strong lang="en">${esc(w.foreign)}</strong> <span class="muted">${esc(w.german)}</span></span><span class="hw-tag">${s.bad}× falsch von ${s.n}</span></li>`).join('')}</ul>` : '<p class="small">Keine Fehler. 🎉</p>'}
         </div>`;
       }).join('')}</div>`;
