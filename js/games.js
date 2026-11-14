@@ -198,7 +198,7 @@ function blitzBegin(set, level) {
   const words = gameWords(set).map(gameForm).filter((f) => f.length >= 2 && f.length <= 30);
   Object.assign(G.s, { level, words, queue: [], score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0 });
   $('#view').innerHTML = gameShell('Blitzrunde', `
-    <div class="blitz-top"><span class="blitz-score" id="blitz-score">0 Punkte</span><span class="blitz-time" id="blitz-time">60</span></div>
+    <div class="blitz-top"><span class="blitz-score" id="blitz-score">0 Punkte</span><span class="blitz-time-wrap"><span class="blitz-time" id="blitz-time">60</span><span class="blitz-bonus" id="blitz-bonus" aria-live="polite"></span></span></div>
     <div class="progress"><div class="progress-fill" id="blitz-bar" style="width:100%"></div></div>
     <p class="hint center">${level === 1 ? 'Richtig geschrieben → nach <strong>rechts</strong> wischen. Falsch geschrieben → nach <strong>links</strong>.' : 'Tippe auf die <strong>falsche Stelle</strong> im Wort – oder auf <strong>„Richtig geschrieben“</strong>.'}</p>
     <div class="blitz-stage" id="blitz-stage"></div>
@@ -209,11 +209,11 @@ function blitzBegin(set, level) {
   G.keys = (e) => { if (G.s.level === 1 && e.key === 'ArrowLeft') blitzAnswer(false); if (e.key === 'ArrowRight' || (G.s.level === 2 && e.key === 'Enter')) blitzAnswer(true); };
   document.addEventListener('keydown', G.keys);
   gEvery(() => {
-    const left = Math.max(0, G.s.end - Date.now());
+    const left = Math.max(0, G.s.end - (G.s.pauseAt || Date.now()));
     const t = $('#blitz-time'), b = $('#blitz-bar');
     if (t) t.textContent = Math.ceil(left / 1000);
-    if (b) b.style.width = `${(left / 600).toFixed(1)}%`;
-    if (!left && !G.s.busy) blitzFinish(set);
+    if (b) b.style.width = `${Math.min(100, left / 600).toFixed(1)}%`;
+    if (!left && !G.s.busy && !G.s.pauseAt) blitzFinish(set);
   }, 200);
   blitzNext(set);
 }
@@ -228,6 +228,8 @@ function blitzNextIsRight() {
 function blitzNext(set) {
   const s = G.s;
   if (s.done) return;
+  if (s.pauseAt) { s.end += Date.now() - s.pauseAt; s.pauseAt = 0; } // Uhr stand still, solange die Auflösung zu sehen war
+  document.activeElement?.blur?.(); // kein Knopf bleibt von der letzten Runde angewählt
   if (Date.now() >= s.end) { blitzFinish(set); return; }
   if (!s.queue.length) s.queue = shuffle(s.words.slice());
   const right = s.queue.pop();
@@ -285,12 +287,20 @@ function blitzShow(good) {
     if (fix) fix.innerHTML = `<span class="bl-correct" lang="${currentSet().lang}">${esc(c.right)}</span>`;
   }
 }
+const BLITZ_BONUS = 2000; // jede richtige Antwort: 2 Sekunden mehr
 function blitzScore(good) {
   const s = G.s;
-  if (good) { s.score++; sfx.good(); } else { s.wrong++; sfx.bad(); }
+  document.activeElement?.blur?.();
+  if (good) {
+    s.score++; sfx.good();
+    s.end += BLITZ_BONUS;
+    const bo = $('#blitz-bonus'); if (bo) { bo.textContent = '+2 s'; bo.classList.remove('show'); void bo.offsetWidth; bo.classList.add('show'); }
+  } else { s.wrong++; sfx.bad(); }
   const sc = $('#blitz-score'); if (sc) sc.textContent = `${s.score} ${s.score === 1 ? 'Punkt' : 'Punkte'}`;
   blitzShow(good);
-  gLater(() => blitzNext(currentSet()), good ? (G.s.card.ok ? 650 : 1100) : 1700);
+  s.pauseAt = Date.now(); // die Auflösung kostet keine Zeit
+  // richtig geschriebenes Wort 2–3 Sekunden zeigen (bei Fehlern etwas länger)
+  gLater(() => blitzNext(currentSet()), good ? 2000 : 2800);
 }
 function blitzAnswer(saysRight) {
   const s = G.s;
@@ -491,9 +501,9 @@ function balloonRound(set) {
   const sp = $('#bl-speed'); if (sp) sp.textContent = s.dur > 8 ? '🐢' : s.dur > 5.5 ? '🐇' : '🚀';
   layer.innerHTML = opts.map((o, k) => {
     const c = BALLOON_COLORS[(s.round * 3 + k) % BALLOON_COLORS.length];
-    const drift = (Math.random() * 30 - 15).toFixed(0);
+    const drift = (Math.random() * 8 - 4).toFixed(0); // alle steigen etwa gleich schnell
     return `<button class="balloon" data-action="bl-pop" data-ok="${o.ok ? 1 : 0}" lang="${set.lang}"
-      style="--lane:${lanes[k]};--lanes:${opts.length};--c:${c};--dur:${s.dur.toFixed(2)}s;--delay:${(k * 0.45 + Math.random() * 0.3).toFixed(2)}s;--drift:${drift}px">
+      style="--lane:${lanes[k]};--lanes:${opts.length};--c:${c};--dur:${s.dur.toFixed(2)}s;--delay:${(Math.random() * 0.25).toFixed(2)}s;--drift:${drift}px">
       <span class="bl-body"><span class="bl-text" style="--fs:${balloonFont(o.text)}">${esc(o.text)}</span></span>
       <svg class="bl-string" viewBox="0 0 20 60" aria-hidden="true"><path d="M10 0 C 2 15, 18 30, 10 45 S 6 58, 10 60" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>`;
@@ -507,7 +517,7 @@ function burst(el, good) {
   const sky = $('#bl-sky');
   if (!sky || !el) return;
   const r = el.getBoundingClientRect(), sr = sky.getBoundingClientRect();
-  const x = r.left - sr.left + r.width / 2, y = r.top - sr.top + r.height * 0.4;
+  const x = Math.min(sr.width - 75, Math.max(75, r.left - sr.left + r.width / 2)), y = r.top - sr.top + r.height * 0.4; // Schrift nicht abschneiden
   const color = getComputedStyle(el).getPropertyValue('--c') || '#f00';
   const fx = document.createElement('div');
   fx.className = 'bl-burst';
@@ -515,10 +525,22 @@ function burst(el, good) {
   fx.innerHTML = Array.from({ length: 12 }, (_, i) => {
     const a = (i / 12) * Math.PI * 2, d = 50 + Math.random() * 40;
     return `<i style="--x:${(Math.cos(a) * d).toFixed(0)}px;--y:${(Math.sin(a) * d).toFixed(0)}px;--r:${Math.floor(Math.random() * 360)}deg;background:${color}"></i>`;
-  }).join('') + `<b class="${good ? '' : 'bad'}">${good ? 'POP!' : 'Oh!'}</b>`;
+  }).join('') + `<b class="${good ? '' : 'bad'}">${good ? 'Great!' : 'Oh!'}</b>`;
   sky.appendChild(fx);
   setTimeout(() => fx.remove(), 900);
   el.classList.add('popped');
+}
+/** Nach dem Treffer: die anderen Ballone düsen davon (von dort, wo sie gerade sind) */
+function balloonsZoomOff() {
+  $$('.balloon:not(.popped)').forEach((b, i) => {
+    const tr = getComputedStyle(b).transform;
+    b.style.transform = tr === 'none' ? '' : tr;
+    b.style.animation = 'none';
+    b.style.setProperty('--zx', `${(i % 2 ? 1 : -1) * (60 + Math.random() * 80)}px`);
+    b.style.setProperty('--zr', `${(i % 2 ? 1 : -1) * (15 + Math.random() * 20)}deg`);
+    void b.offsetWidth;
+    b.classList.add('zoom-off');
+  });
 }
 function balloonPop(el) {
   const s = G.s;
@@ -533,8 +555,8 @@ function balloonPop(el) {
     s.dur = Math.max(BALLOON_FAST, s.dur * 0.9); // schneller
     sfx.good();
     const sc = $('#bl-score'); if (sc) { sc.textContent = `${s.score} Punkte`; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
-    $$('.balloon:not(.popped)').forEach((b) => b.classList.add('fly-off'));
-    gLater(() => balloonRound(set), 700);
+    balloonsZoomOff();
+    gLater(() => balloonRound(set), 900);
   } else {
     burst(el, false);
     balloonMiss(set, false);

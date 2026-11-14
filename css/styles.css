@@ -1134,6 +1134,11 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 /* Blitzrunde */
 .blitz-top { display: flex; justify-content: space-between; font-family: var(--font-display); font-size: 1.3rem; }
 .blitz-time { font-variant-numeric: tabular-nums; }
+.blitz-time-wrap { position: relative; display: inline-block; }
+.blitz-bonus { position: absolute; right: 0; top: -1.1rem; font-size: .95rem; font-weight: 800; color: var(--green-ink); opacity: 0; white-space: nowrap; }
+.blitz-bonus.show { animation: bonus 1.1s ease-out; }
+@keyframes bonus { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
+@media (hover: none) { .blitz-buttons .btn:hover { filter: none; transform: none; } }
 .blitz-stage { position: relative; min-height: 230px; display: grid; place-items: center; align-content: center; overflow: hidden; }
 .blitz-card { user-select: none; touch-action: none; cursor: grab; padding: 1.6rem 2.4rem; min-width: min(80%, 360px); text-align: center; font-family: var(--font-word); font-size: clamp(2rem, 7vw, 3rem); background: var(--paper); border: 3px solid var(--line); border-radius: 26px; box-shadow: var(--shadow-card); transition: transform .25s, border-color .15s, background .15s; }
 .blitz-card.dragging { transition: none; cursor: grabbing; }
@@ -1190,10 +1195,11 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .bl-text { padding: 0 4px; color: #fff; font: 800 calc(var(--fs, 1) * clamp(.95rem, 4.2vw, 1.3rem)) var(--font-word); text-align: center; overflow-wrap: normal; word-break: keep-all; hyphens: none; line-height: 1.1; text-shadow: 0 2px 3px rgba(0, 0, 0, .35); }
 .bl-string { width: 20px; height: 50px; margin-top: 8px; color: rgba(30, 40, 70, .45); }
 @keyframes bl-rise { to { transform: translate(var(--drift), calc(-1 * (clamp(340px, 58vh, 520px) + 210px))); } }
-@keyframes bl-sway { from { margin-left: -6px; } to { margin-left: 6px; } }
+@keyframes bl-sway { from { margin-left: -3px; } to { margin-left: 3px; } }
 .balloon:hover .bl-body { filter: brightness(1.08); }
 .balloon.popped { visibility: hidden; pointer-events: none; }
-.balloon.fly-off { animation-duration: 1s, 2.6s; pointer-events: none; opacity: .5; }
+.balloon.zoom-off { pointer-events: none; transition: transform .8s cubic-bezier(.5, 0, .9, .4), opacity .8s ease-in; transform: translate(var(--zx), -900px) rotate(var(--zr)) !important; opacity: 0; }
+.balloon.zoom-off::after { content: '💨'; position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); font-size: 1.6rem; }
 .bl-burst { position: absolute; width: 0; height: 0; pointer-events: none; z-index: 3; }
 .bl-burst i { position: absolute; width: 14px; height: 9px; border-radius: 3px; animation: shard .75s ease-out forwards; }
 @keyframes shard { from { transform: translate(0, 0) rotate(0); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
