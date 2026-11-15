@@ -35,6 +35,44 @@ function gamePrompt(set, w, cls = '') {
   if (hasPicture(w, set.lang)) return `<div class="g-prompt ${cls}">${picHTML(w, set.lang, 'card-pic')}${w.german ? `<span class="g-de" lang="de">${esc(w.german)}</span>` : ''}</div>`;
   return `<div class="g-prompt ${cls}"><span class="g-de big" lang="de">${esc(w.german || '?')}</span></div>`;
 }
+/**
+ * Welches Wort kommt als Nächstes? Für alle Spiele gleich:
+ * - zuerst alle Wörter, die noch nicht richtig waren (gemischt)
+ * - falsche kommen nach 2–4 anderen Wörtern zufällig nochmal dran
+ * - richtige erst wieder, wenn alle anderen durch sind (falls noch Zeit ist)
+ */
+function makePicker(items) {
+  return { fresh: shuffle(items.slice()), wrong: [], right: [], turn: 0, last: null };
+}
+function pickNext(pk) {
+  pk.turn++;
+  const avoid = (list) => (list.length > 1 ? list.filter((x) => x !== pk.last) : list);
+  const due = avoid(pk.wrong.filter((x) => x.due <= pk.turn).map((x) => x.item));
+  let item;
+  if (due.length && (!pk.fresh.length || Math.random() < 0.6)) item = due[Math.floor(Math.random() * due.length)];
+  else if (pk.fresh.length) {
+    let i = pk.fresh.length - 1;
+    if (pk.fresh[i] === pk.last && i > 0) i--;
+    item = pk.fresh.splice(i, 1)[0];
+  } else if (pk.wrong.length) {
+    const soon = avoid(pk.wrong.slice().sort((a, b) => a.due - b.due).map((x) => x.item));
+    item = soon[0];
+  } else if (pk.right.length) {
+    pk.fresh = shuffle(pk.right); pk.right = []; // alle richtig: jetzt dürfen sie nochmal kommen
+    return pickNext(pk);
+  } else item = pk.last;
+  pk.wrong = pk.wrong.filter((x) => x.item !== item);
+  pk.right = pk.right.filter((x) => x !== item);
+  pk.last = item;
+  return item;
+}
+function markResult(pk, item, ok) {
+  if (!pk || item == null) return;
+  pk.wrong = pk.wrong.filter((x) => x.item !== item);
+  pk.right = pk.right.filter((x) => x !== item);
+  if (ok) pk.right.push(item);
+  else pk.wrong.push({ item, due: pk.turn + 2 + Math.floor(Math.random() * 3) });
+}
 function gameRecord(set, id, score) {
   const p = set.progress = set.progress || {};
   const g = p.games = p.games || {};
@@ -195,7 +233,7 @@ function startBlitz(set) {
 }
 function blitzBegin(set, level) {
   const words = gameWords(set).map(gameForm).filter((f) => f.length >= 2 && f.length <= 30);
-  Object.assign(G.s, { level, words, queue: [], score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0, streak: 0, pauseAt: 0 });
+  Object.assign(G.s, { level, words, pk: makePicker(words), score: 0, wrong: 0, end: Date.now() + 60000, card: null, busy: false, done: false, hist: [], fresh: 0, streak: 0, pauseAt: 0 });
   $('#view').innerHTML = gameShell('Blitzrunde', `
     <div class="blitz-top"><span class="blitz-score" id="blitz-score">0 Punkte</span><span class="blitz-time-wrap"><span class="blitz-time" id="blitz-time">60</span><span class="blitz-bonus" id="blitz-bonus" aria-live="polite"></span></span></div>
     <div class="progress"><div class="progress-fill" id="blitz-bar" style="width:100%"></div></div>
@@ -230,8 +268,7 @@ function blitzNext(set) {
   if (s.pauseAt) { s.end += Date.now() - s.pauseAt; s.pauseAt = 0; } // Uhr stand still, solange die Auflösung zu sehen war
   document.activeElement?.blur?.(); // kein Knopf bleibt von der letzten Runde angewählt
   if (Date.now() >= s.end) { blitzFinish(set); return; }
-  if (!s.queue.length) s.queue = shuffle(s.words.slice());
-  const right = s.queue.pop();
+  const right = pickNext(s.pk);
   let wantRight = blitzNextIsRight();
   // Zuerst häufige Fehler, später ab und zu auch seltenere
   const err = wantRight ? null : misspellPro(right, set.lang, s.fresh < 6 ? 0.1 : 0.3);
@@ -289,6 +326,7 @@ function blitzShow(good) {
 const BLITZ_BONUS = 2000; // je 3 richtige Antworten hintereinander: 2 Sekunden mehr
 function blitzScore(good) {
   const s = G.s;
+  markResult(s.pk, s.card?.right, good);
   document.activeElement?.blur?.();
   if (good) {
     s.score++; sfx.good();
@@ -338,8 +376,8 @@ function blitzFinish(set) {
    ========================================================= */
 const isLetter = (c) => /[\p{L}\p{N}]/u.test(c);
 function startScramble(set) {
-  const words = shuffle(gameWords(set).filter((w) => { const f = gameForm(w); return f.replace(/[^\p{L}]/gu, '').length >= 2 && f.length <= 24; })).slice(0, 10);
-  Object.assign(G.s, { words, i: 0, solved: 0, hints: 0 });
+  const words = gameWords(set).filter((w) => { const f = gameForm(w); return f.replace(/[^\p{L}]/gu, '').length >= 2 && f.length <= 24; });
+  Object.assign(G.s, { words, pk: makePicker(words), total: Math.min(10, words.length), i: 0, solved: 0, hints: 0 });
   $('#view').innerHTML = gameShell('Buchstabensalat', '<div id="scr"></div>');
   scrambleWord(set);
 }
@@ -347,20 +385,20 @@ function scrambleWord(set) {
   const s = G.s;
   const box = $('#scr');
   if (!box) return;
-  if (s.i >= s.words.length) {
+  if (s.i >= s.total) {
     const rec = gameRecord(set, 'scramble', s.solved);
     sfx.win(); confetti();
-    box.innerHTML = gameEndHTML('Super gemacht!', `${s.solved} von ${s.words.length} Wörtern gelegt${s.hints ? `, ${s.hints} Tipp${s.hints === 1 ? '' : 's'} benutzt` : ''}.${rec ? ' Neuer Rekord!' : ''}`);
+    box.innerHTML = gameEndHTML('Super gemacht!', `${s.solved} von ${s.total} Wörtern gelegt${s.hints ? `, ${s.hints} Tipp${s.hints === 1 ? '' : 's'} benutzt` : ''}.${rec ? ' Neuer Rekord!' : ''}`);
     return;
   }
-  const w = s.words[s.i];
+  const w = pickNext(s.pk);
   const target = [...gameForm(w)];
   const slots = target.map((c) => (isLetter(c) ? { want: c, tile: null } : { fixed: c }));
   let tiles = target.filter(isLetter).map((c, k) => ({ id: k, c, used: false }));
   for (let t = 0; t < 10; t++) { tiles = shuffle(tiles); if (tiles.map((x) => x.c).join('') !== target.filter(isLetter).join('') || tiles.length < 3) break; }
-  Object.assign(s, { w, slots, tiles, checked: false });
+  Object.assign(s, { w, slots, tiles, checked: false, missed: false });
   box.innerHTML = `<div class="test-card scramble-card">
-    <p class="progress-label"><span>Wort ${s.i + 1} von ${s.words.length}</span></p>
+    <p class="progress-label"><span>Wort ${s.i + 1} von ${s.total}</span></p>
     <div class="row center"><button class="btn primary round" data-action="scr-play" aria-label="Wort anhören">${icon('speaker', 'big')}</button>
       <button class="btn ghost small" data-action="scr-play" data-slow="1">${icon('snail')} Langsam</button></div>
     ${w.german ? `<p class="muted center" lang="de">${esc(w.german)}</p>` : ''}
@@ -415,11 +453,13 @@ function scrambleCheck() {
   const ok = s.slots.every((x) => x.fixed != null || x.tile.c === x.want);
   if (ok) {
     s.solved++;
+    markResult(s.pk, s.w, !s.missed);
     s.slots.forEach((x) => { if (x.fixed == null) x.state = 'good'; });
     scrambleDraw(); sfx.good();
     const fb = $('#scr-fb'); if (fb) fb.innerHTML = `<div class="banner good">${icon('check')}<div><strong>Richtig!</strong> ${esc(gameForm(s.w))}</div></div>`;
     gLater(() => { s.i++; scrambleWord(currentSet()); }, 1200);
   } else {
+    s.missed = true;
     s.slots.forEach((x) => { if (x.fixed == null) x.state = x.tile.c === x.want ? 'good' : 'bad'; });
     scrambleDraw(); sfx.bad();
     const sl = $('#scr-slots'); sl?.classList.remove('shake'); void sl?.offsetWidth; sl?.classList.add('shake');
@@ -468,7 +508,7 @@ function startBalloon(set) {
 }
 function balloonBegin(set, level) {
   const words = gameWords(set);
-  Object.assign(G.s, { level, words, score: 0, streak: 0, lives: 3, round: 0, hits: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
+  Object.assign(G.s, { level, words, pk: makePicker(words), score: 0, streak: 0, lives: 3, round: 0, hits: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
   $('#view').innerHTML = gameShell('Ballon-Platzen', `
     <div class="balloon-top"><span id="bl-score" class="bl-score">0 Punkte</span><span class="bl-speed" id="bl-speed" title="Tempo">🐢</span><span id="bl-lives" aria-label="Leben">❤️❤️❤️</span></div>
     <div class="balloon-sky" id="bl-sky">
@@ -506,7 +546,7 @@ function balloonRound(set) {
   if (s.done) return;
   const layer = $('#bl-layer'), pr = $('#bl-prompt');
   if (!layer || !pr) return;
-  const w = shuffle(s.words)[0];
+  const w = pickNext(s.pk);
   const opts = balloonOptions(set, w);
   s.cur = { w, settled: false };
   pr.innerHTML = `<span class="bwc-word" lang="de">${esc(w.german || '?')}</span>${s.level === 2 ? '<span class="bwc-hint">Welcher ist richtig geschrieben?</span>' : ''}`;
@@ -563,6 +603,7 @@ function balloonPop(el) {
   popSound();
   if (el.dataset.ok === '1') {
     s.cur.settled = true;
+    markResult(s.pk, s.cur.w, !s.cur.missed);
     burst(el, true);
     s.streak++;
     s.score += 10 + Math.round((BALLOON_SLOW - s.dur) * 3) + (s.streak >= 3 ? 5 : 0);
@@ -579,6 +620,7 @@ function balloonPop(el) {
 }
 function balloonMiss(set, escaped) {
   const s = G.s;
+  if (s.cur) { s.cur.missed = true; if (escaped) markResult(s.pk, s.cur.w, false); }
   s.lives--;
   s.streak = 0;
   s.dur = Math.min(BALLOON_SLOW, s.dur * 1.12); // wieder etwas langsamer
@@ -710,8 +752,8 @@ function dragonSVG() {
   </svg>`;
 }
 function startRocket(set) {
-  const words = shuffle(gameWords(set).filter((w) => /\p{L}/u.test(gameForm(w)) && gameForm(w).length <= 24)).slice(0, 5);
-  Object.assign(G.s, { words, i: 0, solved: 0 });
+  const words = gameWords(set).filter((w) => /\p{L}/u.test(gameForm(w)) && gameForm(w).length <= 24);
+  Object.assign(G.s, { words, pk: makePicker(words), total: Math.min(5, words.length), i: 0, solved: 0 });
   $('#view').innerHTML = gameShell('Weck nicht den Drachen', '<div id="rk"></div>');
   rocketWord(set);
 }
@@ -719,19 +761,19 @@ function rocketWord(set) {
   const s = G.s;
   const box = $('#rk');
   if (!box) return;
-  if (s.i >= s.words.length) {
+  if (s.i >= s.total) {
     const rec = gameRecord(set, 'dragon', s.solved);
     if (s.solved) { sfx.win(); confetti(); }
-    box.innerHTML = gameEndHTML(s.solved === s.words.length ? 'Der Drache hat nichts gemerkt! 😴' : 'Geschafft!',
-      `${s.solved} von ${s.words.length} Wörtern gefunden, ohne den Drachen zu wecken.${rec && s.solved ? ' Neuer Rekord!' : ''}`);
+    box.innerHTML = gameEndHTML(s.solved === s.total ? 'Der Drache hat nichts gemerkt! 😴' : 'Geschafft!',
+      `${s.solved} von ${s.total} Wörtern gefunden, ohne den Drachen zu wecken.${rec && s.solved ? ' Neuer Rekord!' : ''}`);
     return;
   }
-  const w = s.words[s.i];
+  const w = pickNext(s.pk);
   const target = gameForm(w);
   const need = new Set([...target].filter((c) => /\p{L}/u.test(c)).map(baseLetter));
   Object.assign(s, { w, target, need, got: new Set(), wrong: new Set(), launched: false, awake: false });
   const keys = 'abcdefghijklmnopqrstuvwxyz'.split('');
-  const head = `<span>Wort ${s.i + 1} von ${s.words.length}</span><span>${'😴'.repeat(s.solved)}</span>`;
+  const head = `<span>Wort ${s.i + 1} von ${s.total}</span><span>${'😴'.repeat(s.solved)}</span>`;
   const body = `<p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an – aber leise!</p>
     <div class="rk-word" id="rk-word" lang="${set.lang}"></div>
     <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>`;
@@ -787,6 +829,7 @@ function rocketGuess(k) {
   }
   if (s.wrong.size >= DRAGON_MAX) {
     s.awake = true;
+    markResult(s.pk, s.w, false);
     rocketDraw();
     tone([220, 110, 80], 0.5, 'sawtooth', 0.07); // Brüllen
     gLater(() => { s.i++; rocketWord(currentSet()); }, 3200);
@@ -796,6 +839,7 @@ function rocketGuess(k) {
   if ([...s.need].every((x) => s.got.has(x))) {
     s.launched = true;
     s.solved++;
+    markResult(s.pk, s.w, true);
     rocketDraw();
     if (say) say.textContent = dragonSays(currentSet()?.lang).won;
     sfx.win();
@@ -975,7 +1019,7 @@ async function searchPDF() {
    ========================================================= */
 function startDuel(set) {
   const words = shuffle(gameWords(set));
-  Object.assign(G.s, { words, round: 0, total: Math.min(10, words.length), score: [0, 0], lock: [false, false], busy: false });
+  Object.assign(G.s, { words, pk: makePicker(words), round: 0, total: Math.min(10, words.length), score: [0, 0], lock: [false, false], busy: false });
   $('#view').innerHTML = `<section class="duel" id="duel">
     <div class="duel-half p1" id="duel-1"></div>
     <div class="duel-mid"><span id="duel-score">0 : 0</span><button class="btn ghost small" data-action="games">${icon('x')} Beenden</button></div>
@@ -996,7 +1040,7 @@ function duelRound(set) {
     });
     return;
   }
-  const w = s.words[s.round % s.words.length];
+  const w = pickNext(s.pk);
   const others = shuffle(s.words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, 3);
   Object.assign(s, { w, lock: [false, false], busy: false });
   [0, 1].forEach((p) => {
@@ -1014,6 +1058,7 @@ function duelTap(el) {
   if (s.busy || s.lock[p]) return;
   if (el.dataset.ok === '1') {
     s.busy = true;
+    markResult(s.pk, s.w, !s.lock[1 - p]); // falls das andere Kind falsch lag: später nochmal
     s.score[p]++;
     el.classList.add('good');
     sfx.good();
@@ -1027,6 +1072,7 @@ function duelTap(el) {
     $$(`.duel-opt[data-p="${p}"]`).forEach((b) => { b.disabled = true; });
     if (s.lock[0] && s.lock[1]) {
       s.busy = true;
+      markResult(s.pk, s.w, false);
       $$('.duel-opt[data-ok="1"]').forEach((b) => b.classList.add('good'));
       gLater(() => { s.round++; duelRound(currentSet()); }, 1500);
     }
@@ -1091,7 +1137,7 @@ const gameActions = {
   'scr-tile': (el) => scrambleTile(+el.dataset.id),
   'scr-slot': (el) => scrambleSlot(+el.dataset.k),
   'scr-hint': () => scrambleHint(),
-  'scr-skip': () => { G.s.i++; scrambleWord(currentSet()); },
+  'scr-skip': () => { markResult(G.s.pk, G.s.w, false); G.s.i++; scrambleWord(currentSet()); },
   'bl-pop': (el) => balloonPop(el),
   'bl-level': (el) => balloonBegin(currentSet(), +el.dataset.level),
   'bl-count': (el) => { G.s.bcount = +el.dataset.n; $$('[data-action="bl-count"]').forEach((x) => x.setAttribute('aria-pressed', String(x === el))); },
