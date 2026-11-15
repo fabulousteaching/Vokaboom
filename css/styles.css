@@ -1267,9 +1267,11 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .dg.s4 .dg-eye .open, .dg.s5 .dg-eye .open { animation: dg-blink 4.5s 1.5s infinite; }
 @keyframes dg-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
 /* Gähnen */
-.dg.s2 .dg-mouth-open { opacity: 1; animation: dg-yawn 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
-.dg.s2 .dg-mouth-closed { opacity: 0; }
-@keyframes dg-yawn { 0%, 100% { transform: scale(.7, .3); } 35%, 65% { transform: scale(1.2, 1.45); } }
+/* Gähnen: nur einmal */
+.dg.s2 .dg-mouth-open { animation: dg-yawn 2.4s ease-in-out .3s 1 both; transform-box: fill-box; transform-origin: center top; }
+.dg.s2 .dg-mouth-closed { animation: dg-yawn-shut 2.4s ease-in-out .3s 1 both; }
+@keyframes dg-yawn { 0% { opacity: 0; transform: scale(.7, .3); } 15% { opacity: 1; } 40%, 65% { opacity: 1; transform: scale(1.2, 1.45); } 88% { opacity: 1; transform: scale(.8, .4); } 100% { opacity: 0; transform: scale(.7, .3); } }
+@keyframes dg-yawn-shut { 0%, 100% { opacity: 1; } 12%, 90% { opacity: 0; } }
 /* Rauchwölkchen aus der Nase */
 .dg.s3 .dg-smoke, .dg.s4 .dg-smoke, .dg.s5 .dg-smoke { opacity: 1; }
 .dg .dg-smoke circle { fill: #94A3B8; transform-box: fill-box; animation: dg-puff 2s ease-out infinite; }
@@ -1285,7 +1287,14 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 @keyframes dg-z { 0% { opacity: 0; transform: translate(-6px, 14px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -22px) scale(1.25); } }
 .dg.s1 .dg-zzz, .dg.s2 .dg-zzz { opacity: .35; }
 .dg.s3 .dg-zzz, .dg.s4 .dg-zzz, .dg.s5 .dg-zzz, .dg.s6 .dg-zzz { opacity: 0; }
-.dg.won .dg-zzz { opacity: 1; }
+.dg.won .dg-zzz { opacity: 1; transition-delay: 1s; }
+/* geschafft: Augen fallen zu, Kopf sinkt, er schläft wieder ein */
+.dg.won .dg-eye .open { opacity: 0 !important; animation: none !important; transition: opacity .6s .7s; }
+.dg.won .dg-eye .closed { opacity: 1 !important; transition: opacity .6s .7s; }
+.dg.won .dg-smoke, .dg.won .dg-mouth-open, .dg.won .dg-fire { opacity: 0 !important; animation: none !important; }
+.dg.won .dg-mouth-closed { opacity: 1 !important; animation: none !important; }
+.dg.won .dg-tail { animation: none !important; }
+.dg.won .dg-head, .dg.won .dg-neck { transition: transform 1.8s ease-in-out .3s; }
 /* Schwanz: wird unruhiger */
 .dg .dg-tail { transform-box: fill-box; transform-origin: 0% 80%; }
 .dg.s4 .dg-tail { animation: dg-wag 1.6s ease-in-out infinite alternate; }

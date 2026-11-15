@@ -607,9 +607,9 @@ const baseLetter = (c) => stripAccents(c).toLowerCase();
 const DRAGON_MAX = 6; // beim 6. Fehler ist der Drache wach
 /** Was unter dem Drachen steht – in der Sprache der Portion */
 const DRAGON_SAYS = {
-  en: { sleep: 'Shh … the dragon is sleeping.', won: 'Phew – he is still sleeping! 😴',
+  en: { sleep: 'Shh … the dragon is sleeping.', won: 'Phew – he fell asleep again! 😴',
     steps: ['', 'Oh no … one eye opens!', 'He yawns …', 'Little clouds of smoke!', 'Now both eyes are open!', 'He lifts his head – shh!', 'The dragon is awake! 🔥'] },
-  fr: { sleep: 'Chut … le dragon dort.', won: 'Ouf – il dort encore ! 😴',
+  fr: { sleep: 'Chut … le dragon dort.', won: 'Ouf – il se rendort ! 😴',
     steps: ['', 'Oh non … un œil s’ouvre !', 'Il bâille …', 'Des petits nuages de fumée !', 'Maintenant, les deux yeux sont ouverts !', 'Il lève la tête – chut !', 'Le dragon est réveillé ! 🔥'] },
 };
 const dragonSays = (lang) => DRAGON_SAYS[lang] || DRAGON_SAYS.en;
@@ -787,7 +787,7 @@ function rocketGuess(k) {
     rocketDraw();
     if (say) say.textContent = dragonSays(currentSet()?.lang).won;
     sfx.win();
-    gLater(() => { s.i++; rocketWord(currentSet()); }, 2400);
+    gLater(() => { s.i++; rocketWord(currentSet()); }, 3600); // Zeit zum Einschlafen
   }
 }
 
