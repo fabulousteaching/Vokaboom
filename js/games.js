@@ -614,59 +614,98 @@ const DRAGON_SAYS = {
 };
 const dragonSays = (lang) => DRAGON_SAYS[lang] || DRAGON_SAYS.en;
 function dragonSVG() {
-  return `<svg class="dg-svg" viewBox="-48 0 308 170" aria-hidden="true">
+  const O = '#2D5A2A'; // Umrisslinie
+  return `<svg class="dg-svg" viewBox="-60 0 380 260" aria-hidden="true">
     <defs>
-      <radialGradient id="dg-body" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#6EE7B7"/><stop offset="1" stop-color="#059669"/></radialGradient>
-      <radialGradient id="dg-head" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#6EE7B7"/><stop offset="1" stop-color="#10B981"/></radialGradient>
+      <radialGradient id="dg-g" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#7DBE62"/><stop offset="1" stop-color="#4C8F3F"/></radialGradient>
+      <radialGradient id="dg-gh" cx="45%" cy="35%" r="75%"><stop offset="0" stop-color="#86C76A"/><stop offset="1" stop-color="#559A45"/></radialGradient>
+      <linearGradient id="dg-horn" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#9DBF6C"/><stop offset="1" stop-color="#C9DD9A"/></linearGradient>
+      <pattern id="dg-sc" width="16" height="13" patternUnits="userSpaceOnUse">
+        <path d="M0 6.5 q4 -6 8 0 q4 -6 8 0 M-8 13 q4 -6 8 0 q4 -6 8 0 q4 -6 8 0" fill="none" stroke="rgba(30,70,30,.22)" stroke-width="1.2"/>
+      </pattern>
+      <clipPath id="dg-neckclip"><rect x="-60" y="-40" width="380" height="262"/></clipPath>
     </defs>
-    <ellipse cx="135" cy="158" rx="105" ry="9" fill="rgba(30,40,70,.12)"/>
+    <ellipse cx="160" cy="246" rx="140" ry="10" fill="rgba(30,40,70,.12)"/>
+    <!-- Hals (hinter dem Körper, bewegt sich mit dem Kopf) -->
+    <g clip-path="url(#dg-neckclip)"><g class="dg-neck"><path d="M78 120 C 70 160, 84 200, 120 210 L 160 200 C 140 170, 128 140, 122 118 z" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <path d="M86 140 C 88 170, 100 192, 122 202 L 132 196 C 116 180, 106 160, 104 138 z" fill="#E9E5B4"/></g></g>
     <!-- Schwanz -->
-    <path class="dg-tail" d="M210 140 C 250 140, 252 105, 228 98 C 214 94, 210 110, 222 112" fill="none" stroke="#059669" stroke-width="12" stroke-linecap="round"/>
-    <path class="dg-tail" d="M222 112 l 10 -10 l 2 14 z" fill="#F59E0B"/>
-    <!-- Rücken-Zacken -->
-    <g fill="#F59E0B">
-      <path d="M110 98 l 10 -18 l 10 18 z"/><path d="M135 94 l 10 -19 l 10 19 z"/><path d="M160 96 l 10 -17 l 10 17 z"/><path d="M185 104 l 9 -14 l 9 14 z"/>
+    <g class="dg-tail">
+      <path d="M262 214 C 312 214, 318 160, 292 138 C 284 132, 274 138, 280 148 C 296 170, 284 196, 250 206 z" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <path d="M296 150 l 12 -10 l -2 15 z M304 172 l 14 -4 l -8 13 z M300 196 l 12 4 l -13 6 z" fill="#3F7D35"/>
+    </g>
+    <!-- Flügel -->
+    <g class="dg-wing">
+      <path d="M170 150 C 172 110, 196 82, 236 74 C 230 90, 240 98, 252 96 C 246 110, 256 120, 266 120 C 252 136, 230 146, 200 156 z" fill="#5E9F4C" stroke="${O}" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M176 148 L 236 76 M186 150 L 252 98 M196 154 L 264 120" stroke="${O}" stroke-width="1.6" opacity=".55"/>
+    </g>
+    <!-- Rückenzacken -->
+    <g fill="#3F7D35" stroke="${O}" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M150 146 l 8 -18 l 8 16 z"/><path d="M226 150 l 10 -16 l 8 18 z"/><path d="M248 162 l 12 -12 l 4 18 z"/>
     </g>
     <!-- Körper -->
-    <ellipse cx="155" cy="128" rx="68" ry="34" fill="url(#dg-body)"/>
-    <ellipse cx="150" cy="142" rx="50" ry="16" fill="#D1FAE5"/>
-    <!-- Flügel -->
-    <path d="M140 112 C 155 88, 190 86, 200 100 C 188 100, 182 108, 186 116 C 174 110, 160 114, 140 112 z" fill="#047857" opacity=".85"/>
-    <!-- Vorderpfote -->
-    <ellipse cx="100" cy="150" rx="18" ry="9" fill="#10B981"/>
-    <g fill="#fff"><circle cx="88" cy="152" r="2.4"/><circle cx="95" cy="155" r="2.4"/><circle cx="103" cy="155" r="2.4"/></g>
+    <g class="dg-body">
+      <path d="M110 200 C 106 160, 150 136, 200 140 C 252 144, 280 178, 268 214 C 258 238, 140 244, 116 226 z" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <path d="M110 200 C 106 160, 150 136, 200 140 C 252 144, 280 178, 268 214 C 258 238, 140 244, 116 226 z" fill="url(#dg-sc)"/>
+      <!-- Hinterbein -->
+      <ellipse cx="236" cy="208" rx="34" ry="30" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <ellipse cx="236" cy="208" rx="34" ry="30" fill="url(#dg-sc)"/>
+      <path d="M214 236 C 230 230, 258 230, 270 238 C 262 246, 222 248, 214 236 z" fill="#559A45" stroke="${O}" stroke-width="2"/>
+      <g fill="#B9D68C" stroke="${O}" stroke-width="1.2"><ellipse cx="248" cy="242" rx="5" ry="4"/><ellipse cx="258" cy="241" rx="5" ry="4"/><ellipse cx="267" cy="238" rx="4.5" ry="3.6"/></g>
+    </g>
     <!-- Kopf -->
     <g class="dg-head">
-      <path d="M78 92 l -6 -22 l 16 14 z" fill="#F59E0B"/>
-      <path d="M98 90 l 2 -24 l 10 20 z" fill="#F59E0B"/>
-      <ellipse cx="88" cy="114" rx="36" ry="28" fill="url(#dg-head)"/>
-      <ellipse cx="54" cy="124" rx="28" ry="18" fill="#34D399"/>
-      <g fill="#065F46"><ellipse cx="38" cy="117" rx="3" ry="2.2"/><ellipse cx="48" cy="114" rx="3" ry="2.2"/></g>
-      <ellipse cx="104" cy="122" rx="7" ry="4.5" fill="#FDA4AF" opacity=".55"/>
+      <!-- Ohr-Flossen -->
+      <path d="M44 92 C 20 78, 6 86, -2 76 C 8 96, 0 102, -6 110 C 10 110, 14 118, 10 128 C 26 120, 36 118, 46 112 z" fill="#4C8F3F" stroke="${O}" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M146 92 C 170 78, 184 86, 192 76 C 182 96, 190 102, 196 110 C 180 110, 176 118, 180 128 C 164 120, 154 118, 144 112 z" fill="#4C8F3F" stroke="${O}" stroke-width="2.2" stroke-linejoin="round"/>
+      <!-- Hörner -->
+      <g stroke="${O}" stroke-width="2.2" stroke-linejoin="round">
+        <path d="M62 62 C 50 40, 50 18, 64 2 C 62 24, 74 40, 84 54 z" fill="url(#dg-horn)"/>
+        <path d="M128 62 C 140 40, 140 18, 126 2 C 128 24, 116 40, 106 54 z" fill="url(#dg-horn)"/>
+      </g>
+      <g stroke="#7E9F55" stroke-width="1.4" fill="none"><path d="M56 40 l 12 -2 M55 28 l 10 -1 M60 50 l 14 -2"/><path d="M134 40 l -12 -2 M135 28 l -10 -1 M130 50 l -14 -2"/></g>
+      <!-- Zacken oben -->
+      <g fill="#3F7D35" stroke="${O}" stroke-width="1.5" stroke-linejoin="round"><path d="M84 52 l 6 -18 l 6 16 z"/><path d="M96 50 l 8 -20 l 4 20 z"/></g>
+      <!-- Kopf -->
+      <ellipse cx="95" cy="92" rx="54" ry="46" fill="url(#dg-gh)" stroke="${O}" stroke-width="2.5"/>
+      <ellipse cx="95" cy="92" rx="54" ry="46" fill="url(#dg-sc)" opacity=".7"/>
+      <!-- Schnauze -->
+      <ellipse cx="95" cy="126" rx="40" ry="25" fill="#6FB257" stroke="${O}" stroke-width="2.5"/>
+      <ellipse cx="95" cy="142" rx="26" ry="8" fill="#E9E5B4"/>
+      <g fill="${O}"><ellipse cx="82" cy="118" rx="4.5" ry="3"/><ellipse cx="108" cy="118" rx="4.5" ry="3"/></g>
+      <ellipse cx="54" cy="112" rx="9" ry="5" fill="#F4A3A3" opacity=".45"/><ellipse cx="136" cy="112" rx="9" ry="5" fill="#F4A3A3" opacity=".45"/>
       <!-- Mund -->
-      <path class="dg-mouth-closed" d="M32 132 C 45 138, 58 137, 70 131" fill="none" stroke="#065F46" stroke-width="2.6" stroke-linecap="round"/>
-      <g class="dg-mouth-open"><ellipse cx="52" cy="134" rx="15" ry="9" fill="#7F1D1D"/><ellipse cx="52" cy="138" rx="9" ry="4" fill="#FB7185"/><path d="M42 127 l3 5 l3 -5 M58 127 l3 5 l3 -5" fill="#fff"/></g>
-      <!-- Augen: zu / halb / offen -->
+      <path class="dg-mouth-closed" d="M70 134 C 84 146, 106 146, 120 134" fill="none" stroke="${O}" stroke-width="2.6" stroke-linecap="round"/>
+      <g class="dg-mouth-open"><ellipse cx="95" cy="140" rx="17" ry="11" fill="#6B1D1D" stroke="${O}" stroke-width="2"/><ellipse cx="95" cy="145" rx="10" ry="4.5" fill="#F07A8A"/><path d="M84 131 l3 5 l3 -5 M100 131 l3 5 l3 -5" fill="#fff"/></g>
+      <!-- Augen -->
       <g class="dg-eye e1">
-        <path class="closed" d="M84 106 C 90 112, 98 112, 104 106" fill="none" stroke="#065F46" stroke-width="2.8" stroke-linecap="round"/>
-        <g class="open"><ellipse cx="94" cy="106" rx="9" ry="10" fill="#fff"/><circle class="pupil" cx="91" cy="107" r="4.6" fill="#1E1B4B"/><circle cx="89.5" cy="105" r="1.5" fill="#fff"/><path class="lid" d="M84 103 C 88 96, 100 96, 104 103 L 104 98 L 84 98 z" fill="#34D399"/></g>
+        <path class="closed" d="M56 90 C 64 98, 76 98, 84 90" fill="none" stroke="${O}" stroke-width="3" stroke-linecap="round"/>
+        <g class="open"><circle cx="70" cy="86" r="16" fill="#EDEAC0" stroke="${O}" stroke-width="2"/><circle class="pupil" cx="71" cy="87" r="12" fill="#1C2A16"/><circle cx="71" cy="87" r="8" fill="none" stroke="#3E5A2E" stroke-width="1.5"/><circle cx="75" cy="82" r="3.6" fill="#fff"/>
+          <path class="lid" d="M53 86 C 56 70, 84 70, 87 86 z" fill="#5FA34B" stroke="${O}" stroke-width="2"/></g>
       </g>
       <g class="dg-eye e2">
-        <path class="closed" d="M66 102 C 70 106, 76 106, 80 102" fill="none" stroke="#065F46" stroke-width="2.4" stroke-linecap="round"/>
-        <g class="open"><ellipse cx="73" cy="102" rx="7" ry="8" fill="#fff"/><circle class="pupil" cx="70.5" cy="103" r="3.8" fill="#1E1B4B"/><circle cx="69.5" cy="101.5" r="1.2" fill="#fff"/></g>
+        <path class="closed" d="M106 90 C 114 98, 126 98, 134 90" fill="none" stroke="${O}" stroke-width="3" stroke-linecap="round"/>
+        <g class="open"><circle cx="120" cy="86" r="16" fill="#EDEAC0" stroke="${O}" stroke-width="2"/><circle class="pupil" cx="119" cy="87" r="12" fill="#1C2A16"/><circle cx="119" cy="87" r="8" fill="none" stroke="#3E5A2E" stroke-width="1.5"/><circle cx="123" cy="82" r="3.6" fill="#fff"/></g>
       </g>
-      <!-- Rauch aus den Nasenlöchern -->
-      <g class="dg-smoke"><circle cx="38" cy="110" r="7"/><circle cx="48" cy="106" r="8"/><circle cx="32" cy="104" r="6"/><circle cx="44" cy="108" r="6"/></g>
+      <!-- Rauch -->
+      <g class="dg-smoke"><circle cx="82" cy="112" r="6"/><circle cx="108" cy="112" r="6"/><circle cx="84" cy="108" r="5"/><circle cx="106" cy="108" r="5"/></g>
       <!-- Feuer -->
       <g class="dg-fire">
-        <path d="M42 130 C 22 120, 0 128, -34 116 C -18 128, -30 132, -44 134 C -26 138, -18 142, -36 152 C -12 148, 6 150, 18 146 C 4 156, -8 160, -20 166 C 4 164, 26 156, 44 140 z" fill="#F97316"/>
-        <path d="M40 132 C 24 126, 8 132, -14 126 C -4 133, -10 137, -20 140 C -4 142, 6 144, 20 141 C 12 148, 4 152, -4 156 C 14 154, 30 148, 42 138 z" fill="#FACC15"/>
-        <path d="M38 134 C 28 131, 18 134, 6 133 C 14 137, 18 139, 26 139 C 30 139, 36 138, 38 136 z" fill="#FEF9C3"/>
+        <path d="M84 146 C 60 150, 30 140, -10 154 C 10 160, -2 168, -24 180 C 4 182, 14 178, 4 196 C 30 186, 50 178, 70 160 z" fill="#F97316"/>
+        <path d="M86 146 C 66 150, 44 148, 16 158 C 30 162, 22 168, 8 176 C 28 176, 44 170, 74 156 z" fill="#FACC15"/>
+        <path d="M86 147 C 74 150, 60 152, 46 156 C 56 158, 66 158, 80 152 z" fill="#FEF9C3"/>
       </g>
+    </g>
+    <!-- Vorderpfoten (vor dem Kinn) -->
+    <g class="dg-paws">
+      <path d="M58 226 C 60 210, 104 208, 116 222 C 120 236, 64 242, 58 226 z" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <path d="M118 230 C 122 214, 162 214, 172 226 C 174 240, 122 244, 118 230 z" fill="url(#dg-g)" stroke="${O}" stroke-width="2.5"/>
+      <g fill="#B9D68C" stroke="${O}" stroke-width="1.2"><ellipse cx="66" cy="232" rx="5" ry="4"/><ellipse cx="78" cy="235" rx="5" ry="4"/><ellipse cx="91" cy="235" rx="5" ry="4"/>
+        <ellipse cx="128" cy="236" rx="5" ry="4"/><ellipse cx="141" cy="238" rx="5" ry="4"/><ellipse cx="154" cy="237" rx="5" ry="4"/></g>
     </g>
     <!-- Zzz -->
     <g class="dg-zzz" fill="#6366F1" font-family="Bricolage Grotesque, sans-serif" font-weight="800">
-      <text x="118" y="70" font-size="18">z</text><text x="134" y="52" font-size="24">z</text><text x="154" y="32" font-size="30">Z</text>
+      <text x="160" y="70" font-size="20">z</text><text x="178" y="50" font-size="26">z</text><text x="198" y="28" font-size="32">Z</text>
     </g>
   </svg>`;
 }
@@ -734,17 +773,14 @@ function rocketGuess(k) {
     tone([140, 100], 0.22, 'sawtooth', 0.05); // Grummeln
     if (say) { say.textContent = dragonSays(currentSet()?.lang).steps[Math.min(DRAGON_MAX, s.wrong.size)]; say.classList.remove('pop'); void say.offsetWidth; say.classList.add('pop'); }
   }
-  const jolt = () => { const dg = $('#dg'); if (dg && !s.need.has(k)) { dg.classList.remove('jolt'); void dg.offsetWidth; dg.classList.add('jolt'); } };
   if (s.wrong.size >= DRAGON_MAX) {
     s.awake = true;
     rocketDraw();
-    jolt();
     tone([220, 110, 80], 0.5, 'sawtooth', 0.07); // Brüllen
     gLater(() => { s.i++; rocketWord(currentSet()); }, 3200);
     return;
   }
   rocketDraw();
-  jolt();
   if ([...s.need].every((x) => s.got.has(x))) {
     s.launched = true;
     s.solved++;

@@ -1225,77 +1225,78 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .center-field { display: grid; justify-items: center; gap: .4rem; margin-top: 1rem; }
 /* Rakete */
 /* Weck nicht den Drachen */
-.dg-stage { display: grid; justify-items: center; gap: .2rem; }
+.dg-stage { position: relative; display: grid; justify-items: center; gap: .2rem; padding: .4rem 0; border-radius: 24px; transition: background .6s; }
+.dg-stage[data-s="3"], .dg-stage[data-s="4"] { background: radial-gradient(60% 70% at 35% 45%, rgba(148, 163, 184, .16), transparent 70%); }
+.dg-stage[data-s="5"] { background: radial-gradient(60% 70% at 35% 45%, rgba(249, 115, 22, .12), transparent 70%); }
+.dg-stage[data-s="6"] { animation: dg-flash 1s ease-out; }
+@keyframes dg-flash { 0% { background: rgba(250, 204, 21, .5); } 100% { background: rgba(249, 115, 22, .08); } }
 .dg { width: min(380px, 88vw); }
-.dg-stage { position: relative; padding: .4rem 0; border-radius: 24px; transition: background .5s; }
-.dg-stage[data-s="3"], .dg-stage[data-s="4"] { background: radial-gradient(60% 70% at 30% 60%, rgba(148, 163, 184, .16), transparent 70%); }
-.dg-stage[data-s="5"] { background: radial-gradient(60% 70% at 30% 60%, rgba(249, 115, 22, .12), transparent 70%); }
-.dg-stage[data-s="6"] { animation: dg-flash .9s ease-out; }
-@keyframes dg-flash { 0% { background: rgba(250, 204, 21, .55); } 100% { background: rgba(249, 115, 22, .08); } }
-.dg-svg { display: block; width: 100%; height: auto; overflow: visible; transform-origin: 50% 90%; animation: dg-breathe 2.6s ease-in-out infinite; }
-@keyframes dg-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.03, 1.08) translateY(-2px); } }
-.dg.s3 .dg-svg, .dg.s4 .dg-svg { animation-duration: 1.7s; }
-.dg.s5 .dg-svg { animation-duration: 1.1s; }
-/* Ruck bei jedem Fehler */
-.dg.jolt { animation: dg-jolt .55s cubic-bezier(.3, 1.8, .5, 1); }
-@keyframes dg-jolt { 0% { transform: translateY(0); } 30% { transform: translateY(-14px) rotate(-2deg) scale(1.04); } 60% { transform: translateY(3px) rotate(1deg); } 100% { transform: none; } }
-.dg-say.pop { animation: dg-saypop .45s cubic-bezier(.3, 1.8, .5, 1); }
-@keyframes dg-saypop { from { transform: scale(.6); opacity: 0; } }
+.dg-svg { display: block; width: 100%; height: auto; overflow: visible; }
 .dg-say { min-height: 1.5em; margin: 0; font-weight: 700; color: var(--ink-2); text-align: center; }
-.dg .dg-head { transform-origin: 95px 130px; transition: transform .5s cubic-bezier(.3, 1.6, .5, 1); }
-.dg .dg-eye .open, .dg .dg-mouth-open, .dg .dg-smoke, .dg .dg-fire { opacity: 0; transition: opacity .3s; }
-.dg .dg-eye .closed { transition: opacity .2s; }
-.dg .dg-eye .lid { opacity: 0; }
-.dg .dg-zzz text { animation: dg-z 2.4s ease-in-out infinite; transform-box: fill-box; }
-.dg .dg-zzz text:nth-child(2) { animation-delay: .4s; } .dg .dg-zzz text:nth-child(3) { animation-delay: .8s; }
-@keyframes dg-z { 0% { opacity: 0; transform: translate(-6px, 14px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -22px) scale(1.25); } }
-/* 1: ein Auge blinzelt auf */
+.dg-say.pop { animation: dg-saypop .4s ease-out; }
+@keyframes dg-saypop { from { opacity: 0; transform: translateY(6px); } }
+/* ruhiges Atmen (nur der Körper) */
+.dg .dg-body, .dg .dg-wing { transform-box: fill-box; transform-origin: 50% 100%; animation: dg-breathe 3s ease-in-out infinite; }
+@keyframes dg-breathe { 50% { transform: scale(1.012, 1.03); } }
+/* Kopf und Hals: von „liegt schlafend auf den Pfoten“ bis „hebt den Kopf und schaut dich an“ */
+.dg .dg-head, .dg .dg-neck { transform-box: view-box; transform-origin: 120px 200px; transition: transform .9s cubic-bezier(.3, 1.3, .5, 1); }
+.dg.s0 .dg-head, .dg.s0 .dg-neck { transform: translate(14px, 62px) rotate(-16deg); }
+.dg.s1 .dg-head, .dg.s1 .dg-neck { transform: translate(12px, 56px) rotate(-13deg); }
+.dg.s2 .dg-head, .dg.s2 .dg-neck { transform: translate(8px, 42px) rotate(-8deg); }
+.dg.s3 .dg-head, .dg.s3 .dg-neck { transform: translate(5px, 30px) rotate(-5deg); }
+.dg.s4 .dg-head, .dg.s4 .dg-neck { transform: translate(2px, 16px) rotate(-2deg); }
+.dg.s5 .dg-head, .dg.s5 .dg-neck { transform: translate(0, 2px) rotate(0); }
+.dg.s6 .dg-head, .dg.s6 .dg-neck { transform: translate(0, -8px) rotate(2deg) scale(1.04); }
+.dg.won .dg-head, .dg.won .dg-neck { transform: translate(16px, 64px) rotate(-17deg); }
+/* Augen */
+.dg .dg-eye .open, .dg .dg-mouth-open, .dg .dg-smoke, .dg .dg-fire { opacity: 0; transition: opacity .35s; }
+.dg .dg-eye .closed { transition: opacity .25s; }
+.dg .dg-eye .lid { opacity: 0; transition: opacity .3s; }
+.dg .dg-eye .open { transform-box: fill-box; transform-origin: center; }
 .dg.s1 .e1 .closed, .dg.s2 .e1 .closed, .dg.s3 .e1 .closed, .dg.s4 .e1 .closed, .dg.s5 .e1 .closed, .dg.s6 .e1 .closed { opacity: 0; }
 .dg.s1 .e1 .open, .dg.s2 .e1 .open, .dg.s3 .e1 .open, .dg.s4 .e1 .open, .dg.s5 .e1 .open, .dg.s6 .e1 .open { opacity: 1; }
-.dg.s1 .e1 .lid, .dg.s2 .e1 .lid { opacity: 1; }
-/* Auge springt auf */
-.dg .dg-eye .open { transform-box: fill-box; transform-origin: center; }
-.dg.s1 .e1 .open, .dg.s2 .e1 .open, .dg.s3 .e1 .open, .dg.s4 .e1 .open, .dg.s5 .e1 .open, .dg.s6 .e1 .open { animation: dg-eyepop .5s cubic-bezier(.3, 1.9, .5, 1), dg-blink 4s 1.2s infinite; }
-.dg.s4 .e2 .open, .dg.s5 .e2 .open, .dg.s6 .e2 .open { animation: dg-eyepop .5s cubic-bezier(.3, 1.9, .5, 1), dg-blink 4s 1.4s infinite; }
-@keyframes dg-eyepop { 0% { transform: scale(.2, .05); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
-@keyframes dg-blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
-.dg.s1 .dg-zzz, .dg.s2 .dg-zzz { opacity: .45; }
-/* 2: gähnen */
-.dg.s2 .dg-mouth-open { opacity: 1; animation: dg-yawn 2.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
-.dg.s2 .dg-mouth-closed { opacity: 0; }
-@keyframes dg-yawn { 0%, 100% { transform: scale(.7, .35); } 35%, 65% { transform: scale(1.25, 1.5); } }
-.dg.s2 .dg-head { animation: dg-yawnhead 2.2s ease-in-out infinite; }
-@keyframes dg-yawnhead { 0%, 100% { transform: rotate(0); } 35%, 65% { transform: rotate(-11deg) translateY(-4px); } }
-/* 3+: Rauchwölkchen */
-.dg.s3 .dg-zzz, .dg.s4 .dg-zzz, .dg.s5 .dg-zzz, .dg.s6 .dg-zzz { opacity: 0; }
-.dg.s3 .dg-smoke, .dg.s4 .dg-smoke, .dg.s5 .dg-smoke { opacity: 1; }
-.dg .dg-smoke circle { fill: #94A3B8; transform-box: fill-box; animation: dg-puff 1.8s ease-out infinite; }
-.dg .dg-smoke circle:nth-child(2) { animation-delay: .45s; } .dg .dg-smoke circle:nth-child(3) { animation-delay: .9s; } .dg .dg-smoke circle:nth-child(4) { animation-delay: 1.3s; }
-@keyframes dg-puff { 0% { transform: translate(0, 6px) scale(.4); opacity: 0; } 25% { opacity: .95; } 100% { transform: translate(-18px, -55px) scale(2.1); opacity: 0; } }
-.dg.s4 .dg-smoke circle, .dg.s5 .dg-smoke circle { fill: #64748B; animation-duration: 1.1s; }
-/* 4: beide Augen offen */
 .dg.s4 .e2 .closed, .dg.s5 .e2 .closed, .dg.s6 .e2 .closed { opacity: 0; }
 .dg.s4 .e2 .open, .dg.s5 .e2 .open, .dg.s6 .e2 .open { opacity: 1; }
-.dg.s4 .pupil, .dg.s5 .pupil { animation: dg-look 2.6s ease-in-out infinite; transform-box: fill-box; }
-@keyframes dg-look { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(3px); } }
-/* 5: Kopf hebt sich, Schwanz zuckt */
-.dg.s5 .dg-head { animation: dg-bob .9s ease-in-out infinite; }
-@keyframes dg-bob { 0%, 100% { transform: rotate(-8deg) translateY(-6px); } 50% { transform: rotate(-14deg) translateY(-14px); } }
-.dg.s5 .dg-tail { animation: dg-twitch .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: left center; }
-@keyframes dg-twitch { to { transform: rotate(-18deg); } }
-.dg.s4 .dg-tail { animation: dg-twitch 1.1s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: left center; }
-/* 6: wach! Feuer */
-.dg.s6 .dg-svg { animation: dg-shake .1s linear 14; }
-@keyframes dg-shake { 25% { transform: translate(-6px, -2px); } 75% { transform: translate(6px, 2px); } }
-.dg.s6 .dg-head { transform: rotate(-14deg) translateY(-14px) scale(1.05); }
-.dg.s6 .dg-tail { animation: dg-twitch .25s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: left center; }
-.dg.s6 .dg-mouth-open { opacity: 1; } .dg.s6 .dg-mouth-closed { opacity: 0; }
-.dg.s6 .dg-fire { opacity: 1; transform-box: fill-box; transform-origin: right center; animation: dg-fire .25s ease-in-out infinite alternate; }
-@keyframes dg-fire { from { transform: scale(.88, .8); } to { transform: scale(1.1, 1.12); } }
-/* gewonnen: schläft weiter */
+.dg.s1 .e1 .lid, .dg.s2 .e1 .lid, .dg.s3 .e1 .lid { opacity: 1; } /* noch verschlafen: halb offen */
+/* Blick: zuerst zur Seite, dann direkt zu dir */
+.dg .pupil { transition: transform .6s ease; transform-box: fill-box; transform-origin: center; }
+.dg.s1 .pupil, .dg.s2 .pupil { transform: translate(-4px, 3px); }
+.dg.s3 .pupil { transform: translate(-2px, 2px); }
+.dg.s4 .pupil, .dg.s5 .pupil { transform: translate(0, 1px) scale(1.06); }
+.dg.s6 .pupil { transform: scale(.75); }
+.dg.s4 .dg-eye .open, .dg.s5 .dg-eye .open { animation: dg-blink 4.5s 1.5s infinite; }
+@keyframes dg-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+/* Gähnen */
+.dg.s2 .dg-mouth-open { opacity: 1; animation: dg-yawn 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center top; }
+.dg.s2 .dg-mouth-closed { opacity: 0; }
+@keyframes dg-yawn { 0%, 100% { transform: scale(.7, .3); } 35%, 65% { transform: scale(1.2, 1.45); } }
+/* Rauchwölkchen aus der Nase */
+.dg.s3 .dg-smoke, .dg.s4 .dg-smoke, .dg.s5 .dg-smoke { opacity: 1; }
+.dg .dg-smoke circle { fill: #94A3B8; transform-box: fill-box; animation: dg-puff 2s ease-out infinite; }
+.dg .dg-smoke circle:nth-child(2) { animation-delay: .5s; } .dg .dg-smoke circle:nth-child(3) { animation-delay: 1s; } .dg .dg-smoke circle:nth-child(4) { animation-delay: 1.5s; }
+.dg .dg-smoke circle:nth-child(odd) { animation-name: dg-puff-l; }
+@keyframes dg-puff { 0% { transform: translate(0, 0) scale(.4); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(55px, -18px) scale(2.2); opacity: 0; } }
+@keyframes dg-puff-l { 0% { transform: translate(0, 0) scale(.4); opacity: 0; } 20% { opacity: .9; } 100% { transform: translate(-55px, -18px) scale(2.2); opacity: 0; } }
+.dg.s5 .dg-smoke circle { fill: #64748B; animation-duration: 1.3s; }
+/* Zzz */
+.dg .dg-zzz { transition: opacity .4s; }
+.dg .dg-zzz text { animation: dg-z 2.6s ease-in-out infinite; transform-box: fill-box; }
+.dg .dg-zzz text:nth-child(2) { animation-delay: .5s; } .dg .dg-zzz text:nth-child(3) { animation-delay: 1s; }
+@keyframes dg-z { 0% { opacity: 0; transform: translate(-6px, 14px) scale(.6); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -22px) scale(1.25); } }
+.dg.s1 .dg-zzz, .dg.s2 .dg-zzz { opacity: .35; }
+.dg.s3 .dg-zzz, .dg.s4 .dg-zzz, .dg.s5 .dg-zzz, .dg.s6 .dg-zzz { opacity: 0; }
 .dg.won .dg-zzz { opacity: 1; }
-.dg.won .dg-zzz text { animation-duration: 1.6s; }
-.dg.won .dg-svg { animation-duration: 3.4s; }
+/* Schwanz: wird unruhiger */
+.dg .dg-tail { transform-box: fill-box; transform-origin: 0% 80%; }
+.dg.s4 .dg-tail { animation: dg-wag 1.6s ease-in-out infinite alternate; }
+.dg.s5 .dg-tail { animation: dg-wag .7s ease-in-out infinite alternate; }
+.dg.s6 .dg-tail { animation: dg-wag .25s ease-in-out infinite alternate; }
+@keyframes dg-wag { from { transform: rotate(0); } to { transform: rotate(-10deg); } }
+/* wach: Maul auf, Feuer */
+.dg.s6 .dg-mouth-open { opacity: 1; } .dg.s6 .dg-mouth-closed { opacity: 0; }
+.dg.s6 .dg-fire { opacity: 1; }
+.dg.s6 .dg-fire path { transform-box: fill-box; transform-origin: 100% 0%; animation: dg-fire .22s ease-in-out infinite alternate; }
+@keyframes dg-fire { from { transform: scale(.85, .8); } to { transform: scale(1.1, 1.12); } }
 .rk-l.missed { color: var(--red); }
 .rocket-card { display: grid; gap: 1rem; }
 .rocket-wrap { display: flex; align-items: flex-end; justify-content: center; gap: 1rem; height: 120px; }
