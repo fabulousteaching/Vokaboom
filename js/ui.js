@@ -63,6 +63,7 @@ function renderShell() {
   document.getElementById('app').innerHTML = `
     <header class="topbar">
       <div class="topbar-inner">
+        <button class="back-btn" id="back-btn" data-action="back" hidden aria-label="Zurück">${icon('left')}</button>
         <button class="brand" data-action="home" aria-label="Vokaboom – zur Startseite">
           <span class="brand-mark" aria-hidden="true"><svg class="brand-svg" viewBox="0 -6 80 78" aria-hidden="true"><defs><linearGradient id="brandgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect x="6" y="22" width="36" height="42" rx="10" fill="#FFB703" transform="rotate(-12 24 43)"/><rect x="14" y="20" width="38" height="46" rx="11" fill="url(#brandgrad)"/><path d="M23 34l10 18 10-18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g stroke-linecap="round"><path d="M54 13.1L52 2.3" stroke="#EC4899" stroke-width="4"/><path d="M57.8 13.2L63.3 1.9" stroke="#FFB703" stroke-width="4.4"/><path d="M60.3 16.2L70 11" stroke="#EC4899" stroke-width="4"/><path d="M61.5 19.7L68.9 20.5" stroke="#FFB703" stroke-width="3.6"/><path d="M50.2 14.7L45.7 10.6" stroke="#FFB703" stroke-width="3.6"/></g><circle cx="57.9" cy="-1.8" r="2" fill="#EC4899"/><circle cx="75.1" cy="14.7" r="1.9" fill="#FFB703"/><circle cx="71" cy="2.5" r="1.5" fill="#EC4899"/><circle cx="46.5" cy="3.1" r="1.5" fill="#EC4899"/></svg></span>
           <span class="brand-name">Voka<span class="hot">boom</span></span>
@@ -79,7 +80,26 @@ function renderShell() {
     <div id="toasts" class="toasts" role="status" aria-live="polite"></div>`;
 }
 
+/** Eine Ebene höher: wohin der Zurück-Pfeil führt */
+function backTarget() {
+  const v = ui.view;
+  if (v === 'home') return null;
+  if (v === 'class') return { view: 'classes', label: 'Zurück zu den Klassen' };
+  if (v === 'classes') return { view: 'home', label: 'Zurück zur Startseite' };
+  if (v === 'game' || v === 'match') return { view: 'games', label: 'Zurück zu den Spielen' };
+  if (v === 'set' || !currentSet()) return { view: 'home', label: 'Zurück zur Startseite' };
+  return { view: 'set', label: 'Zurück zur Portion' };
+}
+function updateBackBtn() {
+  const b = $('#back-btn');
+  if (!b) return;
+  const t = backTarget();
+  b.hidden = !t;
+  $('.topbar')?.classList.toggle('has-back', !!t);
+  if (t) { b.setAttribute('aria-label', t.label); b.title = t.label; }
+}
 function renderCrumbs() {
+  updateBackBtn();
   const el = $('#crumbs');
   if (!el) return;
   const set = currentSet();

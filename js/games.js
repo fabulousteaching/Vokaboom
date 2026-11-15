@@ -1,5 +1,5 @@
 /* Vokaboom – Vokabelspiele (Schritt 2 einer Portion)
- * Memory, Ballon-Platzen, Blitzrunde, Buchstabensalat, Wortsuchsel, Rakete starten, Duell zu zweit.
+ * Memory, Ballon-Platzen, Blitzrunde, Buchstabensalat, Wortsuchsel, Weck nicht den Drachen, Duell zu zweit.
  * Die Lehrperson kann einzelne Spiele pro Portion ausschalten (set.gamesOff). Spiele zählen NICHT für die
  * Auswertung (kein trackWord) – nur der eigene Rekord wird auf dem Gerät gemerkt (set.progress.games).
  */
@@ -11,7 +11,7 @@ const GAMES = [
   { id: 'blitz', name: 'Blitzrunde', art: '⚡', text: 'Richtig oder falsch geschrieben? Wisch nach rechts oder links!', min: 2 },
   { id: 'scramble', name: 'Buchstabensalat', art: '🔤', text: 'Hör dir das Wort an und leg die Buchstaben in die Felder.', min: 1 },
   { id: 'search', name: 'Wortsuchsel', art: '🔍', text: 'Finde die Wörter im Buchstabengitter.', min: 3 },
-  { id: 'rocket', name: 'Rakete starten', art: '🚀', text: 'Errate das Wort Buchstabe für Buchstabe – nur die Striche sind vorgegeben.', min: 1 },
+  { id: 'rocket', name: 'Weck nicht den Drachen', art: '🐉', text: 'Errate das Wort Buchstabe für Buchstabe. Jeder Fehler weckt den Drachen ein bisschen mehr …', min: 1 },
   { id: 'duel', name: 'Duell zu zweit', art: '⚔️', text: 'Zwei Kinder, ein Gerät: Wer tippt schneller?', min: 4 },
 ];
 const GAME_BY_ID = Object.fromEntries(GAMES.map((g) => [g.id, g]));
@@ -381,6 +381,17 @@ function scrambleDraw() {
     ? `<span class="scr-fixed ${x.fixed === ' ' ? 'gap' : ''}">${x.fixed === ' ' ? '' : esc(x.fixed)}</span>`
     : `<button class="scr-slot ${x.tile ? 'full' : ''} ${x.state || ''}" data-action="scr-slot" data-k="${k}" aria-label="${x.tile ? `Buchstabe ${esc(x.tile.c)} zurücklegen` : 'leeres Feld'}">${x.tile ? esc(x.tile.c) : ''}</button>`)).join('');
   tl.innerHTML = s.tiles.map((t) => `<button class="scr-tile" data-action="scr-tile" data-id="${t.id}" ${t.used ? 'disabled' : ''}>${t.used ? '' : esc(t.c)}</button>`).join('');
+  scrambleHyphens();
+}
+/** Geht ein Wort auf der nächsten Zeile weiter, steht am Zeilenende ein Bindestrich */
+function scrambleHyphens() {
+  const kids = [...($('#scr-slots')?.children || [])];
+  kids.forEach((el) => el.classList.remove('hy'));
+  for (let i = 1; i < kids.length; i++) {
+    const a = kids[i - 1], b = kids[i];
+    if (a.classList.contains('gap') || b.classList.contains('gap')) continue;
+    if (b.offsetTop > a.offsetTop + 4) a.classList.add('hy');
+  }
 }
 function scrambleTile(id) {
   const s = G.s;
@@ -459,7 +470,7 @@ function startBalloon(set) {
 }
 function balloonBegin(set, level) {
   const words = gameWords(set);
-  Object.assign(G.s, { level, words, score: 0, streak: 0, lives: 3, round: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
+  Object.assign(G.s, { level, words, score: 0, streak: 0, lives: 3, round: 0, hits: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
   $('#view').innerHTML = gameShell('Ballon-Platzen', `
     <div class="balloon-top"><span id="bl-score" class="bl-score">0 Punkte</span><span class="bl-speed" id="bl-speed" title="Tempo">🐢</span><span id="bl-lives" aria-label="Leben">❤️❤️❤️</span></div>
     <div class="balloon-prompt" id="bl-prompt"></div>
@@ -555,7 +566,8 @@ function balloonPop(el) {
     burst(el, true);
     s.streak++;
     s.score += 10 + Math.round((BALLOON_SLOW - s.dur) * 3) + (s.streak >= 3 ? 5 : 0);
-    s.dur = Math.max(BALLOON_FAST, s.dur * 0.9); // schneller
+    s.hits = (s.hits || 0) + 1;
+    if (s.hits % 5 === 0) s.dur = Math.max(BALLOON_FAST, s.dur * 0.85); // erst nach je 5 Treffern schneller
     sfx.good();
     const sc = $('#bl-score'); if (sc) { sc.textContent = `${s.score} Punkte`; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
     balloonsZoomOff();
@@ -588,13 +600,73 @@ function balloonMiss(set, escaped) {
 }
 
 /* =========================================================
-   Rakete starten: Buchstaben raten, der Tank füllt sich
+   Weck nicht den Drachen: Buchstaben raten. Jeder falsche Buchstabe weckt den Drachen ein bisschen mehr
+   (Auge auf, gähnen, Rauchwölkchen …). Leben werden nirgends angezeigt – nur der Drache zeigt es.
    ========================================================= */
 const baseLetter = (c) => stripAccents(c).toLowerCase();
+const DRAGON_MAX = 6; // beim 6. Fehler ist der Drache wach
+const DRAGON_SAYS = ['', 'Oh … ein Auge geht auf!', 'Er gähnt …', 'Rauchwölkchen!', 'Jetzt sind beide Augen offen!', 'Er hebt den Kopf – psst!', 'Der Drache ist wach! 🔥'];
+function dragonSVG() {
+  return `<svg class="dg-svg" viewBox="-48 0 308 170" aria-hidden="true">
+    <defs>
+      <radialGradient id="dg-body" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#6EE7B7"/><stop offset="1" stop-color="#059669"/></radialGradient>
+      <radialGradient id="dg-head" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#6EE7B7"/><stop offset="1" stop-color="#10B981"/></radialGradient>
+    </defs>
+    <ellipse cx="135" cy="158" rx="105" ry="9" fill="rgba(30,40,70,.12)"/>
+    <!-- Schwanz -->
+    <path class="dg-tail" d="M210 140 C 250 140, 252 105, 228 98 C 214 94, 210 110, 222 112" fill="none" stroke="#059669" stroke-width="12" stroke-linecap="round"/>
+    <path class="dg-tail" d="M222 112 l 10 -10 l 2 14 z" fill="#F59E0B"/>
+    <!-- Rücken-Zacken -->
+    <g fill="#F59E0B">
+      <path d="M110 98 l 10 -18 l 10 18 z"/><path d="M135 94 l 10 -19 l 10 19 z"/><path d="M160 96 l 10 -17 l 10 17 z"/><path d="M185 104 l 9 -14 l 9 14 z"/>
+    </g>
+    <!-- Körper -->
+    <ellipse cx="155" cy="128" rx="68" ry="34" fill="url(#dg-body)"/>
+    <ellipse cx="150" cy="142" rx="50" ry="16" fill="#D1FAE5"/>
+    <!-- Flügel -->
+    <path d="M140 112 C 155 88, 190 86, 200 100 C 188 100, 182 108, 186 116 C 174 110, 160 114, 140 112 z" fill="#047857" opacity=".85"/>
+    <!-- Vorderpfote -->
+    <ellipse cx="100" cy="150" rx="18" ry="9" fill="#10B981"/>
+    <g fill="#fff"><circle cx="88" cy="152" r="2.4"/><circle cx="95" cy="155" r="2.4"/><circle cx="103" cy="155" r="2.4"/></g>
+    <!-- Kopf -->
+    <g class="dg-head">
+      <path d="M78 92 l -6 -22 l 16 14 z" fill="#F59E0B"/>
+      <path d="M98 90 l 2 -24 l 10 20 z" fill="#F59E0B"/>
+      <ellipse cx="88" cy="114" rx="36" ry="28" fill="url(#dg-head)"/>
+      <ellipse cx="54" cy="124" rx="28" ry="18" fill="#34D399"/>
+      <g fill="#065F46"><ellipse cx="38" cy="117" rx="3" ry="2.2"/><ellipse cx="48" cy="114" rx="3" ry="2.2"/></g>
+      <ellipse cx="104" cy="122" rx="7" ry="4.5" fill="#FDA4AF" opacity=".55"/>
+      <!-- Mund -->
+      <path class="dg-mouth-closed" d="M32 132 C 45 138, 58 137, 70 131" fill="none" stroke="#065F46" stroke-width="2.6" stroke-linecap="round"/>
+      <g class="dg-mouth-open"><ellipse cx="52" cy="134" rx="15" ry="9" fill="#7F1D1D"/><ellipse cx="52" cy="138" rx="9" ry="4" fill="#FB7185"/><path d="M42 127 l3 5 l3 -5 M58 127 l3 5 l3 -5" fill="#fff"/></g>
+      <!-- Augen: zu / halb / offen -->
+      <g class="dg-eye e1">
+        <path class="closed" d="M84 106 C 90 112, 98 112, 104 106" fill="none" stroke="#065F46" stroke-width="2.8" stroke-linecap="round"/>
+        <g class="open"><ellipse cx="94" cy="106" rx="9" ry="10" fill="#fff"/><circle class="pupil" cx="91" cy="107" r="4.6" fill="#1E1B4B"/><circle cx="89.5" cy="105" r="1.5" fill="#fff"/><path class="lid" d="M84 103 C 88 96, 100 96, 104 103 L 104 98 L 84 98 z" fill="#34D399"/></g>
+      </g>
+      <g class="dg-eye e2">
+        <path class="closed" d="M66 102 C 70 106, 76 106, 80 102" fill="none" stroke="#065F46" stroke-width="2.4" stroke-linecap="round"/>
+        <g class="open"><ellipse cx="73" cy="102" rx="7" ry="8" fill="#fff"/><circle class="pupil" cx="70.5" cy="103" r="3.8" fill="#1E1B4B"/><circle cx="69.5" cy="101.5" r="1.2" fill="#fff"/></g>
+      </g>
+      <!-- Rauch aus den Nasenlöchern -->
+      <g class="dg-smoke"><circle cx="38" cy="110" r="7"/><circle cx="48" cy="106" r="8"/><circle cx="32" cy="104" r="6"/><circle cx="44" cy="108" r="6"/></g>
+      <!-- Feuer -->
+      <g class="dg-fire">
+        <path d="M42 130 C 22 120, 0 128, -34 116 C -18 128, -30 132, -44 134 C -26 138, -18 142, -36 152 C -12 148, 6 150, 18 146 C 4 156, -8 160, -20 166 C 4 164, 26 156, 44 140 z" fill="#F97316"/>
+        <path d="M40 132 C 24 126, 8 132, -14 126 C -4 133, -10 137, -20 140 C -4 142, 6 144, 20 141 C 12 148, 4 152, -4 156 C 14 154, 30 148, 42 138 z" fill="#FACC15"/>
+        <path d="M38 134 C 28 131, 18 134, 6 133 C 14 137, 18 139, 26 139 C 30 139, 36 138, 38 136 z" fill="#FEF9C3"/>
+      </g>
+    </g>
+    <!-- Zzz -->
+    <g class="dg-zzz" fill="#6366F1" font-family="Bricolage Grotesque, sans-serif" font-weight="800">
+      <text x="118" y="70" font-size="18">z</text><text x="134" y="52" font-size="24">z</text><text x="154" y="32" font-size="30">Z</text>
+    </g>
+  </svg>`;
+}
 function startRocket(set) {
   const words = shuffle(gameWords(set).filter((w) => /\p{L}/u.test(gameForm(w)) && gameForm(w).length <= 24)).slice(0, 5);
-  Object.assign(G.s, { words, i: 0, stars: 0 });
-  $('#view').innerHTML = gameShell('Rakete starten', '<div id="rk"></div>');
+  Object.assign(G.s, { words, i: 0, solved: 0 });
+  $('#view').innerHTML = gameShell('Weck nicht den Drachen', '<div id="rk"></div>');
   rocketWord(set);
 }
 function rocketWord(set) {
@@ -602,20 +674,21 @@ function rocketWord(set) {
   const box = $('#rk');
   if (!box) return;
   if (s.i >= s.words.length) {
-    const rec = gameRecord(set, 'rocket', s.stars);
-    sfx.win(); confetti();
-    box.innerHTML = gameEndHTML('Alle Raketen gestartet!', `Du hast ${s.stars} von ${s.words.length * 3} Sternen gesammelt.${rec ? ' Neuer Rekord!' : ''}`);
+    const rec = gameRecord(set, 'dragon', s.solved);
+    if (s.solved) { sfx.win(); confetti(); }
+    box.innerHTML = gameEndHTML(s.solved === s.words.length ? 'Der Drache hat nichts gemerkt! 😴' : 'Geschafft!',
+      `${s.solved} von ${s.words.length} Wörtern gefunden, ohne den Drachen zu wecken.${rec && s.solved ? ' Neuer Rekord!' : ''}`);
     return;
   }
   const w = s.words[s.i];
   const target = gameForm(w);
   const need = new Set([...target].filter((c) => /\p{L}/u.test(c)).map(baseLetter));
-  Object.assign(s, { w, target, need, got: new Set(), wrong: new Set(), launched: false });
+  Object.assign(s, { w, target, need, got: new Set(), wrong: new Set(), launched: false, awake: false });
   const keys = 'abcdefghijklmnopqrstuvwxyz'.split('');
   box.innerHTML = `<div class="test-card rocket-card">
-    <p class="progress-label"><span>Rakete ${s.i + 1} von ${s.words.length}</span><span id="rk-stars"></span></p>
-    <div class="rocket-wrap"><div class="rocket-tank"><i id="rk-fuel"></i></div><div class="rocket" id="rk-rocket" aria-hidden="true">🚀</div></div>
-    <p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an.</p>
+    <p class="progress-label"><span>Wort ${s.i + 1} von ${s.words.length}</span><span>${'😴'.repeat(s.solved)}</span></p>
+    <div class="dg-stage"><div class="dg s0" id="dg">${dragonSVG()}</div><p class="dg-say" id="dg-say" aria-live="polite">Pssst … der Drache schläft.</p></div>
+    <p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an – aber leise!</p>
     <div class="rk-word" id="rk-word" lang="${set.lang}"></div>
     <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>
   </div>`;
@@ -624,35 +697,50 @@ function rocketWord(set) {
   document.addEventListener('keydown', G.keys);
   rocketDraw();
 }
-function rocketStars() { return Math.max(0, 3 - Math.floor(G.s.wrong.size / 2)); }
 function rocketDraw() {
   const s = G.s;
   const wd = $('#rk-word');
   if (!wd) return;
+  const end = s.launched || s.awake;
   // Jedes Wort bleibt zusammen (kein Umbruch mitten im Wort)
-  const cell = (c) => (!/\p{L}/u.test(c) ? `<span class="rk-fix">${esc(c)}</span>`
-    : `<span class="rk-l ${s.got.has(baseLetter(c)) || s.launched ? 'shown' : ''}">${s.got.has(baseLetter(c)) || s.launched ? esc(c) : ''}</span>`);
+  const cell = (c) => {
+    if (!/\p{L}/u.test(c)) return `<span class="rk-fix">${esc(c)}</span>`;
+    const has = s.got.has(baseLetter(c));
+    return `<span class="rk-l ${has || end ? 'shown' : ''} ${!has && s.awake ? 'missed' : ''}">${has || end ? esc(c) : ''}</span>`;
+  };
   wd.innerHTML = s.target.split(' ').map((part) => `<span class="rk-group">${[...part].map(cell).join('')}</span>`).join('');
-  const f = $('#rk-fuel'); if (f) f.style.height = `${(100 * s.got.size / Math.max(1, s.need.size)).toFixed(0)}%`;
-  const st = $('#rk-stars'); if (st) st.textContent = '⭐'.repeat(rocketStars()) + '☆'.repeat(3 - rocketStars());
+  const dg = $('#dg');
+  if (dg) dg.className = `dg s${Math.min(DRAGON_MAX, s.wrong.size)}${s.launched ? ' won' : ''}`;
   $$('.rk-key').forEach((b) => {
     const k = b.dataset.k;
-    b.disabled = s.got.has(k) || s.wrong.has(k) || s.launched;
+    b.disabled = s.got.has(k) || s.wrong.has(k) || end;
     b.classList.toggle('hit', s.got.has(k)); b.classList.toggle('miss', s.wrong.has(k));
   });
 }
 function rocketGuess(k) {
   const s = G.s;
-  if (!s.need || s.launched || s.got.has(k) || s.wrong.has(k)) return;
-  if (s.need.has(k)) { s.got.add(k); sfx.good(); } else { s.wrong.add(k); sfx.flip(); }
+  if (!s.need || s.launched || s.awake || s.got.has(k) || s.wrong.has(k)) return;
+  const say = $('#dg-say');
+  if (s.need.has(k)) { s.got.add(k); sfx.good(); } else {
+    s.wrong.add(k);
+    tone([140, 100], 0.22, 'sawtooth', 0.05); // Grummeln
+    if (say) say.textContent = DRAGON_SAYS[Math.min(DRAGON_MAX, s.wrong.size)];
+  }
+  if (s.wrong.size >= DRAGON_MAX) {
+    s.awake = true;
+    rocketDraw();
+    tone([220, 110, 80], 0.5, 'sawtooth', 0.07); // Brüllen
+    gLater(() => { s.i++; rocketWord(currentSet()); }, 3200);
+    return;
+  }
   rocketDraw();
   if ([...s.need].every((x) => s.got.has(x))) {
     s.launched = true;
-    s.stars += rocketStars();
+    s.solved++;
     rocketDraw();
-    $('#rk-rocket')?.classList.add('launch');
+    if (say) say.textContent = 'Geschafft – er schläft weiter! 😴';
     sfx.win();
-    gLater(() => { s.i++; rocketWord(currentSet()); }, 2200);
+    gLater(() => { s.i++; rocketWord(currentSet()); }, 2400);
   }
 }
 
@@ -660,18 +748,21 @@ function rocketGuess(k) {
    Wortsuchsel (auch als PDF)
    ========================================================= */
 const searchKey = (w) => stripAccents(core(gameForm(w), currentSet()?.lang || 'en')).toUpperCase().replace(/[^A-Z]/g, '');
-function buildWordSearch(words, size) {
+/** back: Wörter dürfen auch von rechts nach links und von unten nach oben stehen */
+function buildWordSearch(words, size, back = false) {
   const grid = Array.from({ length: size }, () => Array(size).fill(''));
   const placed = [];
-  const dirs = [[0, 1], [1, 0]];
+  const dirs = back ? [[0, 1], [1, 0], [0, -1], [-1, 0]] : [[0, 1], [1, 0]];
   for (const w of words) {
     const key = w.key;
     let ok = false;
     for (let t = 0; t < 200 && !ok; t++) {
       const [dr, dc] = dirs[Math.floor(Math.random() * dirs.length)];
-      const maxR = dr ? size - key.length : size - 1, maxC = dc ? size - key.length : size - 1;
-      if (maxR < 0 || maxC < 0) break;
-      const r0 = Math.floor(Math.random() * (maxR + 1)), c0 = Math.floor(Math.random() * (maxC + 1));
+      const L = key.length;
+      const minR = dr < 0 ? L - 1 : 0, maxR = dr > 0 ? size - L : size - 1;
+      const minC = dc < 0 ? L - 1 : 0, maxC = dc > 0 ? size - L : size - 1;
+      if (maxR < minR || maxC < minC) break;
+      const r0 = minR + Math.floor(Math.random() * (maxR - minR + 1)), c0 = minC + Math.floor(Math.random() * (maxC - minC + 1));
       let fits = true;
       for (let k = 0; k < key.length; k++) { const ch = grid[r0 + dr * k][c0 + dc * k]; if (ch && ch !== key[k]) { fits = false; break; } }
       if (!fits) continue;
@@ -689,13 +780,19 @@ function startSearch(set) {
   const seen = new Set();
   const words = cand.filter((x) => (seen.has(x.key) ? false : seen.add(x.key))).slice(0, 8).sort((a, b) => b.key.length - a.key.length);
   const size = Math.min(12, Math.max(9, (words[0]?.key.length || 8) + 1));
-  const puzzle = buildWordSearch(words, size);
+  const back = !!db.settings.wsBack;
+  const puzzle = buildWordSearch(words, size, back);
   Object.assign(G.s, { puzzle, found: new Set(), sel: null });
   $('#view').innerHTML = gameShell('Wortsuchsel', `<div class="search-wrap">
     <div class="ws-grid" id="ws-grid" style="--n:${size}">${puzzle.grid.map((row, r) => row.map((ch, c) => `<span class="ws-cell" data-r="${r}" data-c="${c}">${ch}</span>`).join('')).join('')}</div>
     <div class="ws-side">
-      <p class="label">Finde diese Wörter (auf ${LANGS[set.lang].name}):</p>
-      <ul class="ws-list" id="ws-list">${puzzle.placed.map((p, i) => `<li data-i="${i}">${hasPicture(p.w, set.lang) ? picHTML(p.w, set.lang, 'mini') : ''}<span lang="de">${esc(p.w.german || '?')}</span><b lang="${set.lang}"></b></li>`).join('')}</ul>
+      <div class="seg small ws-dir" role="group" aria-label="Richtung der Wörter">
+        <button class="seg-btn" data-action="ws-back" data-on="0" aria-pressed="${!back}">→ ↓ Vorwärts</button>
+        <button class="seg-btn" data-action="ws-back" data-on="1" aria-pressed="${back}">← ↑ Auch rückwärts</button>
+      </div>
+      <p class="label">Finde diese Wörter auf ${LANGS[set.lang].name}:</p>
+      <ul class="ws-list" id="ws-list">${puzzle.placed.map((p, i) => `<li data-i="${i}"><button class="ws-word" data-action="ws-tip" data-i="${i}" aria-label="Tipp: ${esc(p.w.german || '?')} auf ${LANGS[set.lang].name} zeigen"><span class="ws-de" lang="de">${esc(p.w.german || '?')}</span><span class="ws-fr" lang="${set.lang}">${esc(gameForm(p.w))}</span></button></li>`).join('')}</ul>
+      <p class="hint small">Zu schwer? Tippe auf ein deutsches Wort – dann dreht es sich um und zeigt das Wort auf ${LANGS[set.lang].name}.</p>
       <p class="ws-done" id="ws-done"></p>
     </div>
   </div>`);
@@ -737,13 +834,16 @@ function bindSearch(set) {
 function wsCheck(set, cells) {
   const s = G.s;
   const word = cells.map(({ r, c }) => s.puzzle.grid[r][c]).join('');
-  const i = s.puzzle.placed.findIndex((p, k) => !s.found.has(k) && p.key === word && p.r === cells[0]?.r && p.c === cells[0]?.c);
+  const first = cells[0], lastC = cells[cells.length - 1];
+  const rev = [...word].reverse().join('');
+  // egal, von welchem Ende aus markiert wurde
+  const i = s.puzzle.placed.findIndex((p, k) => !s.found.has(k) && ((p.key === word && p.r === first?.r && p.c === first?.c) || (p.key === rev && p.r === lastC?.r && p.c === lastC?.c)));
   $$('.ws-cell.sel').forEach((e) => e.classList.remove('sel'));
   if (i < 0) { if (cells.length > 1) sfx.flip(); return; }
   s.found.add(i);
   cells.forEach(({ r, c }) => $(`.ws-cell[data-r="${r}"][data-c="${c}"]`)?.classList.add('found', `f${i % 6}`));
   const li = $(`#ws-list li[data-i="${i}"]`);
-  if (li) { li.classList.add('done'); $('b', li).textContent = gameForm(s.puzzle.placed[i].w); }
+  if (li) li.classList.add('done', 'flip');
   sfx.good();
   if (s.found.size === s.puzzle.placed.length) {
     gameRecord(set, 'search', s.found.size);
@@ -911,6 +1011,8 @@ document.addEventListener('change', (e) => {
 const gameActions = {
   games: () => { stopGame(); openGames(); },
   'game-open': (el) => openGame(el.dataset.game),
+  'ws-tip': (el) => { el.closest('li')?.classList.toggle('flip'); },
+  'ws-back': (el) => { db.settings.wsBack = el.dataset.on === '1'; saveDB(); stopGame(); renderGame(); },
   'kids-pics': (el) => {
     const set = currentSet();
     if (!set || !isOwnSet(set)) return;

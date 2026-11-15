@@ -18,6 +18,14 @@ function startMode(mode, opts = {}) {
 
 const actions = {
   home: () => { ui.confirmDelete = null; go('home'); },
+  back: () => {
+    const t = backTarget();
+    if (!t) return;
+    if (t.view === 'set') openSet(ui.setId);
+    else if (t.view === 'games') { if (typeof stopGame === 'function') stopGame(); openGames(); }
+    else if (t.view === 'classes') openClasses();
+    else go('home');
+  },
   'open-set': (el) => openSet(el.dataset.id),
   settings: () => openSettings(),
   'close-modal': () => closeModal(),
@@ -195,7 +203,7 @@ const actions = {
   'flip-current': () => flipCurrent(),
   'card-known': () => flyCard(true),
   'card-again': () => flyCard(false),
-  'card-front': (el) => { cards.front = el.dataset.front; db.settings.cardFront = cards.front; saveDB(); cards.flipped = false; renderCards(); },
+  'card-front': (el) => { cards.front = el.dataset.front; db.settings.cardFront2 = cards.front; saveDB(); cards.flipped = false; renderCards(); },
   'card-layout': (el) => { cards.layout = el.dataset.layout; cards.flipped = false; renderCards(); },
   'cards-again': (el) => {
     const hard = [...cards.firstTry].filter(([, ok]) => !ok).map(([id]) => id);

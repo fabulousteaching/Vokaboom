@@ -37,12 +37,12 @@ function saveProgress(set, key, value) {
 /* =========================================================
    1 · LERNKARTEN
    ========================================================= */
-const cards = { ids: [], queue: [], flipped: false, front: 'picword', layout: 'stack', firstTry: new Map(), total: 0, known: 0, finished: false };
+const cards = { ids: [], queue: [], flipped: false, front: 'german', layout: 'stack', firstTry: new Map(), total: 0, known: 0, finished: false };
 
 function startCards(set, opts = {}) {
   const anyPic = set.words.some((w) => hasPicture(w, set.lang));
-  cards.front = db.settings.cardFront || (anyPic ? 'picword' : 'foreign');
-  if (!anyPic && (cards.front === 'pic' || cards.front === 'picword')) cards.front = 'foreign';
+  cards.front = db.settings.cardFront2 || 'german'; // Standard: Deutsch vorne, Fremdsprache hinten
+  if (!anyPic && (cards.front === 'pic' || cards.front === 'picword')) cards.front = 'german';
   cards.layout = opts.layout || 'stack';
   cards.ids = opts.ids || set.words.map((w) => w.id);
   resetCards(true);
@@ -62,16 +62,17 @@ function resetCards(mix = true, ids) {
 function cardFaces(set, w, front) {
   const L = LANGS[set.lang].name;
   const pic = hasPicture(w, set.lang);
-  const f = (front === 'pic' || front === 'picword') && !pic ? 'foreign' : front;
+  const f = (front === 'pic' || front === 'picword') && !pic ? 'german' : front;
   const label = (t) => `<p class="face-label">${t}</p>`;
   const en = (big) => `<div class="cw-line"><p class="cw-foreign ${big ? 'xl' : ''}" lang="${set.lang}">${esc(w.foreign)}</p>${sayBtn(w.foreign, set.lang)}</div>`;
   const de = `<p class="cw-german xl" lang="de">${esc(w.german || '–')}</p>`;
   const bigPic = picHTML(w, set.lang, 'card-pic');
-  const smallPic = pic ? picHTML(w, set.lang, 'card-pic small') : '';
   if (f === 'pic') return { frontHTML: label(`Wie heißt das auf ${L}?`) + bigPic, backHTML: label(L) + en(true), englishBack: true };
-  if (f === 'picword') return { frontHTML: label(L) + bigPic + en(false), backHTML: label('Deutsch') + de, englishBack: false };
-  if (f === 'german') return { frontHTML: label('Deutsch') + de, backHTML: label(L) + smallPic + en(true), englishBack: true };
-  return { frontHTML: label(L) + en(true), backHTML: label('Deutsch') + smallPic + de, englishBack: false };
+  // Bild + Wort: vorne Bild und deutsches Wort, hinten die Fremdsprache
+  if (f === 'picword') return { frontHTML: label('Deutsch') + bigPic + `<p class="cw-german" lang="de">${esc(w.german || '–')}</p>`, backHTML: label(L) + en(true), englishBack: true };
+  // Nur Wörter, keine Bilder
+  if (f === 'german') return { frontHTML: label('Deutsch') + de, backHTML: label(L) + en(true), englishBack: true };
+  return { frontHTML: label(L) + en(true), backHTML: label('Deutsch') + de, englishBack: false };
 }
 /** Ist gerade die englische Seite zu sehen? (dann wird vorgelesen) */
 const englishShowing = (set, w, flipped) => cardFaces(set, w, cards.front).englishBack === !!flipped;
@@ -92,7 +93,7 @@ function renderCards() {
   const v = $('#view');
   const L = LANGS[set.lang].name;
   const anyPic = set.words.some((w) => hasPicture(w, set.lang));
-  const fronts = [['foreign', `${L} → Deutsch`], ['german', `Deutsch → ${L}`], ['pic', 'Bild'], ['picword', 'Bild + Wort']]
+  const fronts = [['german', `Deutsch → ${L}`], ['foreign', `${L} → Deutsch`], ['pic', 'Bild'], ['picword', 'Bild + Wort']]
     .filter(([k]) => anyPic || (k !== 'pic' && k !== 'picword'));
   const bar = `
     <div class="mode-bar">

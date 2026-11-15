@@ -121,7 +121,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 
 ## Vokabelspiele und Live in der Klasse
 
-**Vokabelspiele** (Schritt 2 jeder Portion): Memory (allein oder zu zweit), Ballon-Platzen (2 Stufen), Blitzrunde (2 Stufen), Buchstabensalat, Wortsuchsel, Rakete starten und Duell zu zweit. Spiele zählen nicht für die Auswertung. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
+**Vokabelspiele** (Schritt 2 jeder Portion): Memory (allein oder zu zweit), Ballon-Platzen (2 Stufen), Blitzrunde (2 Stufen), Buchstabensalat, Wortsuchsel (deutsche Wörter als Hinweis, antippen zeigt die Übersetzung; wahlweise auch rückwärts), Weck nicht den Drachen und Duell zu zweit. Oben links führt ein Zurück-Pfeil immer eine Ebene höher. Spiele zählen nicht für die Auswertung. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
 
 **Für die Kinder** (Bereich in der eigenen Portion, unter den Übungen):
 - **Vokabeln zeigen: Mit Bildern / Nur Wörter.** Bei „Nur Wörter“ zeigen Lernkarten, Übungen, Spiele und Test keine Bilder. In der eigenen Kartenübersicht bleiben die Bilder sichtbar.
