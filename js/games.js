@@ -366,8 +366,7 @@ function scrambleWord(set) {
     ${w.german ? `<p class="muted center" lang="de">${esc(w.german)}</p>` : ''}
     <div class="scr-slots" id="scr-slots" lang="${set.lang}"></div>
     <div class="scr-tiles" id="scr-tiles" lang="${set.lang}"></div>
-    <div class="row center"><button class="btn ghost small" data-action="scr-hint">${icon('sparkle')} Tipp</button>
-      <button class="btn ghost small" data-action="scr-skip">Überspringen</button></div>
+    <div class="row center"><button class="btn ghost small" data-action="scr-skip">Überspringen</button></div>
     <div id="scr-fb" class="feedback" aria-live="polite"></div>
   </div>`;
   scrambleDraw();
