@@ -45,8 +45,7 @@ function gameRecord(set, id, score) {
 }
 function gameShell(title, inner) {
   return `<section class="mode game-mode game-${G.id}">
-    <div class="mode-bar"><h1 class="mode-title">${esc(title)}</h1>
-      <button class="btn ghost small" data-action="games">${icon('left')} Alle Spiele</button></div>
+    <div class="mode-bar"><h1 class="mode-title">${esc(title)}</h1></div>
     <div class="game-area" id="game-area">${inner}</div>
   </section>`;
 }
@@ -452,7 +451,7 @@ function scrambleHint() {
    Tempo: beginnt langsam, jeder Treffer macht schneller, jeder Fehler wieder etwas langsamer.
    ========================================================= */
 const BALLOON_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
-const BALLOON_SLOW = 11, BALLOON_FAST = 3.2; // Sekunden, bis ein Ballon oben ist
+const BALLOON_SLOW = 14, BALLOON_FAST = 4; // Sekunden, bis ein Ballon oben ist
 function popSound() { tone([880, 330], 0.07, 'square', 0.06); }
 function startBalloon(set) {
   const b = G.s.bcount || 4;
@@ -473,11 +472,14 @@ function balloonBegin(set, level) {
   Object.assign(G.s, { level, words, score: 0, streak: 0, lives: 3, round: 0, hits: 0, dur: BALLOON_SLOW, done: false, bcount: G.s.bcount || 4 });
   $('#view').innerHTML = gameShell('Ballon-Platzen', `
     <div class="balloon-top"><span id="bl-score" class="bl-score">0 Punkte</span><span class="bl-speed" id="bl-speed" title="Tempo">🐢</span><span id="bl-lives" aria-label="Leben">❤️❤️❤️</span></div>
-    <div class="balloon-prompt" id="bl-prompt"></div>
     <div class="balloon-sky" id="bl-sky">
+      <div class="bl-word-cloud" id="bl-prompt" aria-live="polite"></div>
       <span class="bl-sun" aria-hidden="true"></span><span class="bl-cloud c1" aria-hidden="true"></span><span class="bl-cloud c2" aria-hidden="true"></span><span class="bl-cloud c3" aria-hidden="true"></span>
       <div class="bl-layer" id="bl-layer"></div>
     </div>`);
+  // Spielfeld ganz zeigen: Punkte-Zeile direkt unter die Kopfzeile scrollen
+  const top = $('.balloon-top'), bar = $('.topbar');
+  if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   balloonRound(set);
 }
 function balloonOptions(set, w) {
@@ -508,9 +510,8 @@ function balloonRound(set) {
   const w = shuffle(s.words)[0];
   const opts = balloonOptions(set, w);
   s.cur = { w, settled: false };
-  pr.innerHTML = s.level === 2
-    ? `<div class="g-prompt">${hasPicture(w, set.lang) ? picHTML(w, set.lang, 'card-pic') : ''}<span class="g-de big" lang="de">${esc(w.german || '')}</span><span class="small muted">Welcher Ballon ist richtig geschrieben?</span></div>`
-    : gamePrompt(set, w);
+  pr.innerHTML = `<span class="bwc-word" lang="de">${esc(w.german || '?')}</span>${s.level === 2 ? '<span class="bwc-hint">Welcher ist richtig geschrieben?</span>' : ''}`;
+  pr.classList.remove('in'); void pr.offsetWidth; pr.classList.add('in');
   const lanes = shuffle([...Array(opts.length).keys()]);
   const sp = $('#bl-speed'); if (sp) sp.textContent = s.dur > 8 ? '🐢' : s.dur > 5.5 ? '🐇' : '🚀';
   layer.innerHTML = opts.map((o, k) => {
@@ -605,7 +606,14 @@ function balloonMiss(set, escaped) {
    ========================================================= */
 const baseLetter = (c) => stripAccents(c).toLowerCase();
 const DRAGON_MAX = 6; // beim 6. Fehler ist der Drache wach
-const DRAGON_SAYS = ['', 'Oh … ein Auge geht auf!', 'Er gähnt …', 'Rauchwölkchen!', 'Jetzt sind beide Augen offen!', 'Er hebt den Kopf – psst!', 'Der Drache ist wach! 🔥'];
+/** Was unter dem Drachen steht – in der Sprache der Portion */
+const DRAGON_SAYS = {
+  en: { sleep: 'Shh … the dragon is sleeping.', won: 'Phew – he is still sleeping! 😴',
+    steps: ['', 'Oh no … one eye opens!', 'He yawns …', 'Little clouds of smoke!', 'Now both eyes are open!', 'He lifts his head – shh!', 'The dragon is awake! 🔥'] },
+  fr: { sleep: 'Chut … le dragon dort.', won: 'Ouf – il dort encore ! 😴',
+    steps: ['', 'Oh non … un œil s’ouvre !', 'Il bâille …', 'Des petits nuages de fumée !', 'Maintenant, les deux yeux sont ouverts !', 'Il lève la tête – chut !', 'Le dragon est réveillé ! 🔥'] },
+};
+const dragonSays = (lang) => DRAGON_SAYS[lang] || DRAGON_SAYS.en;
 function dragonSVG() {
   return `<svg class="dg-svg" viewBox="-48 0 308 170" aria-hidden="true">
     <defs>
@@ -687,7 +695,7 @@ function rocketWord(set) {
   const keys = 'abcdefghijklmnopqrstuvwxyz'.split('');
   box.innerHTML = `<div class="test-card rocket-card">
     <p class="progress-label"><span>Wort ${s.i + 1} von ${s.words.length}</span><span>${'😴'.repeat(s.solved)}</span></p>
-    <div class="dg-stage"><div class="dg s0" id="dg">${dragonSVG()}</div><p class="dg-say" id="dg-say" aria-live="polite">Pssst … der Drache schläft.</p></div>
+    <div class="dg-stage"><div class="dg s0" id="dg">${dragonSVG()}</div><p class="dg-say" id="dg-say" lang="${set.lang}" aria-live="polite">${esc(dragonSays(set.lang).sleep)}</p></div>
     <p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an – aber leise!</p>
     <div class="rk-word" id="rk-word" lang="${set.lang}"></div>
     <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>
@@ -711,6 +719,7 @@ function rocketDraw() {
   wd.innerHTML = s.target.split(' ').map((part) => `<span class="rk-group">${[...part].map(cell).join('')}</span>`).join('');
   const dg = $('#dg');
   if (dg) dg.className = `dg s${Math.min(DRAGON_MAX, s.wrong.size)}${s.launched ? ' won' : ''}`;
+  const stage = dg?.closest('.dg-stage'); if (stage) stage.dataset.s = Math.min(DRAGON_MAX, s.wrong.size);
   $$('.rk-key').forEach((b) => {
     const k = b.dataset.k;
     b.disabled = s.got.has(k) || s.wrong.has(k) || end;
@@ -724,21 +733,24 @@ function rocketGuess(k) {
   if (s.need.has(k)) { s.got.add(k); sfx.good(); } else {
     s.wrong.add(k);
     tone([140, 100], 0.22, 'sawtooth', 0.05); // Grummeln
-    if (say) say.textContent = DRAGON_SAYS[Math.min(DRAGON_MAX, s.wrong.size)];
+    if (say) { say.textContent = dragonSays(currentSet()?.lang).steps[Math.min(DRAGON_MAX, s.wrong.size)]; say.classList.remove('pop'); void say.offsetWidth; say.classList.add('pop'); }
   }
+  const jolt = () => { const dg = $('#dg'); if (dg && !s.need.has(k)) { dg.classList.remove('jolt'); void dg.offsetWidth; dg.classList.add('jolt'); } };
   if (s.wrong.size >= DRAGON_MAX) {
     s.awake = true;
     rocketDraw();
+    jolt();
     tone([220, 110, 80], 0.5, 'sawtooth', 0.07); // Brüllen
     gLater(() => { s.i++; rocketWord(currentSet()); }, 3200);
     return;
   }
   rocketDraw();
+  jolt();
   if ([...s.need].every((x) => s.got.has(x))) {
     s.launched = true;
     s.solved++;
     rocketDraw();
-    if (say) say.textContent = 'Geschafft – er schläft weiter! 😴';
+    if (say) say.textContent = dragonSays(currentSet()?.lang).won;
     sfx.win();
     gLater(() => { s.i++; rocketWord(currentSet()); }, 2400);
   }
