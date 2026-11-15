@@ -731,13 +731,25 @@ function rocketWord(set) {
   const need = new Set([...target].filter((c) => /\p{L}/u.test(c)).map(baseLetter));
   Object.assign(s, { w, target, need, got: new Set(), wrong: new Set(), launched: false, awake: false });
   const keys = 'abcdefghijklmnopqrstuvwxyz'.split('');
-  box.innerHTML = `<div class="test-card rocket-card">
-    <p class="progress-label"><span>Wort ${s.i + 1} von ${s.words.length}</span><span>${'😴'.repeat(s.solved)}</span></p>
-    <div class="dg-stage"><div class="dg s0" id="dg">${dragonSVG()}</div><p class="dg-say" id="dg-say" lang="${set.lang}" aria-live="polite">${esc(dragonSays(set.lang).sleep)}</p></div>
-    <p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an – aber leise!</p>
+  const head = `<span>Wort ${s.i + 1} von ${s.words.length}</span><span>${'😴'.repeat(s.solved)}</span>`;
+  const body = `<p class="muted center small">Welches Wort ist gesucht? Tippe Buchstaben an – aber leise!</p>
     <div class="rk-word" id="rk-word" lang="${set.lang}"></div>
-    <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>
-  </div>`;
+    <div class="rk-keys">${keys.map((k) => `<button class="rk-key" data-action="rk-key" data-k="${k}">${k}</button>`).join('')}</div>`;
+  const dg = $('#dg');
+  if (dg) {
+    // Drache bleibt stehen und kehrt mit Schwung in die Schlafposition zurück
+    $('#rk-head').innerHTML = head;
+    $('#rk-body').innerHTML = body;
+    const say = $('#dg-say'); if (say) say.textContent = dragonSays(set.lang).sleep;
+    dg.classList.add('settle');
+    clearTimeout(s.settleT); s.settleT = setTimeout(() => dg.classList.remove('settle'), 2200);
+  } else {
+    box.innerHTML = `<div class="test-card rocket-card">
+      <p class="progress-label" id="rk-head">${head}</p>
+      <div class="dg-stage"><div class="dg s0" id="dg">${dragonSVG()}</div><p class="dg-say" id="dg-say" lang="${set.lang}" aria-live="polite">${esc(dragonSays(set.lang).sleep)}</p></div>
+      <div id="rk-body" class="rk-body">${body}</div>
+    </div>`;
+  }
   if (G.keys) document.removeEventListener('keydown', G.keys);
   G.keys = (e) => { if (/^[a-zA-Z]$/.test(e.key)) rocketGuess(e.key.toLowerCase()); };
   document.addEventListener('keydown', G.keys);
@@ -756,7 +768,7 @@ function rocketDraw() {
   };
   wd.innerHTML = s.target.split(' ').map((part) => `<span class="rk-group">${[...part].map(cell).join('')}</span>`).join('');
   const dg = $('#dg');
-  if (dg) dg.className = `dg s${Math.min(DRAGON_MAX, s.wrong.size)}${s.launched ? ' won' : ''}`;
+  if (dg) dg.className = `dg s${Math.min(DRAGON_MAX, s.wrong.size)}${s.launched ? ' won' : ''}${dg.classList.contains('settle') ? ' settle' : ''}`;
   const stage = dg?.closest('.dg-stage'); if (stage) stage.dataset.s = Math.min(DRAGON_MAX, s.wrong.size);
   $$('.rk-key').forEach((b) => {
     const k = b.dataset.k;

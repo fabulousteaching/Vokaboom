@@ -1295,6 +1295,10 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .dg.won .dg-mouth-closed { opacity: 1 !important; animation: none !important; }
 .dg.won .dg-tail { animation: none !important; }
 .dg.won .dg-head, .dg.won .dg-neck { transition: transform 1.8s ease-in-out .3s; }
+/* neues Wort: mit Schwung zurück in die Schlafposition (leicht nachfedern) */
+.dg.settle .dg-head, .dg.settle .dg-neck { transition: transform 1.5s cubic-bezier(.34, 1.45, .45, 1); }
+.dg.settle .dg-eye .open { transition: opacity .5s .4s; }
+.dg.settle .dg-zzz { transition: opacity .6s 1.2s; }
 /* Schwanz: wird unruhiger */
 .dg .dg-tail { transform-box: fill-box; transform-origin: 0% 80%; }
 .dg.s4 .dg-tail { animation: dg-wag 1.6s ease-in-out infinite alternate; }
@@ -1308,6 +1312,7 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 @keyframes dg-fire { from { transform: scale(.85, .8); } to { transform: scale(1.1, 1.12); } }
 .rk-l.missed { color: var(--red); }
 .rocket-card { display: grid; gap: 1rem; }
+.rk-body { display: grid; gap: 1rem; }
 .rocket-wrap { display: flex; align-items: flex-end; justify-content: center; gap: 1rem; height: 120px; }
 .rocket-tank { width: 26px; height: 110px; border-radius: 13px; background: var(--sunken); overflow: hidden; display: flex; align-items: flex-end; border: 2px solid var(--line-2); }
 .rocket-tank i { display: block; width: 100%; background: linear-gradient(var(--amber), var(--orange)); transition: height .3s; }
