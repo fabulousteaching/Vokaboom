@@ -340,6 +340,25 @@ input:focus, textarea:focus, select:focus { border-color: var(--brand); outline:
 .lib-list, .examples { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .lib-item { display: flex; align-items: center; gap: .3rem; border-radius: 18px; background: var(--paper-2); border: 1px solid var(--line); padding: 4px; transition: border-color .15s; }
 .lib-item:hover { border-color: var(--line-2); }
+.lib-grip { flex: none; display: grid; place-items: center; width: 26px; align-self: stretch; color: var(--ink-3, #94a3b8); font-size: 1.1rem; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; border-radius: 10px; }
+.lib-grip:hover { color: var(--brand); background: var(--brand-wash); }
+.lib-move .flag { width: 20px; height: auto; border-radius: 3px; opacity: .75; }
+.lib-move:hover .flag { opacity: 1; }
+.lib-item.dragging { opacity: .35; }
+.drag-ghost { position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none; box-shadow: var(--shadow-pop); opacity: .95; background: var(--paper); list-style: none; }
+body.set-dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+body.set-dragging .lang-tabs .seg-btn[aria-selected="false"] { outline: 2px dashed var(--brand); outline-offset: 2px; animation: tab-wiggle 1s ease-in-out infinite; }
+.lang-tabs .seg-btn.drop-ok { background: var(--brand); color: #fff; outline-style: solid !important; transform: scale(1.06); }
+@keyframes tab-wiggle { 50% { transform: translateY(-2px); } }
+.lang-tabs .seg-btn.got { animation: tab-got .7s ease-out; }
+@keyframes tab-got { 30% { transform: scale(1.12); background: var(--green-wash); } }
+.lib-move-hint { margin-top: .7rem; }
+.drop-bar { position: fixed; left: 0; right: 0; top: 72px; z-index: 999; display: flex; justify-content: center; padding: 0 12px; pointer-events: none; animation: dropbar-in .25s ease-out; }
+.drop-target { pointer-events: auto; display: flex; align-items: center; gap: .5rem; padding: 1.1rem 1.6rem; width: min(520px, 100%); justify-content: center; border-radius: 20px; border: 3px dashed var(--brand); background: var(--paper); color: var(--brand-ink); font-weight: 800; font-size: 1.05rem; box-shadow: var(--shadow-pop); transition: transform .15s, background .15s; }
+.drop-target .flag { width: 24px; height: auto; border-radius: 3px; }
+.drop-target.drop-ok { background: var(--brand); color: #fff; border-style: solid; transform: scale(1.04); }
+@keyframes dropbar-in { from { opacity: 0; transform: translateY(-14px); } }
+.lib-move-hint .flag { width: 16px; height: auto; vertical-align: -2px; border-radius: 2px; }
 .lib-item.confirm { padding: .65rem .85rem; flex-wrap: wrap; background: var(--red-wash); border-color: transparent; }
 .lib-confirm { display: flex; gap: .4rem; margin-left: auto; }
 .lib-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: .85rem; background: none; border: 0; text-align: left; padding: .5rem .55rem; border-radius: 14px; }

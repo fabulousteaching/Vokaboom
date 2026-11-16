@@ -288,7 +288,8 @@ function viewHome() {
       <aside class="panel library" aria-labelledby="lib-title">
         <div class="lib-head"><h2 id="lib-title">Meine ${LANGS[lang].name}-Portionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
         ${libraryNote()}
-        ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
+        ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>
+          <p class="hint small lib-move-hint">Falsche Sprache erwischt? Portion am Griff ⠿ auf den Reiter ${flag(lang === 'fr' ? 'en' : 'fr')} ${LANGS[lang === 'fr' ? 'en' : 'fr'].name} ziehen – oder auf die Flagge rechts tippen.</p>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
       </aside>
     </div>
   </section>`;
@@ -308,17 +309,92 @@ function libItem(s) {
       </span>
     </li>`;
   }
-  return `<li class="lib-item">
+  const other = langOf(s) === 'fr' ? 'en' : 'fr';
+  return `<li class="lib-item" data-set-id="${s.id}">
+    <span class="lib-grip" title="Ziehen: auf den anderen Sprach-Reiter verschieben" aria-hidden="true">⠿</span>
     <button class="lib-open" data-action="open-set" data-id="${s.id}">
       <span class="lib-text"><strong>${esc(s.name)}</strong><small>${s.words.length} Vokabeln${t != null ? ` · Test ${t} %` : ''}</small></span>
     </button>
+    <button class="icon-btn subtle lib-move" data-action="move-set-lang" data-id="${s.id}" data-lang="${other}" aria-label="„${esc(s.name)}“ zu ${LANGS[other].name} verschieben" title="Zu ${LANGS[other].name} verschieben">${flag(other)}</button>
     <button class="icon-btn subtle" data-action="delete-set" data-id="${s.id}" aria-label="„${esc(s.name)}“ löschen" title="Löschen">${icon('trash')}</button>
   </li>`;
+}
+
+/** Portion in die andere Sprache verschieben (falls beim falschen Reiter gespeichert) */
+function moveSetLang(id, lang) {
+  const set = getSet(id);
+  if (!set || !['en', 'fr'].includes(lang) || langOf(set) === lang) return;
+  set.lang = lang;
+  // automatisch gefundene Bilder passen zur alten Sprache: neu suchen (eigene Bilder bleiben)
+  set.words.forEach((w) => { if (!(w.pic && w.pic.manual)) { w.pic = null; w.picStatus = 'stale'; } });
+  set.updated = Date.now();
+  saveDB();
+  render();
+  const tab = $(`.lang-tabs [data-lang="${lang}"]`);
+  if (tab) { tab.classList.remove('got'); void tab.offsetWidth; tab.classList.add('got'); }
+  toast(`„${set.name}“ ist jetzt bei ${LANGS[lang].name}.`);
+  startPictureFill(set);
+}
+let dragEndedAt = 0;
+document.addEventListener('click', (c) => { if (Date.now() - dragEndedAt < 400) { c.stopPropagation(); c.preventDefault(); } }, true);
+/** Ziehen am Griff (Finger und Maus) oder am ganzen Eintrag (Maus) – loslassen über dem Sprach-Reiter */
+function bindSetDrag() {
+  $$('.lib-item[data-set-id]').forEach((li) => {
+    li.addEventListener('pointerdown', (e) => {
+      const grip = e.target.closest('.lib-grip');
+      if (!grip && (e.pointerType !== 'mouse' || e.target.closest('.icon-btn'))) return;
+      if (e.button) return;
+      const id = li.dataset.setId, from = langOf(getSet(id));
+      const x0 = e.clientX, y0 = e.clientY;
+      let ghost = null, over = null;
+      if (grip) e.preventDefault();
+      const tabAt = (x, y) => { const el = document.elementFromPoint(x, y)?.closest?.('.lang-tabs [data-lang], .drop-bar [data-lang]'); return el && el.dataset.lang !== from ? el : null; };
+      let bar = null, lx = x0, ly = y0;
+      const move = (ev) => {
+        if (!ghost) {
+          if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+          ghost = li.cloneNode(true);
+          ghost.classList.add('drag-ghost');
+          ghost.style.width = `${li.offsetWidth}px`;
+          document.body.appendChild(ghost);
+          li.classList.add('dragging');
+          document.body.classList.add('set-dragging');
+          // Ablage oben im Bild (die Reiter sind auf dem Handy oft weggescrollt)
+          const to = from === 'fr' ? 'en' : 'fr';
+          bar = document.createElement('div');
+          bar.className = 'drop-bar';
+          bar.innerHTML = `<div class="drop-target" data-lang="${to}">${icon('down')} Hierher ziehen: zu ${flag(to)} ${LANGS[to].name}</div>`;
+          document.body.appendChild(bar);
+        }
+        ev.preventDefault();
+        lx = ev.clientX; ly = ev.clientY;
+        ghost.style.transform = `translate(${ev.clientX - 30}px, ${ev.clientY - 24}px) rotate(-2deg)`;
+        const t = tabAt(ev.clientX, ev.clientY);
+        if (t !== over) { over?.classList.remove('drop-ok'); over = t; over?.classList.add('drop-ok'); }
+      };
+      const up = (ev) => {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', up);
+        if (!ghost) return;
+        ghost.remove(); bar?.remove(); li.classList.remove('dragging'); document.body.classList.remove('set-dragging');
+        over?.classList.remove('drop-ok');
+        // nach dem Ziehen kein Klick auf „Öffnen“
+        dragEndedAt = Date.now();
+        const t = ev.type === 'pointerup' || over ? (over || tabAt(lx, ly)) : null; // letzte bekannte Position (Finger)
+        if (t) moveSetLang(id, t.dataset.lang);
+      };
+      document.addEventListener('pointermove', move, { passive: false });
+      document.addEventListener('pointerup', up);
+      document.addEventListener('pointercancel', up);
+    });
+  });
 }
 
 function bindHome() {
   if (!$('#vocab-input')) return; // Kinder-Ansicht
   bindBoom();
+  bindSetDrag();
   const ta = $('#vocab-input'), name = $('#set-name');
   const update = () => { ui.draft.text = ta.value; renderPreview(); };
   ta.addEventListener('input', debounce(update, 120));

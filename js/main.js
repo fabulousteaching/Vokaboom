@@ -49,6 +49,7 @@ const actions = {
   /* Startseite */
   'draft-swap': () => { ui.draft.swap = !ui.draft.swap; renderPreview(); },
   'delete-set': (el) => { ui.confirmDelete = el.dataset.id; render(); },
+  'move-set-lang': (el) => moveSetLang(el.dataset.id, el.dataset.lang),
   'delete-set-no': () => { ui.confirmDelete = null; render(); },
   'delete-set-yes': (el) => {
     db.sets = db.sets.filter((s) => s.id !== el.dataset.id);
