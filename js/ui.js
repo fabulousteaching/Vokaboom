@@ -289,7 +289,7 @@ function viewHome() {
         <div class="lib-head"><h2 id="lib-title">Meine ${LANGS[lang].name}-Portionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
         ${libraryNote()}
         ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>
-          <p class="hint small lib-move-hint">Falsche Sprache erwischt? Portion am Griff ⠿ auf den Reiter ${flag(lang === 'fr' ? 'en' : 'fr')} ${LANGS[lang === 'fr' ? 'en' : 'fr'].name} ziehen – oder auf die Flagge rechts tippen.</p>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
+          <p class="hint small lib-move-hint">Falsche Sprache erwischt? Portion einfach auf den Reiter ${flag(lang === 'fr' ? 'en' : 'fr')} ${LANGS[lang === 'fr' ? 'en' : 'fr'].name} ziehen – am Handy und Tablet am Griff ⠿ anfassen.</p>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
       </aside>
     </div>
   </section>`;
@@ -309,13 +309,11 @@ function libItem(s) {
       </span>
     </li>`;
   }
-  const other = langOf(s) === 'fr' ? 'en' : 'fr';
   return `<li class="lib-item" data-set-id="${s.id}">
     <span class="lib-grip" title="Ziehen: auf den anderen Sprach-Reiter verschieben" aria-hidden="true">⠿</span>
     <button class="lib-open" data-action="open-set" data-id="${s.id}">
       <span class="lib-text"><strong>${esc(s.name)}</strong><small>${s.words.length} Vokabeln${t != null ? ` · Test ${t} %` : ''}</small></span>
     </button>
-    <button class="icon-btn subtle lib-move" data-action="move-set-lang" data-id="${s.id}" data-lang="${other}" aria-label="„${esc(s.name)}“ zu ${LANGS[other].name} verschieben" title="Zu ${LANGS[other].name} verschieben">${flag(other)}</button>
     <button class="icon-btn subtle" data-action="delete-set" data-id="${s.id}" aria-label="„${esc(s.name)}“ löschen" title="Löschen">${icon('trash')}</button>
   </li>`;
 }
