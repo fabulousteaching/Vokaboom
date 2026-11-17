@@ -553,17 +553,35 @@ function balloonRound(set) {
   pr.classList.remove('in'); void pr.offsetWidth; pr.classList.add('in');
   const lanes = shuffle([...Array(opts.length).keys()]);
   const sp = $('#bl-speed'); if (sp) sp.textContent = s.dur > 8 ? '🐢' : s.dur > 5.5 ? '🐇' : '🚀';
+  // Grössen in Pixeln ausrechnen (funktioniert in allen Browsern, auch älteren iPads)
+  const W = layer.clientWidth || 340, H = layer.clientHeight || 480, n = opts.length;
+  const laneW = W / n, bw = Math.max(54, Math.min(118, laneW - 8)), bh = Math.round(bw / 0.86);
   layer.innerHTML = opts.map((o, k) => {
     const c = BALLOON_COLORS[(s.round * 3 + k) % BALLOON_COLORS.length];
-    const drift = (Math.random() * 8 - 4).toFixed(0); // alle steigen etwa gleich schnell
-    return `<button class="balloon" data-action="bl-pop" data-ok="${o.ok ? 1 : 0}" lang="${set.lang}"
-      style="--lane:${lanes[k]};--lanes:${opts.length};--c:${c};--dur:${s.dur.toFixed(2)}s;--delay:${(Math.random() * 0.25).toFixed(2)}s;--drift:${drift}px">
-      <span class="bl-body"><span class="bl-text" style="--fs:${balloonFont(o.text)}">${esc(o.text)}</span></span>
+    const left = Math.round(laneW * lanes[k] + (laneW - bw) / 2);
+    return `<button type="button" class="balloon" data-action="bl-pop" data-ok="${o.ok ? 1 : 0}" lang="${set.lang}"
+      style="left:${left}px;width:${bw}px;bottom:${-(bh + 70)}px;--c:${c};--fs:${balloonFont(o.text)}">
+      <span class="bl-body" style="height:${bh}px;background-color:${c}"><span class="bl-text">${esc(o.text)}</span></span>
       <svg class="bl-string" viewBox="0 0 20 60" aria-hidden="true"><path d="M10 0 C 2 15, 18 30, 10 45 S 6 58, 10 60" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>`;
   }).join('');
-  const ok = $('.balloon[data-ok="1"]', layer);
-  ok?.addEventListener('animationend', (e) => { if (e.animationName === 'bl-rise' && !s.cur.settled && G.s.cur === s.cur) { s.cur.settled = true; balloonMiss(set, true); } });
+  // Aufsteigen per JavaScript statt CSS-Animation: läuft überall gleich
+  const items = $$('.balloon', layer).map((el) => ({ el, ok: el.dataset.ok === '1', delay: Math.random() * 0.25, drift: Math.random() * 8 - 4 }));
+  const dist = H + bh + 140, dur = s.dur, cur = s.cur;
+  const t0 = performance.now();
+  cancelAnimationFrame(G.raf);
+  const step = (now) => {
+    if (G.s !== s || s.cur !== cur || s.done) return;
+    const t = (now - t0) / 1000;
+    for (const it of items) {
+      if (it.el.classList.contains('popped') || it.el.classList.contains('zoom-off')) continue;
+      const q = Math.max(0, Math.min(1, (t - it.delay) / dur));
+      it.el.style.transform = `translate(${(it.drift * q).toFixed(1)}px, ${(-q * dist).toFixed(1)}px)`;
+      if (it.ok && q >= 1 && !cur.settled) { cur.settled = true; balloonMiss(set, true); return; }
+    }
+    G.raf = requestAnimationFrame(step);
+  };
+  G.raf = requestAnimationFrame(step);
   s.round++;
 }
 /** Ballon zerplatzt: Fetzen fliegen, „POP!“ */
