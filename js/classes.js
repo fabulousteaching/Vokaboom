@@ -13,7 +13,7 @@
    ========================================================= */
 const KID_KEY = 'vokaboom.kid';        // Anmeldung des Kindes auf diesem Gerät
 const KID_DB_KEY = 'vokaboom.kiddb';   // Portionen + Übungsstand des Kindes, getrennt von eigenen Portionen
-const kid = { token: '', first: '', initial: '', username: '', cls: '', sent: {}, busy: false, again: false, status: 'ok' };
+const kid = { token: '', first: '', initial: '', username: '', cls: '', sent: {}, busy: false, again: false, status: 'ok', sso: false, e1: false };
 const isKid = () => !!kid.token;
 const kidName = (k = kid) => `${k.first || k.first_name || ''}${(k.initial ?? k.last_initial) ? ` ${k.initial ?? k.last_initial}.` : ''}`;
 const displayUser = (u) => String(u || '').charAt(0).toUpperCase() + String(u || '').slice(1);
@@ -36,8 +36,8 @@ function kidLoadSession() {
   if (isKid()) STORE_KEY = KID_DB_KEY;
 }
 function kidSaveSession() {
-  const { token, first, initial, username, cls, sent } = kid;
-  try { localStorage.setItem(KID_KEY, JSON.stringify({ token, first, initial, username, cls, sent })); } catch { /* */ }
+  const { token, first, initial, username, cls, sent, sso, e1 } = kid;
+  try { localStorage.setItem(KID_KEY, JSON.stringify({ token, first, initial, username, cls, sent, sso, e1 })); } catch { /* */ }
 }
 
 function kidErrorText(e) {
@@ -55,14 +55,29 @@ async function kidLogin(username, pics) {
   const { data, error } = await c.rpc('vokaboom_student_login', { p_username: user, p_pics: pics.join(',') });
   if (error) throw error;
   if (!data || !data.token) return false;
+  await kidStart(data.token, user);
+  return isKid();
+}
+/** Mit einem Anmelde-Schlüssel als Kind anmelden. fromCookie: kam über das gemeinsame Anmelden aus Einmaleins. */
+async function kidStart(token, user, { fromCookie = false } = {}) {
   if (isKid()) kidForget(false); // anderes Kind war noch angemeldet (geteiltes iPad)
   else saveNow(); // eigene Portionen bleiben unter dem normalen Speicherplatz
-  Object.assign(kid, { token: data.token, username: user, first: '', initial: '', cls: '', sent: {}, status: 'ok' });
+  Object.assign(kid, { token, username: user, first: '', initial: '', cls: '', sent: {}, status: 'ok', sso: fromCookie, e1: false });
   STORE_KEY = KID_DB_KEY;
   db = { sets: [], settings: { ...structuredClone(DEFAULT_SETTINGS), ...db.settings } };
   kidSaveSession();
   await kidRefresh();
-  return true;
+  if (isKid() && !fromCookie) { kid.sso = SSO.kid.set({ u: kid.username, tool: 'v', t: kid.token }); kidSaveSession(); }
+}
+/** Gibt es das Kind auch in Einmaleins? (für den Knopf „1×1 Rechnen“) */
+async function kidCheckEinmaleins() {
+  if (!isKid() || !CLOUD_CFG.einmaleinsUrl) return;
+  try {
+    const c = await cloudClient();
+    const { data, error } = await c.rpc('einmaleins_kid_linked', { p_from: 'vokaboom', p_token: kid.token });
+    if (error) return;
+    if (!!data !== kid.e1) { kid.e1 = !!data; kidSaveSession(); if (ui.view === 'home') render(); }
+  } catch { /* Einmaleins nicht eingerichtet oder offline */ }
 }
 
 /** Freigegebene Portionen und eigenen Übungsstand holen */
@@ -75,6 +90,8 @@ async function kidRefresh() {
     throw error;
   }
   kid.first = data.student?.first || ''; kid.initial = data.student?.initial || ''; kid.cls = data.class?.name || '';
+  kid.username = data.student?.username || kid.username;
+  kidCheckEinmaleins();
   const prog = new Map((data.progress || []).map((p) => [p.set_id, p.data]));
   const old = new Map(db.sets.map((s) => [s.id, s]));
   db.sets = (data.sets || []).map((r) => {
@@ -128,13 +145,14 @@ const kidPushSoon = debounce(kidPushNow, 1500);
 async function kidLogout() {
   try { await kidPushNow(); } catch { /* */ }
   try { const c = await cloudClient(); await c.rpc('vokaboom_student_logout', { p_token: kid.token }); } catch { /* */ }
+  if (SSO.kid.get()?.u === kid.username) SSO.kid.clear(); // gemeinsames Anmelden: auch in Einmaleins abmelden
   kidForget();
   toast('Abgemeldet. Tschüss!');
 }
 /** Kind abmelden: dessen Daten vom Gerät entfernen, eigene Portionen wieder laden */
 function kidForget(rerender = true) {
   try { localStorage.removeItem(KID_KEY); localStorage.removeItem(KID_DB_KEY); } catch { /* */ }
-  Object.assign(kid, { token: '', first: '', initial: '', username: '', cls: '', sent: {}, status: 'ok' });
+  Object.assign(kid, { token: '', first: '', initial: '', username: '', cls: '', sent: {}, status: 'ok', sso: false, e1: false });
   STORE_KEY = MAIN_STORE_KEY;
   db = { sets: [], settings: structuredClone(DEFAULT_SETTINGS) };
   loadDB();
@@ -144,17 +162,64 @@ function kidForget(rerender = true) {
   renderShell(); bindTopSearch(); render();
 }
 
-/** Login über den QR-Code auf dem Kärtchen: …#k=maus67.11-0-2 */
+/** Gemeinsames Anmelden mit Einmaleins (Cookie auf fabulousteaching.ch): Kind übernehmen oder abmelden */
+const ssoTried = new Set();
+async function kidSsoCheck() {
+  if (!SSO.DOMAIN || !cloudConfigured() || cloud.uid || SSO.teacherSignedIn(AUTH_KEY)) return;
+  const c = SSO.kid.get();
+  if (!c) { if (isKid() && kid.sso) { kidForget(); toast('Abgemeldet.'); } return; }
+  if (isKid() && kid.username === c.u) { SSO.kid.set(c); if (!kid.sso) { kid.sso = true; kidSaveSession(); } return; } // Cookie erneuern
+  const key = c.tool + c.t;
+  if (ssoTried.has(key)) return;
+  ssoTried.add(key);
+  try {
+    let tok = c.tool === 'v' ? c.t : '', user = c.u;
+    if (c.tool === 'e') {
+      const cl = await cloudClient();
+      const { data } = await cl.rpc('einmaleins_kid_bridge', { p_from: 'einmaleins', p_token: c.t });
+      if (data?.token) { tok = data.token; user = data.username || c.u; }
+    }
+    if (!tok) { if (isKid() && kid.sso) { kidForget(); toast('Abgemeldet.'); } return; } // anderes Kind ohne Vokaboom
+    await kidStart(tok, user, { fromCookie: true });
+    if (isKid()) toast(`Hallo ${kid.first}! Du bist angemeldet.`);
+  } catch { ssoTried.delete(key); /* offline: später nochmals */ }
+}
+/** Knopf „1×1 Rechnen“: mit derselben Anmeldung nach Einmaleins */
+function goEinmaleins() {
+  const base = String(CLOUD_CFG.einmaleinsUrl || '').trim();
+  if (!base) return;
+  saveNow();
+  kidPushNow().finally(() => { location.href = isKid() ? `${base}#sso=v.${kid.token}` : base; });
+}
+
+/** Login über den QR-Code auf dem Kärtchen (…#k=maus67.11-0-2) oder über den Knopf in Einmaleins (…#sso=e.<Schlüssel>) */
 async function kidLoginFromHash() {
+  const sso = location.hash.match(/^#sso=([ve])\.([0-9a-f-]{36})$/i);
+  if (sso) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
+    render();
+    if (cloud.uid || SSO.teacherSignedIn(AUTH_KEY)) return true;
+    try {
+      let tok = sso[2], user = '';
+      if (sso[1] === 'e') {
+        const cl = await cloudClient();
+        const { data } = await cl.rpc('einmaleins_kid_bridge', { p_from: 'einmaleins', p_token: sso[2] });
+        tok = data?.token || ''; user = data?.username || '';
+      }
+      if (!tok) { toast('Für dich gibt es in Vokaboom noch keine Klasse. Frag deine Lehrperson.', 'bad'); return true; }
+      if (isKid() && kid.token === tok) return true;
+      await kidStart(tok, user);
+      if (isKid()) toast(`Hallo ${kid.first}! Du bist angemeldet.`);
+    } catch (e) { toast(kidErrorText(e), 'bad'); }
+    return true;
+  }
   const m = location.hash.match(/^#k=([a-z]+[0-9]{2,4})\.(\d{1,2})-(\d{1,2})-(\d{1,2})$/i);
   if (!m) return false;
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
   const user = m[1].toLowerCase(), pics = [m[2], m[3], m[4]].map(Number);
   if (isKid() && kid.username === user) { render(); return true; }
-  let teacher = false;
-  try { teacher = !!localStorage.getItem(AUTH_KEY); } catch { /* */ }
   render();
-  if (teacher || cloud.uid) { openTeacherBlocks(); return true; }
+  if (cloud.uid || SSO.teacherSignedIn(AUTH_KEY)) { openTeacherBlocks(); return true; }
   toast('Anmelden …');
   try {
     if (await kidLogin(user, pics)) toast(`Hallo ${kid.first}! Du bist angemeldet.`);
@@ -260,7 +325,8 @@ function kidHomeHTML() {
     <div class="kid-hello">
       <span class="kid-hello-pic" aria-hidden="true">${kidWordImg(kid.username)}</span>
       <div><p class="eyebrow">${esc(kid.cls)}</p><h1>Hallo ${esc(kid.first)}!</h1><p class="lead">Wähle eine Portion und leg los.</p>
-        <button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button></div>
+        <span class="row kid-hello-btns"><button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>
+        ${kid.e1 && CLOUD_CFG.einmaleinsUrl ? '<button class="btn secondary other-tool" data-action="go-einmaleins"><span class="ot-tag">1×1</span> Rechnen üben</button>' : ''}</span></div>
     </div>
     ${db.sets.length ? `<ul class="kid-sets">${db.sets.map((s) => {
       const p = s.progress || {};
@@ -302,12 +368,36 @@ async function loadClasses() {
       klass.list = (cl.data || []).map((x) => ({ ...x, rules: x.rules && typeof x.rules === 'object' && !Array.isArray(x.rules) ? x.rules : {} }));
       klass.students = {};
       (st.data || []).forEach((s) => { (klass.students[s.class_id] = klass.students[s.class_id] || []).push(s); });
+      await loadEinmaleinsLinks();
       klass.loaded = true; klass.error = '';
     } catch (e) {
       klass.error = classErrorText(e);
     } finally { klass.loading = null; }
   })();
   return klass.loading;
+}
+/** Einmaleins (gleiches Supabase-Projekt): Welche Kinder haben dort dasselbe Login? */
+async function loadEinmaleinsLinks() {
+  klass.e1 = null;
+  try {
+    const c = await cloudClient();
+    const [a, b] = await Promise.all([
+      c.from('einmaleins_classes').select('vokaboom_class,settings'),
+      c.from('einmaleins_students').select('username,vokaboom_id'),
+    ]);
+    if (a.error || b.error) return;
+    const linked = new Map();
+    (a.data || []).forEach((x) => { if (x.vokaboom_class) linked.set(x.vokaboom_class, new Set(Array.isArray(x.settings?.vbSkip) ? x.settings.vbSkip : [])); });
+    klass.e1 = { byVid: new Map((b.data || []).filter((x) => x.vokaboom_id).map((x) => [x.vokaboom_id, x.username])), usernames: new Set((b.data || []).map((x) => x.username)), linked };
+  } catch { /* Einmaleins nicht eingerichtet */ }
+}
+/** Hat dieses Kind in Einmaleins dasselbe Login (oder bekommt es beim ersten Anmelden dort)? */
+function einmaleinsLoginOf(st) {
+  const e = klass.e1, base = String(CLOUD_CFG.einmaleinsUrl || '').trim();
+  if (!e || !base) return '';
+  const u = e.byVid.get(st.id);
+  const ok = u ? u === st.username : (e.linked.has(st.class_id) && !e.linked.get(st.class_id).has(st.id) && !e.usernames.has(st.username));
+  return ok ? `${base}#k=${st.username}.${picsList(st.pics).join('-')}` : '';
 }
 async function loadClassProgress(cid) {
   const ids = studentsOf(cid).map((s) => s.id);
@@ -440,7 +530,7 @@ function classKidsHTML(c, kids) {
     }
     return `<li class="kid-row">
       <span class="kid-av-big" aria-hidden="true">${kidWordImg(s.username)}</span>
-      <span class="kid-who"><strong>${esc(kidName(s))}</strong><small>${esc(displayUser(s.username))}</small></span>
+      <span class="kid-who"><strong>${esc(kidName(s))}</strong><small>${esc(displayUser(s.username))}${einmaleinsLoginOf(s) ? ' <span class="e1-tag" title="Gleiches Kärtchen wie in Einmaleins">auch in Einmaleins</span>' : ''}</small></span>
       <span class="kid-pw" aria-label="Bilder-Passwort">${picsList(s.pics).map((i) => `<span>${kidPwImg(i)}</span>`).join('')}</span>
       <span class="kid-actions">
         <button class="icon-btn subtle" data-action="kid-newpics" data-id="${s.id}" title="Neue Bilder (neues Passwort)" aria-label="Neue Bilder für ${esc(kidName(s))}">${icon('shuffle')}</button>
@@ -676,7 +766,8 @@ function classCardsHTML(c, kids) {
   return `<div class="panel">
     <div class="cards-head">
       <div><h2>Login-Kärtchen</h2>
-        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen.</p></div>
+        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen.</p>
+        <p class="hint">Die Kärtchen sind neutral, ohne Logo. ${kids.some((x) => einmaleinsLoginOf(x)) ? 'Kinder, die auch in Einmaleins sind, bekommen zwei QR-Codes: <strong>ABC Vokabeln</strong> öffnet Vokaboom, <strong>1×1 Rechnen</strong> öffnet Einmaleins – ein Kärtchen für beide Tools.' : 'Der QR-Code <strong>ABC Vokabeln</strong> öffnet Vokaboom.'}</p></div>
       <button class="btn primary" data-action="cards-pdf" id="cards-pdf">${icon('down')} PDF herunterladen</button>
     </div>
     <div class="card-previews">${kids.map((s) => `<figure class="card-prev" data-sid="${s.id}"><span class="spinner"></span></figure>`).join('')}</div>
@@ -685,7 +776,6 @@ function classCardsHTML(c, kids) {
 
 const CARD_W = 85, CARD_H = 54; // mm, wie eine Kreditkarte
 const CARD_COLORS = [['#4F46E5', '#EEF0FF'], ['#DB2777', '#FDE7F1'], ['#D97706', '#FFF2D9'], ['#0891B2', '#DDF6FB'], ['#059669', '#DCF7EC'], ['#7C3AED', '#F1EAFF'], ['#E8730C', '#FFEDD8'], ['#0E7490', '#DFF5F9'], ['#BE185D', '#FCE7F3'], ['#4D7C0F', '#ECFCCB']];
-const BRAND_MARK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -6 80 78"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect x="6" y="22" width="36" height="42" rx="10" fill="#FFB703" transform="rotate(-12 24 43)"/><rect x="14" y="20" width="38" height="46" rx="11" fill="url(#g)" stroke="#fff" stroke-width="2.5"/><path d="M23 34l10 18 10-18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g stroke-linecap="round"><path d="M54 13.1L52 2.3" stroke="#FFB703" stroke-width="4"/><path d="M57.8 13.2L63.3 1.9" stroke="#FFB703" stroke-width="4.4"/><path d="M60.3 16.2L70 11" stroke="#FFD166" stroke-width="4"/><path d="M61.5 19.7L68.9 20.5" stroke="#FFB703" stroke-width="3.6"/><path d="M50.2 14.7L45.7 10.6" stroke="#FFD166" stroke-width="3.6"/></g></svg>';
 function cardColor(username) {
   let h = 0;
   for (const ch of String(username)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -718,74 +808,88 @@ function fitText(ctx, text, maxW, font, size) {
   return t + '…';
 }
 
-/** Zeichnet ein Kärtchen. x, y in mm; s = Pixel pro mm */
+function drawQR(ctx, url, qx, qy, qs, X, Y, L) {
+  ctx.fillStyle = '#fff'; ctx.fillRect(X(qx), Y(qy), L(qs), L(qs));
+  try {
+    const q = qrcode(0, 'M'); q.addData(url, 'Byte'); q.make();
+    const n = q.getModuleCount(), m = 1, cell = qs / (n + m * 2);
+    ctx.fillStyle = '#1E293B';
+    for (let r = 0; r < n; r++) for (let cc = 0; cc < n; cc++) {
+      if (q.isDark(r, cc)) ctx.fillRect(Math.floor(X(qx + (cc + m) * cell)), Math.floor(Y(qy + (r + m) * cell)), Math.ceil(L(cell)), Math.ceil(L(cell)));
+    }
+  } catch { /* */ }
+}
+/** Beschriftung unter einem QR-Code: farbiges Kästchen („ABC“ / „1×1“) und Fach */
+function drawQRLabel(ctx, cx, y, tag, text, accent, X, Y, L, body) {
+  ctx.font = `700 ${L(2.3)}px ${body}`;
+  const tw = ctx.measureText(tag).width + L(2);
+  ctx.font = `600 ${L(2.3)}px ${body}`;
+  const xw = ctx.measureText(text).width;
+  const x0 = X(cx) - (tw + L(1) + xw) / 2;
+  rrect(ctx, x0, Y(y - 2.4), tw, L(3.3), L(1.1)); ctx.fillStyle = accent; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.3)}px ${body}`; ctx.textAlign = 'left';
+  ctx.fillText(tag, x0 + L(1), Y(y));
+  ctx.fillStyle = '#475569'; ctx.font = `600 ${L(2.3)}px ${body}`;
+  ctx.fillText(text, x0 + tw + L(1), Y(y));
+}
+/**
+ * Zeichnet ein Login-Kärtchen (x, y in mm; s = Pixel pro mm). Ohne Logo und ohne Namen eines Tools:
+ * Es gilt für alle Tools, in denen das Kind dasselbe Login hat. Ein QR-Code pro Fach: „ABC Vokabeln“ (Vokaboom)
+ * und bei Kindern, die auch in Einmaleins sind, „1×1 Rechnen“. Gleiches Kärtchen wie in Einmaleins.
+ */
 async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
   const X = (mm) => (x + mm) * s, Y = (mm) => (y + mm) * s, L = (mm) => mm * s;
-  const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = "Lexend, system-ui, sans-serif";
+  const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
+  const e1Url = einmaleinsLoginOf(st);
   ctx.save();
-  // Karte
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
   ctx.fillStyle = '#fff'; ctx.fill();
   ctx.save(); ctx.clip();
-  const g = ctx.createLinearGradient(X(0), Y(0), X(CARD_W), Y(11));
-  g.addColorStop(0, '#4F46E5'); g.addColorStop(1, '#7C3AED');
-  ctx.fillStyle = g; ctx.fillRect(X(0), Y(0), L(CARD_W), L(11));
-  // Farbstreifen unten in der Farbe des Kindes
-  ctx.fillStyle = accent; ctx.fillRect(X(0), Y(CARD_H - 1.6), L(CARD_W), L(1.6));
+  ctx.fillStyle = accent; ctx.fillRect(X(0), Y(0), L(CARD_W), L(9));
   ctx.restore();
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
-  ctx.lineWidth = L(0.25); ctx.strokeStyle = '#CDD2E2'; ctx.stroke();
-  // Kopf: Logo, „Vokaboom“, Klasse
-  const mark = await svgImage(BRAND_MARK_SVG);
-  if (mark) ctx.drawImage(mark, X(2.6), Y(0.9), L(9.2), L(9));
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `800 ${L(4.6)}px ${disp}`;
-  ctx.fillStyle = '#fff'; ctx.fillText('Voka', X(12.6), Y(7.3));
-  const vw = ctx.measureText('Voka').width;
-  ctx.fillStyle = '#FFB703'; ctx.fillText('boom', X(12.6) + vw, Y(7.3));
-  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.92)';
-  ctx.fillText(fitText(ctx, className, L(36), (z) => `500 ${z}px ${body}`, L(3)), X(CARD_W - 3.5), Y(7));
+  ctx.lineWidth = L(0.25); ctx.strokeStyle = '#CBD5E1'; ctx.stroke();
+  // Kopf: „Mein Login“ und Klasse
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff'; ctx.font = `800 ${L(3.4)}px ${disp}`;
+  ctx.fillText('Mein Login', X(4), Y(6.2));
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.fillText(fitText(ctx, className, L(44), (z) => `500 ${z}px ${body}`, L(2.8)), X(CARD_W - 4), Y(6));
   ctx.textAlign = 'left';
-  // Bild zum Benutzernamen
-  rrect(ctx, X(4), Y(14), L(19), L(19), L(4)); ctx.fillStyle = wash; ctx.fill();
+  // Bild, Name, Benutzername
+  rrect(ctx, X(4), Y(12), L(16), L(16), L(3.5)); ctx.fillStyle = wash; ctx.fill();
   const wimg = await svgImage(KID_WORDS[kidWordOf(st.username)] || '');
-  if (wimg) ctx.drawImage(wimg, X(5.5), Y(15.5), L(16), L(16));
-  // Name und Benutzername
-  ctx.fillStyle = '#161A33';
-  ctx.fillText(fitText(ctx, kidName(st), L(28), (z) => `600 ${z}px ${body}`, L(3.6)), X(26), Y(18.6));
-  ctx.fillStyle = '#7A80A0'; ctx.font = `500 ${L(2.3)}px ${body}`; ctx.fillText('Benutzername', X(26), Y(24));
+  if (wimg) ctx.drawImage(wimg, X(5.5), Y(13.5), L(13), L(13));
+  ctx.fillStyle = '#1E293B';
+  ctx.fillText(fitText(ctx, kidName(st), L(56), (z) => `600 ${z}px ${body}`, L(3.4)), X(23.5), Y(16.6));
+  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`; ctx.fillText('Benutzername', X(23.5), Y(21));
   ctx.fillStyle = accent;
-  ctx.fillText(fitText(ctx, displayUser(st.username), L(28), (z) => `800 ${z}px ${disp}`, L(6.4)), X(26), Y(31));
+  ctx.fillText(fitText(ctx, displayUser(st.username), L(56), (z) => `800 ${z}px ${disp}`, L(6.2)), X(23.5), Y(27.8));
   // Bilder-Passwort
-  ctx.fillStyle = '#7A80A0'; ctx.font = `500 ${L(2.3)}px ${body}`;
-  ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(38.4));
+  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
+  ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
   const pics = picsList(st.pics);
   for (let k = 0; k < 3; k++) {
-    const bx = 4 + k * 12.6, by = 40.3;
-    rrect(ctx, X(bx), Y(by), L(10.6), L(10.6), L(2.2));
+    const bx = 4 + k * 13, by = 37;
+    rrect(ctx, X(bx), Y(by), L(11), L(11), L(2.2));
     ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.45); ctx.strokeStyle = accent; ctx.stroke();
     const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
-    if (im) ctx.drawImage(im, X(bx + 1.6), Y(by + 1.6), L(7.4), L(7.4));
+    if (im) ctx.drawImage(im, X(bx + 1.7), Y(by + 1.7), L(7.6), L(7.6));
     ctx.beginPath(); ctx.arc(X(bx + 0.4), Y(by + 0.4), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
     ctx.fillText(String(k + 1), X(bx + 0.4), Y(by + 1.3)); ctx.textAlign = 'left';
   }
-  // QR-Code
-  const qx = 56, qy = 13.3, qs = 26;
-  ctx.fillStyle = '#fff'; ctx.fillRect(X(qx), Y(qy), L(qs), L(qs));
-  try {
-    const q = qrcode(0, 'M'); q.addData(kidLoginUrl(st), 'Byte'); q.make();
-    const n = q.getModuleCount(), m = 1.5, cell = qs / (n + m * 2);
-    ctx.fillStyle = '#161A33';
-    for (let r = 0; r < n; r++) for (let cc = 0; cc < n; cc++) {
-      if (q.isDark(r, cc)) ctx.fillRect(Math.floor(X(qx + (cc + m) * cell)), Math.floor(Y(qy + (r + m) * cell)), Math.ceil(L(cell)), Math.ceil(L(cell)));
-    }
-  } catch { /* zu lang – kommt nicht vor */ }
-  ctx.textAlign = 'center'; ctx.fillStyle = '#4A5072'; ctx.font = `600 ${L(2.3)}px ${body}`;
-  ctx.fillText('Scannen = anmelden', X(qx + qs / 2), Y(43.4));
-  ctx.fillStyle = '#7A80A0'; ctx.font = `400 ${L(1.9)}px ${body}`;
-  ctx.fillText(location.host || 'vokaboom', X(qx + qs / 2), Y(47.4));
+  // QR-Codes: einer pro Fach
+  if (e1Url) {
+    drawQR(ctx, kidLoginUrl(st), 46.5, 30.5, 17.5, X, Y, L);
+    drawQR(ctx, e1Url, 65, 30.5, 17.5, X, Y, L);
+    drawQRLabel(ctx, 55.25, 51.2, 'ABC', 'Vokabeln', accent, X, Y, L, body);
+    drawQRLabel(ctx, 73.75, 51.2, '1×1', 'Rechnen', accent, X, Y, L, body);
+  } else {
+    drawQR(ctx, kidLoginUrl(st), 61, 29.5, 20, X, Y, L);
+    drawQRLabel(ctx, 71, 51.6, 'ABC', 'Vokabeln', accent, X, Y, L, body);
+  }
   ctx.restore();
 }
 
@@ -837,7 +941,7 @@ async function downloadCardsPDF() {
     const blob = buildPDF(pages);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `Vokaboom-Logins-${c.name.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'Klasse'}.pdf`;
+    a.download = `Logins-${c.name.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'Klasse'}.pdf`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
     toast('PDF heruntergeladen.');
@@ -1010,6 +1114,7 @@ const classActions = {
   'kid-unpick': () => kidUnpick(),
   'kid-account': () => openKidAccount(),
   'kid-logout': () => kidLogout(),
+  'go-einmaleins': () => goEinmaleins(),
   'kid-refresh': async () => { closeModal(true); try { await kidRefresh(); toast('Auf dem neuesten Stand.'); } catch (e) { toast(kidErrorText(e), 'bad'); } },
 };
 

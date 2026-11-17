@@ -67,7 +67,8 @@ async function cloudClient() {
   if (cloud.client) return cloud.client;
   const sb = await loadSupabase();
   cloud.client = sb.createClient(cloudUrl(), String(CLOUD_CFG.supabaseKey).trim(), {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: AUTH_KEY },
+    // Gemeinsames Anmelden mit Einmaleins: Sitzung im Cookie von fabulousteaching.ch (siehe js/sso.js)
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: AUTH_KEY, storage: SSO.authStorage(AUTH_KEY) },
   });
   cloud.client.auth.onAuthStateChange((ev, session) => {
     // Supabase rät, hier nicht direkt auf Supabase zu warten
@@ -115,9 +116,12 @@ async function cloudInit() {
       ? 'Dieser Link ist abgelaufen oder wurde schon benutzt. Fordere einfach einen neuen an.'
       : `Der Link aus der E-Mail hat nicht geklappt (${code}).`, 'bad');
   }
-  let stored = false;
-  try { stored = !!localStorage.getItem(AUTH_KEY); } catch { /* */ }
-  if (!stored && !fromMail) return; // nie angemeldet: Supabase gar nicht erst laden
+  const stored = SSO.teacherSignedIn(AUTH_KEY);
+  if (!stored && !fromMail) {
+    // Zuletzt angemeldet, inzwischen aber im anderen Tool (Einmaleins) abgemeldet: hier ebenfalls abmelden
+    if (SSO.DOMAIN && cloud.stateUid) signedOutElsewhere();
+    return; // nicht angemeldet: Supabase gar nicht erst laden
+  }
   try {
     const c = await cloudClient();
     const { data } = await c.auth.getSession();
@@ -160,6 +164,34 @@ async function cloudResetPassword(email) {
   const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo: siteUrl() });
   if (error) throw error;
 }
+
+/** Im anderen Tool abgemeldet: wie „Abmelden“, nur ohne Supabase (die Sitzung ist schon weg) */
+function signedOutElsewhere() {
+  const keep = (s) => !cloud.synced[s.id] || isDirty(s);
+  db.sets = db.sets.filter(keep);
+  forgetCloudUser();
+  saveNow();
+  if (ui.view === 'set' && !currentSet()) ui.view = 'home';
+  render();
+}
+/** Gemeinsames Anmelden: Hat sich im anderen Tool (Einmaleins) etwas geändert? */
+let ssoBusy = false;
+async function ssoCheck() {
+  if (ssoBusy || !SSO.DOMAIN || !cloudConfigured()) return;
+  ssoBusy = true;
+  try {
+    const signed = SSO.teacherSignedIn(AUTH_KEY);
+    if (cloud.uid && !signed) { signedOutElsewhere(); toast('Du wurdest abgemeldet.'); return; }
+    if (!cloud.uid && signed && !isKid()) {
+      await cloudInit();
+      if (cloud.uid) { toast(`Angemeldet als ${cloud.user}.`); render(); }
+      return;
+    }
+    if (typeof kidSsoCheck === 'function') await kidSsoCheck();
+  } finally { ssoBusy = false; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ssoCheck(); });
+window.addEventListener('focus', () => ssoCheck());
 
 async function cloudLogout() {
   // Was noch nicht hochgeladen ist, bleibt auf dem Gerät

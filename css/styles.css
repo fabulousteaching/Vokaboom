@@ -1449,3 +1449,9 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .bl-gap { width: 14px; }
 .blitz-buttons.one { grid-template-columns: 1fr; }
 .big-emoji { font-size: 2.4rem; justify-content: center; }
+
+/* Verbindung mit Einmaleins (Mathe-Tool) */
+.kid-hello-btns { margin-top: .3rem; }
+.ot-tag { display: inline-grid; place-items: center; padding: 0 .4rem; min-height: 1.4em; border-radius: 6px; background: linear-gradient(135deg, #0F766E, #0E7490); color: #fff; font-family: var(--font-display); font-weight: 800; font-size: .78rem; }
+.e1-tag { display: inline-block; padding: 0 .45rem; border-radius: 99px; background: #E1F5F1; color: #0B5E58; font-size: .72rem; font-weight: 600; vertical-align: 1px; }
+:root[data-theme="dark"] .e1-tag { background: #133A37; color: #7FE9DA; }

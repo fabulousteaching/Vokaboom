@@ -488,8 +488,9 @@ async function boot() {
   setTimeout(initClaude, 1500);
   if (!(await importFromHash())) render();
   window.addEventListener('hashchange', importFromHash);
-  if (isKid()) kidRefresh().catch(() => { kid.status = 'error'; renderAccountSlot(); });
-  else cloudInit();
+  // gemeinsames Anmelden mit Einmaleins: kidSsoCheck (js/classes.js)
+  if (isKid()) { kidRefresh().catch(() => { kid.status = 'error'; renderAccountSlot(); }); kidSsoCheck(); }
+  else cloudInit().finally(() => kidSsoCheck());
   setTimeout(checkForUpdate, 1500);
   // Datenpakete im Hintergrund: zuerst die Lauterkennung (für alle), danach die Stimmen (ohne Anmeldung)
   setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => phInBackground().then(() => voicesInBackground())), 3000);
