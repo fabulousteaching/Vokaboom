@@ -106,14 +106,14 @@ Alles läuft auf dem Gerät, keine Aufnahme verlässt es. Beim ersten Mal werden
 
 Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie streng bewertet wird. Ab dieser Punktzahl ist das Wort richtig (grün) und das nächste kommt automatisch. Das Modell wurde mit erwachsenen Muttersprachlern trainiert; wie gut es Kinderstimmen bewertet, muss sich im Einsatz zeigen.
 
-## Zusammen mit Einmaleins (Mathe)
+## Zusammen mit Teilmal (Mathe, früher «Einmaleins»)
 
-[Einmaleins](https://github.com/fabulousteaching/Einmaleins) läuft im selben Supabase-Projekt. Lehrpersonen benutzen dasselbe Konto.
+[Teilmal](https://github.com/fabulousteaching/Einmaleins) (Mal und Geteilt üben, https://teilmal.fabulousteaching.ch) läuft im selben Supabase-Projekt. Lehrpersonen benutzen dasselbe Konto.
 
-- **Verbundene Klassen:** In Einmaleins lässt sich eine Vokaboom-Klasse übernehmen oder eine Einmaleins-Klasse mit Vokaboom verbinden. Dann hat jedes Kind in beiden Tools denselben Benutzernamen und dieselben 3 Bilder. Neue Kinder bekommen automatisch dasselbe Login im anderen Tool. In der Kinderliste steht dann „auch in Einmaleins“.
-- **Login-Kärtchen** sind neutral, ohne Logo, und in beiden Tools gleich: oben „Mein Login“ und die Klasse. Kinder, die auch in Einmaleins sind, bekommen zwei QR-Codes: **ABC Vokabeln** (Vokaboom) und **1×1 Rechnen** (Einmaleins).
-- **Gemeinsam angemeldet:** Laufen beide Tools unter fabulousteaching.ch, gilt die Anmeldung für beide (Lehrperson und Kind), ebenso das Abmelden. Kinder wechseln mit dem Knopf **„1×1 Rechnen üben“** angemeldet nach Einmaleins. Technisch: Cookies der Domain fabulousteaching.ch (`js/sso.js`, in beiden Repositories gleich). Bestehende Anmeldungen ziehen beim ersten Öffnen von selbst dorthin um.
-- Die Adresse von Einmaleins steht in `js/config.js` (`einmaleinsUrl`). Die Datenbank-Funktionen dafür liegen in Einmaleins (`supabase/einmaleins.sql`); ohne sie läuft Vokaboom wie bisher allein.
+- **Verbundene Klassen:** In Teilmal lässt sich eine Vokaboom-Klasse übernehmen oder eine Teilmal-Klasse mit Vokaboom verbinden. Dann hat jedes Kind in beiden Tools denselben Benutzernamen und dieselben 3 Bilder. Neue Kinder bekommen automatisch dasselbe Login im anderen Tool. In der Kinderliste steht dann „auch in Teilmal“.
+- **Login-Kärtchen** sind neutral, ohne Logo, und in beiden Tools gleich: oben „Mein Login“ und die Klasse. Kinder, die auch in Teilmal sind, bekommen zwei QR-Codes: **ABC Vokabeln** (Vokaboom) und **1×1 Rechnen** (Teilmal).
+- **Gemeinsam angemeldet:** Laufen beide Tools unter fabulousteaching.ch, gilt die Anmeldung für beide (Lehrperson und Kind), ebenso das Abmelden. Kinder wechseln mit dem Knopf **„1×1 Rechnen üben“** angemeldet nach Teilmal. Technisch: Cookies der Domain fabulousteaching.ch (`js/sso.js`, in beiden Repositories gleich). Bestehende Anmeldungen ziehen beim ersten Öffnen von selbst dorthin um.
+- Die Adresse von Teilmal steht in `js/config.js` (`einmaleinsUrl`). Die Datenbank-Funktionen dafür liegen in Teilmal (`supabase/einmaleins.sql`); ohne sie läuft Vokaboom wie bisher allein.
 
 ## Browser
 
@@ -136,7 +136,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt:
 | `js/phonetic.js` | Lauterkennung: Laut für Laut auf dem Gerät |
 | `js/ui.js` | Startseite, Übersicht, Dialoge |
 | `js/modes.js` | Lernkarten, Zuordnen, Aussprechen, Hören & Schreiben, Test |
-| `js/sso.js` | Gemeinsames Anmelden mit Einmaleins (Cookies auf fabulousteaching.ch) |
+| `js/sso.js` | Gemeinsames Anmelden mit Teilmal (Cookies auf fabulousteaching.ch) |
 | `js/cloud.js` | Anmelden und Speichern im Konto (Supabase) |
 | `js/main.js` | Aktionen und Start |
 | `supabase/` | Tabelle mit Zugriffsregeln (`vokabelwelt.sql`) und Anleitung |

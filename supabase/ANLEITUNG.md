@@ -89,7 +89,7 @@ Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Kla
 2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
 3. Jedes Kind bekommt automatisch einen eigenen **Benutzernamen** (z. B. `Baum34`, nie doppelt vergeben) und ein **Bilder-Passwort** aus 3 Bildern.
 4. **Portionen**: anhaken, welche Portionen die Klasse sieht. Kinder sehen nur diese – mit allen Übungen, aber ohne Bearbeiten. Unter jeder angehakten Portion gibt es **„Für einzelne Kinder anpassen“**: Häkchen weg bei „Sieht die Portion“ = dieses Kind bekommt die Portion nicht; Häkchen weg bei einem Spiel = dieses Kind bekommt das Spiel in dieser Portion nicht. In der Auswertung steht dann „ausgenommen“.
-5. **Kärtchen**: als PDF herunterladen (10 pro A4-Seite), ausdrucken, ausschneiden. Die Kärtchen sind neutral, ohne Logo (gleich wie in Einmaleins). Kinder, die auch in Einmaleins sind, bekommen zusätzlich den QR-Code „1×1 Rechnen“.
+5. **Kärtchen**: als PDF herunterladen (10 pro A4-Seite), ausdrucken, ausschneiden. Die Kärtchen sind neutral, ohne Logo (gleich wie in Teilmal). Kinder, die auch in Teilmal sind, bekommen zusätzlich den QR-Code „1×1 Rechnen“.
 6. **Auswertung**: pro Kind und Portion der Anteil richtiger Antworten, wie viele Wörter und Übungen gemacht sind und der beste Test. Antippen eines Kindes zeigt seine schwierigsten Wörter; unten stehen die schwierigsten Wörter der ganzen Klasse.
 
 **Anmelden als Kind:** QR-Code auf dem Kärtchen mit der Kamera scannen – oder auf **Anmelden → Kinder-Login**, Benutzernamen eintippen und die 3 Bilder der Reihe nach antippen. Nach 8 falschen Versuchen ist 5 Minuten Pause. Auf einem Gerät, auf dem eine Lehrperson angemeldet ist, geht das Kinder-Login erst nach dem Abmelden.
@@ -100,13 +100,13 @@ Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals
 
 - **Neu: Ausnahmen für einzelne Kinder** brauchen die Spalte `rules`. Dafür `supabase/vokabelwelt.sql` nochmals ganz ausführen. Bis dahin funktionieren die Klassen wie bisher, nur das Anpassen für einzelne Kinder ist noch nicht möglich (Vokaboom zeigt dann einen Hinweis).
 
-## Zusammen mit Einmaleins
+## Zusammen mit Teilmal (früher «Einmaleins»)
 
-Einmaleins (Mathe-Tool) benutzt dieses Supabase-Projekt mit. Die Einrichtung steht im Einmaleins-Repository (`supabase/einmaleins.sql` und `supabase/ANLEITUNG.md`). Danach:
+Teilmal (Mathe-Tool) benutzt dieses Supabase-Projekt mit. Die Einrichtung steht im Repository von Teilmal, `fabulousteaching/Einmaleins` (`supabase/einmaleins.sql` und `supabase/ANLEITUNG.md`). Danach:
 
-- Klassen lassen sich in Einmaleins mit Vokaboom verbinden: Jedes Kind hat in beiden Tools dasselbe Login (ein Kärtchen).
+- Klassen lassen sich in Teilmal mit Vokaboom verbinden: Jedes Kind hat in beiden Tools dasselbe Login (ein Kärtchen).
 - Laufen beide Tools unter fabulousteaching.ch, ist man in beiden gleichzeitig angemeldet bzw. abgemeldet (Lehrperson und Kind).
-- Ohne die Einmaleins-Tabellen läuft Vokaboom wie bisher.
+- Ohne die Tabellen von Teilmal (`einmaleins_…`) läuft Vokaboom wie bisher.
 
 ## Vokaboom-Stimmen (Audio-Speicher)
 

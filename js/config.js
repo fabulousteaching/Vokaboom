@@ -11,5 +11,5 @@ window.VOKABELWELT_CONFIG = {
   supabaseKey: 'sb_publishable_66QwDLf_H_O1aNdn2mP1LA_A40he3mM',   // «Publishable key», darf öffentlich sein
   // Einmaleins (Mathe-Tool im selben Supabase-Projekt): für den QR-Code „1×1 Rechnen“ auf den Login-Kärtchen
   // und den Knopf für Kinder. Die github.io-Adresse leitet auf die eigene Adresse weiter, sobald es eine gibt.
-  einmaleinsUrl: 'https://fabulousteaching.github.io/Einmaleins/',
+  einmaleinsUrl: 'https://fabulousteaching.github.io/Einmaleins/',   // Teilmal (früher Einmaleins); leitet auf die eigene Adresse teilmal.fabulousteaching.ch weiter
 };
