@@ -207,6 +207,28 @@ function phExpected(engine, text) {
   return phones.filter((p) => engine.vocab[p] != null);
 }
 
+/** Alle Aussprache-Varianten eines Textes: „-day“ als [deɪ] und [di] (Saturday, Monday …) */
+function phExpectedAll(engine, text) {
+  const { groups } = engine.phonemizer.getPhonesAndWords(text);
+  let all = [[]];
+  for (const g of groups) {
+    const w = g.map((p) => p.replace(/[0-9]$/, '')).filter((p) => engine.vocab[p] != null);
+    const alts = [w];
+    const n = w.length;
+    if (n >= 3 && w[n - 2] === 'D' && (w[n - 1] === 'IY' || w[n - 1] === 'EY')) alts.push([...w.slice(0, -1), w[n - 1] === 'IY' ? 'EY' : 'IY']);
+    all = all.flatMap((pre) => alts.map((a) => [...pre, ...a])).slice(0, 8);
+  }
+  return all.filter((x) => x.length);
+}
+
+/* Ähnliche Laute (Englisch):
+   EN_SAME  – gilt als derselbe Laut (unbetonte Vokale, britisches „Thursday“ ohne r …)
+   EN_CLOSE – sehr nah, zählt fast voll (stimmhaft/stimmlos, th → f/s/t …)
+   Bewusst NICHT dabei: e/ä (bed – bad), i/ie (ship – sheep), m/p (lamb – lamp). */
+const EN_SAME = { ER: ['AH', 'EH', 'AO', 'R'], AH: ['IH', 'ER', 'AA', 'UH', 'EH'], AA: ['AO', 'AH'], AO: ['AA', 'OW'], UH: ['UW', 'AH'], UW: ['UH', 'AH'], IH: ['AH', 'IY'], OW: ['AO'], HH: [] };
+const EN_CLOSE = { S: ['Z'], Z: ['S'], D: ['T', 'DH'], T: ['D'], B: ['P'], P: ['B'], G: ['K'], K: ['G'], V: ['F', 'W'], F: ['V', 'TH'], TH: ['F', 'S'], DH: ['D', 'Z', 'V'], EY: ['EH', 'IY'], IY: ['IH', 'EY'], EH: ['EY', 'AH'], AE: ['AH'], W: ['V'], N: ['M', 'NG'], NG: ['N'] };
+const EN_CLOSE_W = 0.75; // so viel ist ein sehr naher Laut wert
+
 /** Wahrscheinlichkeiten je 10 ms (Frames × Laute) */
 async function phPosteriors(engine, wave) {
   const { core, session, ort } = engine;
@@ -238,24 +260,33 @@ function phScore(engine, post, phones) {
   const align = core.forcedAlign(sub, n, V, ids);
   const id2p = {};
   for (const [p, i] of Object.entries(vocab)) id2p[i] = p;
-  const st = ids.map(() => ({ frames: 0, gop: 0, votes: new Float64Array(V) }));
+  const same = phones.map((p) => [vocab[p], ...(EN_SAME[p] || []).map((q) => vocab[q])].filter((x) => x != null));
+  const close = phones.map((p) => (EN_CLOSE[p] || []).map((q) => vocab[q]).filter((x) => x != null));
+  const st = ids.map(() => ({ g: [], votes: new Float64Array(V) }));
   for (let t = 0; t < n; t++) {
     const row = sub.subarray(t * V, t * V + V);
     const j = align[t], s = st[j];
     const b = argmax(row);
-    s.frames++;
-    s.gop += Math.log(row[ids[j]] + 1e-8) - Math.log(row[b] + 1e-8);
+    let own = 0;
+    for (const c of same[j]) own = Math.max(own, row[c]);
+    for (const c of close[j]) own = Math.max(own, EN_CLOSE_W * row[c]);
+    s.g.push(Math.min(0, Math.log(own + 1e-8) - Math.log(row[b] + 1e-8)));
     for (let c = 0; c < V; c++) s.votes[c] += row[c];
   }
   const result = phones.map((p, j) => {
     const s = st[j];
-    const score = s.frames ? Math.round(100 * Math.exp(s.gop / s.frames)) : 0;
+    // Ränder eines Lauts sind unsicher: die besseren zwei Drittel der Frames zählen
+    const g = s.g.slice().sort((a, b) => b - a).slice(0, Math.max(1, Math.ceil(s.g.length * 0.67)));
+    const score = g.length ? Math.round(100 * Math.exp(g.reduce((a, x) => a + x, 0) / g.length)) : 0;
     const top = argmax(s.votes);
-    // Ist der erwartete Laut genauso wahrscheinlich wie der beste, gilt er als gehört
-    const heard = s.votes[ids[j]] >= s.votes[top] - 1e-6 ? p : (id2p[top] || '?');
+    const heard = same[j].includes(top) ? p : (id2p[top] || '?');
     return { exp: p, heard, score };
   });
-  const score = Math.round(result.reduce((a, r) => a + r.score, 0) / result.length);
+  // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte:
+  // ein etwas undeutlicher Laut kippt nicht gleich alles, ein falscher zählt immer
+  const ps = result.map((r) => r.score);
+  const mean = ps.reduce((a, x) => a + x, 0) / ps.length;
+  const score = Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length)));
   return { silent: false, score, phones: result };
 }
 
@@ -268,30 +299,44 @@ function phReferences(word, lang = 'en') {
   return [...new Set([full, short])].filter(Boolean);
 }
 
+/** Aufnehmen und bewerten */
 async function assessSpoken(word, { onStart, onLevel, onPhase } = {}, lang = 'en') {
-  if (lang === 'fr') return assessSpokenFr(word, { onStart, onLevel, onPhase });
-  const engine = await loadPhoneticEngine();
+  await loadPhoneticEngine(lang);
   const rec = await phRecord({ onStart, onLevel });
   if (!rec.samples) return { silent: true, peak: rec.peak };
   onPhase?.('thinking');
-  const post = await phPosteriors(engine, rec.samples);
+  const best = await assessWave(rec.samples, word, lang);
+  best.peak = rec.peak;
+  return best;
+}
+
+/** Eine Aufnahme (16 kHz) bewerten: alle Varianten (mit/ohne Artikel, Aussprache-Varianten) – die beste zählt */
+async function assessWave(wave, word, lang = 'en') {
   let best = null;
-  for (const ref of phReferences(word)) {
-    const phones = phExpected(engine, ref);
-    if (!phones.length) continue;
-    const r = phScore(engine, post, phones);
-    if (r.silent) { best = best || { ...r, ref }; continue; }
+  const take = (r, ref) => {
+    if (r.silent) { best = best || { ...r, ref }; return; }
     if (!best || best.silent || r.score > best.score) best = { ...r, ref };
+  };
+  if (lang === 'fr') {
+    const engine = await loadFrenchEngine();
+    const post = await frLogProbs(engine, wave);
+    for (const ref of phReferences(word, 'fr')) {
+      const toks = frExpected(engine, ref);
+      if (toks.length) take(frScore(post, toks), ref);
+    }
+  } else {
+    const engine = await loadPhoneticEngine();
+    const post = await phPosteriors(engine, wave);
+    for (const ref of phReferences(word)) {
+      for (const phones of phExpectedAll(engine, ref)) if (phones.length) take(phScore(engine, post, phones), ref);
+    }
   }
   if (!best) throw 'ph-word';
-  let passMin = passMinNow();
-  // Kurze Wörter (höchstens 3 Laute pro Wort, z. B. he, his, tie) sind schwer zu treffen: 10 Punkte weniger nötig
-  if (!best.silent && best.phones && best.phones.length <= 3 * String(best.ref || '').split(/\s+/).filter(Boolean).length) passMin = Math.max(30, passMin - 10);
   if (!best.silent) {
-    best.passMin = passMin;
-    best.ok = best.score >= passMin; // ab der eingestellten Punktzahl (Standard 60) ist es richtig
+    // gleiche Grenze für alle Wörter: ähnliche Laute sind schon in der Bewertung berücksichtigt
+    best.passMin = passMinNow();
+    best.ok = best.score >= best.passMin; // ab der eingestellten Punktzahl (Standard 60) ist es richtig
   }
-  best.peak = rec.peak;
   return best;
 }
 
@@ -315,7 +360,10 @@ const PH_FR = {
   BLANK: 58, SEP: 0, NASAL: 54, V: 61,
 };
 // Gleichwertige Aussprachen (z. B. Schweizer Zungen-r, „un“ wie „in“)
-const FR_EQ = { 'ʁ': ['ɾ', 'r', 'x', 'ɣ', 'h'], a: ['ɑ', 'ɐ'], 'ɑ': ['a'], y: ['ɨ'], 'ə': ['œ', 'ø'], 'ɡ': [] };
+const FR_EQ = { 'ʁ': ['ɾ', 'r', 'x', 'ɣ', 'h'], a: ['ɑ', 'ɐ'], 'ɑ': ['a'], y: ['ɨ'], 'ə': ['œ', 'ø', 'ɛ', 'e'], e: ['ɛ'], 'ɛ': ['e'], o: ['ɔ'], 'ɔ': ['o'], 'ø': ['œ', 'ə'], 'œ': ['ø', 'ə'], i: ['ɪ', 'j'], u: ['ʊ', 'w'], j: ['i'], w: ['u'] };
+// sehr nahe Laute (stimmhaft/stimmlos …): zählen fast voll
+const FR_CLOSE = { s: ['z'], z: ['s'], t: ['d'], d: ['t'], p: ['b'], b: ['p'], k: ['ɡ'], 'ɡ': ['k'], f: ['v'], v: ['f'], 'ʃ': ['ʒ', 's'], 'ʒ': ['ʃ', 'z'], 'ɲ': ['n', 'j'], n: ['ɲ', 'm'], m: ['n'], y: ['i'] };
+const FR_CLOSE_W = Math.log(0.6);
 const FR_ID2P = Object.fromEntries(Object.entries(PH_FR.VOCAB).map(([k, v]) => [v, k]));
 
 function loadFrenchEngine() {
@@ -435,8 +483,9 @@ function frScore(post, toks) {
     const fr = frames.get(st) || [];
     let g = -10, heard = '?';
     if (fr.length) {
+      const close = (FR_CLOSE[FR_ID2P[tok]] || []).map((q) => PH_FR.VOCAB[q]).filter((x) => x != null && !eq.includes(x));
       let tb = fr[0], best = -Infinity;
-      for (const t of fr) { const x = Math.max(...eq.map((c) => at(t, c))); if (x > best) { best = x; tb = t; } }
+      for (const t of fr) { const x = Math.max(...eq.map((c) => at(t, c)), ...close.map((c) => at(t, c) + FR_CLOSE_W)); if (x > best) { best = x; tb = t; } }
       let other = -Infinity, oc = tok;
       for (let c = 0; c < V; c++) { if (c === BLANK || c === SEP || c > 56 || eq.includes(c)) continue; if (at(tb, c) > other) { other = at(tb, c); oc = c; } }
       g = best - other;
@@ -459,27 +508,4 @@ function frScore(post, toks) {
   const mean = ps.reduce((a, x) => a + x, 0) / ps.length;
   const min = Math.min(...ps);
   return { silent: false, score: Math.round(100 * (0.35 * mean + 0.65 * min)), phones, extra };
-}
-
-async function assessSpokenFr(word, { onStart, onLevel, onPhase } = {}) {
-  const engine = await loadFrenchEngine();
-  const rec = await phRecord({ onStart, onLevel });
-  if (!rec.samples) return { silent: true, peak: rec.peak };
-  onPhase?.('thinking');
-  const post = await frLogProbs(engine, rec.samples);
-  let best = null;
-  for (const ref of phReferences(word, 'fr')) {
-    const toks = frExpected(engine, ref);
-    if (!toks.length) continue;
-    const r = frScore(post, toks);
-    if (r.silent) { best = best || { ...r, ref }; continue; }
-    if (!best || best.silent || r.score > best.score) best = { ...r, ref };
-  }
-  if (!best) throw 'ph-word';
-  if (!best.silent) {
-    best.passMin = passMinNow();
-    best.ok = best.score >= best.passMin;
-  }
-  best.peak = rec.peak;
-  return best;
 }

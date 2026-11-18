@@ -102,6 +102,8 @@ Alles läuft auf dem Gerät, keine Aufnahme verlässt es. Beim ersten Mal werden
 
 **Französisch** hat eine eigene Lauterkennung auf dem Gerät (Modell [wav2vec2-french-phonemizer](https://huggingface.co/Cnam-LMSSC/wav2vec2-french-phonemizer) von Cnam-LMSSC, MIT, als ONNX ca. 95 MB; erwartete Lautschrift von eSpeak NG). Sie wird immer benutzt, auch beim ersten Mal (die Übung wartet kurz, bis sie geladen ist): Die Spracherkennung des Browsers würde falsch Gesagtes zum richtigen Wort „verbessern“. Je Laut zählt, wie klar er zu hören war; ein einziger deutlich falscher Laut („pan“ statt „pain“, „garcon“ mit k) oder ein zusätzlicher Laut („beaucoupe“) drückt die Punkte unter die Grenze. Übliche Varianten zählen als richtig (Zungen-r, „un“ wie „in“).
 
+**Ähnliche Laute zählen als richtig** (beide Sprachen): unbetonte Vokale, britische Aussprache ohne r („Thursday“), „-day“ als [deɪ] oder [di], stimmhaft/stimmlos (s/z, d/t, b/p, f/v), th als f oder s; im Französischen e/è, o/ò, eu/œ, Zungen-r, „un“ wie „in“. Klar andere Laute bleiben falsch: bed – bad, ship – sheep, lamb – lamp, „Tursday“; pain – pan, rue – roue, garçon mit k. Stumme Buchstaben (knife, island, listen, castle, lamb, write) werden nicht erwartet – wer sie ausspricht, liegt falsch. Die Punkte: Durchschnitt aller Laute, jeder klar falsche Laut kostet zusätzlich Punkte.
+
 Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie streng bewertet wird. Ab dieser Punktzahl ist das Wort richtig (grün) und das nächste kommt automatisch. Das Modell wurde mit erwachsenen Muttersprachlern trainiert; wie gut es Kinderstimmen bewertet, muss sich im Einsatz zeigen.
 
 ## Zusammen mit Einmaleins (Mathe)
