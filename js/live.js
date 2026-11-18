@@ -1,5 +1,6 @@
 /* Vokaboom – Live in der Klasse: Quiz und Hör-Bingo
- * Nur die angemeldete Lehrperson startet (in ihrer Portion). Kinder machen mit einem Code oder QR-Code mit –
+ * Starten kann jede erwachsene Person, mit oder ohne Konto (in einer eigenen oder per Link bekommenen Portion,
+ * nicht im Kinder-Login und nicht in Portionen, die eine Klasse zugeteilt bekommt). Kinder machen mit einem Code oder QR-Code mit –
  * mit Kinder-Login (Name automatisch) oder ohne (Vorname eingeben).
  * Verbindung: Supabase Realtime „Broadcast“ (nichts wird gespeichert). Ohne Supabase: nur Fenster auf demselben Gerät.
  */
@@ -39,9 +40,10 @@ function liveStop() {
 }
 const joinUrl = (code) => `${siteUrl()}#live=${code}`;
 
-/* ---------- Start (nur Lehrperson, in der eigenen Portion) ---------- */
+/* ---------- Start (mit oder ohne Konto, nicht als Kind) ---------- */
+const mayHostLive = (set) => !!set && !isKid() && !set.assigned;
 function liveStartHTML(set) {
-  if (!set || !isTeacher() || !isOwnSet(set)) return '';
+  if (!mayHostLive(set)) return '';
   const n = set.words.filter((w) => w.foreign).length;
   return `<section class="live-start panel">
     <div><h2>${icon('user')} Live in der Klasse</h2>
@@ -56,7 +58,7 @@ function liveStartHTML(set) {
 
 async function liveHost(kind) {
   const set = currentSet();
-  if (!set || !isTeacher()) return;
+  if (!mayHostLive(set)) return;
   liveStop();
   Object.assign(LV, { role: 'host', kind, set, code: newCode(), players: new Map(), st: { phase: 'lobby' } });
   go('live');

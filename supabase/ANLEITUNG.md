@@ -136,7 +136,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 - **Welche Spiele?** Einzelne Spiele für diese Portion ausschalten.
 - Beides gilt für Klassen und für Portionen, die per Link oder QR-Code geteilt werden. Einzelne Kinder lassen sich zusätzlich unter **Klassen → Portionen → Für einzelne Kinder anpassen** ausnehmen.
 
-**Live in der Klasse** (nur angemeldete Lehrperson, in der eigenen Portion):
+**Live in der Klasse** (mit oder ohne Konto starten, in der eigenen oder per Link bekommenen Portion; nicht im Kinder-Login):
 - **Quiz:** Die Fragen erscheinen am Beamer, die Kinder antworten auf ihren Geräten. Schnelle richtige Antworten geben mehr Punkte, am Schluss gibt es eine Rangliste.
 - **Hör-Bingo:** Jedes Kind bekommt 9 Wortkarten. Die Lehrperson liest mit „Nächstes Wort“ vor; wer drei in einer Reihe hat, drückt BINGO, und Vokaboom prüft, ob alle Wörter schon vorgelesen wurden.
 - Die Kinder machen mit dem QR-Code oder über „Live-Spiel beitreten“ mit dem 5-stelligen Code mit (mit Kinder-Login automatisch mit Namen, sonst mit Vorname).
