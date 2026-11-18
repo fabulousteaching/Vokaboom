@@ -42,13 +42,44 @@ function liveStop() {
 }
 const joinUrl = (code) => `${siteUrl()}#live=${code}`;
 
+/* ---------- Namen ohne Login: Beleidigungen werden nicht angenommen ----------
+   Geprüft wird auf dem Gerät des Kindes UND bei der Lehrperson (falls jemand die Prüfung umgeht).
+   Schreibweisen wie „4rschl0ch“, „A.r.s.c.h“ oder „aaaarsch“ werden vorher vereinheitlicht. */
+// Wörter, die auch IN einem Namen nicht vorkommen dürfen (Teilwort)
+const NAME_BAD_PART = ['arschloch', 'arsch', 'hurensohn', 'hure', 'nutte', 'fotze', 'fick', 'ficker', 'wichs', 'wixx', 'wixer', 'schlampe', 'missgeburt', 'mistgeburt',
+  'spast', 'spasti', 'mongo', 'behindert', 'schwuchtel', 'scheiss', 'scheis', 'kacke', 'kackbratze', 'pisser', 'pimmel', 'penis', 'vagina', 'titten', 'moese',
+  'drecksau', 'sauhund', 'souhung', 'schafseckel', 'seckel', 'vollidiot', 'idiot', 'trottel', 'depp', 'bastard', 'hitler', 'neger', 'nigger', 'nigga',
+  'kanake', 'zigeuner', 'tubel', 'gopfertami', 'huere', 'fudi', 'bitch', 'fuck', 'shit', 'asshole', 'cunt', 'whore', 'slut', 'retard', 'faggot', 'porn',
+  'putain', 'merde', 'connard', 'connasse', 'salope', 'encule', 'batard', 'nique', 'couille', 'dumm', 'bloed', 'blod', 'doof', 'loser', 'penner'];
+// kurze Wörter: nur als ganzes Wort (sonst wären harmlose Namen betroffen)
+const NAME_BAD_WORD = ['ass', 'sau', 'sex', 'dick', 'cock', 'pussy', 'fag', 'pd', 'con', 'conne', 'bite', 'kuh', 'affe', 'opfer', 'lappen', 'figg', 'gaggi', 'heil', 'schwanz', 'schwein', 'kot', 'nazi', 'nazis', 'pute'];
+function nameNorm(name) {
+  return String(name || '').toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[0@]/g, (c) => (c === '0' ? 'o' : 'a')).replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/[5$]/g, 's').replace(/7/g, 't').replace(/8/g, 'b');
+}
+function liveNameProblem(name) {
+  const n = String(name || '').trim();
+  if (n.length < 2) return 'Schreib deinen Vornamen (mindestens 2 Buchstaben).';
+  if (n.length > 16) return 'Der Name ist zu lang (höchstens 16 Zeichen).';
+  if (!/^[\p{L}][\p{L} .'’-]*$/u.test(n)) return 'Bitte nur Buchstaben – zum Beispiel deinen Vornamen.';
+  const norm = nameNorm(n);
+  const joined = norm.replace(/[^a-z]/g, '').replace(/(.)\1+/g, '$1'); // „A.r.s.c.h“, „aaarsch“
+  const plain = norm.replace(/[^a-z]/g, '');
+  const words = norm.split(/[^a-z]+/).filter(Boolean);
+  const hit = NAME_BAD_PART.some((b) => plain.includes(b) || joined.includes(b.replace(/(.)\1+/g, '$1')))
+    || words.some((w) => NAME_BAD_WORD.includes(w) || NAME_BAD_WORD.includes(w.replace(/(.)\1+/g, '$1')));
+  return hit ? 'Dieser Name geht nicht. Bitte nimm deinen richtigen Vornamen.' : '';
+}
+
 /* ---------- Einstellungen vor dem Start ---------- */
 /** Wörter, die sich für das Spiel eignen */
 function liveEligible(set, kind) {
   const seen = new Set();
   return set.words.filter((w) => {
     if (!w.foreign) return false;
-    if (kind === 'quiz' && !(w.german || hasPicture(w, set.lang))) return false;
+    if (kind === 'quiz' && !w.german) return false;
     const k = gameForm(w).toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
@@ -57,13 +88,13 @@ function liveEligible(set, kind) {
 }
 const liveSelected = () => liveEligible(LV.set, LV.kind).filter((w) => LV.cfg.ids.has(w.id));
 function liveCfgSave() {
-  db.settings.liveCfg = { n: LV.cfg.n, time: LV.cfg.time, auto: LV.cfg.auto };
+  db.settings.liveCfg = { n: LV.cfg.n, time: LV.cfg.time, auto: LV.cfg.auto, dir: LV.cfg.dir };
   saveDB();
 }
 function liveProblem() {
   const sel = liveSelected().length;
   if (LV.kind === 'quiz') {
-    if (liveEligible(LV.set, 'quiz').length < 4) return 'Das Quiz braucht mindestens 4 Vokabeln mit deutschem Wort oder Bild.';
+    if (liveEligible(LV.set, 'quiz').length < 4) return 'Das Quiz braucht mindestens 4 Vokabeln mit deutschem Wort.';
     if (!sel) return 'Wähle mindestens ein Wort aus.';
   } else if (sel < 9) return `Hör-Bingo braucht mindestens 9 Wörter (ausgewählt: ${sel}).`;
   return '';
@@ -75,7 +106,8 @@ function liveSetupHTML() {
   const nChoices = [5, 10, 15, 20].filter((n) => n < sel).map((n) => [n, String(n)]).concat([['all', `Alle (${sel})`]]);
   return `<div class="live-setup panel" id="live-setup">
     <h3>${icon('sliders')} Einstellungen</h3>
-    ${quiz ? `<div class="ls-row"><span class="label">Anzahl Fragen</span>${seg('lv-n', c.n === 'all' || c.n >= sel ? 'all' : c.n, nChoices)}</div>
+    ${quiz ? `<div class="ls-row"><span class="label">Richtung</span>${seg('lv-dir', c.dir, [['de', `Deutsch → ${LANGS[LV.set.lang].name}`], ['fo', `${LANGS[LV.set.lang].name} → Deutsch`]])}</div>
+      <div class="ls-row"><span class="label">Anzahl Fragen</span>${seg('lv-n', c.n === 'all' || c.n >= sel ? 'all' : c.n, nChoices)}</div>
       <div class="ls-row"><span class="label">Zeit pro Frage</span>${seg('lv-time', c.time, [10, 15, 20, 30, 45, 60].map((t) => [t, `${t} s`]))}</div>`
       : `<div class="ls-row"><span class="label">Wörter vorlesen</span>${seg('lv-auto', c.auto, [[0, 'Von Hand'], [6, 'Alle 6 s'], [10, 'Alle 10 s'], [15, 'Alle 15 s']])}</div>`}
     <details class="ls-words" ${LV.ui?.wordsOpen ? 'open' : ''}>
@@ -123,7 +155,7 @@ async function liveHost(kind) {
   const saved = db.settings.liveCfg || {};
   const elig = liveEligible(set, kind);
   Object.assign(LV, { role: 'host', kind, set, code: newCode(), players: new Map(), st: { phase: 'lobby' }, ui: {},
-    cfg: { n: saved.n || 10, time: saved.time || 20, auto: saved.auto || 0, ids: new Set(elig.map((w) => w.id)) } });
+    cfg: { n: saved.n || 10, time: saved.time || 20, auto: saved.auto || 0, dir: saved.dir === 'fo' ? 'fo' : 'de', ids: new Set(elig.map((w) => w.id)) } });
   go('live');
   try {
     LV.ch = await liveChannel(LV.code, hostMsg);
@@ -146,6 +178,7 @@ function hostBroadcastState() {
 function hostMsg(m) {
   if (!m || LV.role !== 'host') return;
   if (m.t === 'join' && m.id) {
+    if (!m.kid && liveNameProblem(m.name)) { LV.ch.send({ t: 'denied', id: m.id, reason: liveNameProblem(m.name) }); return; }
     if (!LV.players.has(m.id)) LV.players.set(m.id, { name: String(m.name || 'Kind').slice(0, 24), score: 0 });
     hostBroadcastState();
     if (LV.st.phase === 'lobby') { const pl = $('#live-players'); if (pl) pl.outerHTML = livePlayersHTML(); else renderLive(); liveRefreshLobby(); }
@@ -198,8 +231,9 @@ function quizQuestions(set) {
   return pool.slice(0, n).map((w) => {
     const others = shuffle(words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, 3);
     const opts = shuffle([w, ...others]);
-    const p = effectivePic(w, set.lang);
-    return { w, options: opts.map(gameForm), correct: opts.indexOf(w), german: w.german || '', pic: p && (p.kind === 'emoji' ? { kind: 'emoji', src: p.src } : p.src && !/^data:/.test(p.src) ? { kind: 'img', src: p.src } : null) };
+    // Deutsch → Fremdsprache: deutsches Wort gefragt, fremdsprachige Antworten – oder umgekehrt
+    const fo = LV.cfg.dir === 'fo';
+    return { w, fo, prompt: fo ? gameForm(w) : (w.german || ''), options: opts.map((x) => (fo ? (x.german || '') : gameForm(x))), correct: opts.indexOf(w) };
   });
 }
 function quizStart() {
@@ -217,7 +251,7 @@ function quizNext() {
   if (s.i >= s.qs.length) { s.phase = 'end'; LV.ch.send({ t: 'end', ranking: quizRanking() }); renderLive(); podiumShow(); return; }
   const q = s.qs[s.i];
   s.phase = 'q'; s.answers = new Map(); s.t0 = Date.now(); s.dur = (LV.cfg.time || 20) * 1000;
-  s.qMsg = { t: 'q', i: s.i, total: s.qs.length, options: q.options, german: q.german, pic: q.pic, dur: s.dur, at: s.t0 };
+  s.qMsg = { t: 'q', i: s.i, total: s.qs.length, n: q.options.length, dur: s.dur, at: s.t0 }; // Kinder sehen nur die Farben
   LV.ch.send(s.qMsg);
   renderLive();
   clearTimeout(s.timer);
@@ -309,10 +343,11 @@ function quizHostHTML() {
   }
   if (s.phase === 'end') return podiumHTML();
   const q = s.qs[s.i];
-  const prompt = `${q.pic ? (q.pic.kind === 'emoji' ? `<span class="quiz-emoji">${esc(q.pic.src)}</span>` : `<img class="quiz-pic" src="${esc(q.pic.src)}" alt="">`) : ''}<span class="quiz-de" lang="de">${esc(q.german)}</span>`;
+  const promptLang = q.fo ? LV.set.lang : 'de', optLang = q.fo ? 'de' : LV.set.lang;
+  const prompt = `<span class="quiz-de" lang="${promptLang}">${esc(q.prompt)}</span>`;
   const answered = Math.max(1, s.answers?.size || 0);
   const opts = q.options.map((o, k) => `<div class="quiz-opt ${s.phase === 'reveal' ? (k === q.correct ? 'right' : 'dim') : ''}" style="${optStyle(k)}">
-      <span class="quiz-shape">${QUIZ_COLORS[k][1]}</span><span lang="${LV.set.lang}">${esc(o)}</span>${s.phase === 'reveal' ? `<b class="quiz-n">${s.counts[k] || 0}</b><i class="quiz-bar" style="--p:${((s.counts[k] || 0) / answered * 100).toFixed(0)}%"></i>` : ''}</div>`).join('');
+      <span class="quiz-shape">${QUIZ_COLORS[k][1]}</span><span lang="${optLang}">${esc(o)}</span>${s.phase === 'reveal' ? `<b class="quiz-n">${s.counts[k] || 0}</b><i class="quiz-bar" style="--p:${((s.counts[k] || 0) / answered * 100).toFixed(0)}%"></i>` : ''}</div>`).join('');
   const timer = s.phase === 'q' ? `<span class="quiz-left" id="quiz-left" style="--dur:${s.dur}ms">${Math.ceil(s.dur / 1000)}</span>` : '';
   if (s.phase === 'reveal') {
     const last = s.i + 1 >= s.qs.length;
@@ -332,7 +367,7 @@ function quizHostHTML() {
   return `<section class="mode live-host quiz-host">
     <div class="quiz-head"><span>Frage ${s.i + 1} von ${s.qs.length}</span>${timer}<span class="small muted">Code ${LV.code}</span></div>
     <div class="quiz-timebar" style="--dur:${s.dur}ms"><i></i></div>
-    <div class="quiz-prompt"><p class="small muted">Wie heisst das auf ${LANGS[LV.set.lang].name}?</p>${prompt}</div>
+    <div class="quiz-prompt"><p class="small muted">${q.fo ? 'Was heisst das auf Deutsch?' : `Wie heisst das auf ${LANGS[LV.set.lang].name}?`}</p>${prompt}</div>
     <div class="quiz-opts">${opts}</div>
     <p class="center muted" id="quiz-count">${s.answers.size} von ${LV.players.size} haben geantwortet</p>
     <div class="row center"><button class="btn ghost" data-action="quiz-reveal">Jetzt auflösen</button></div>
@@ -440,22 +475,26 @@ function bingoHostHTML() {
 /* =========================================================
    Kinder: mitmachen
    ========================================================= */
-function openJoin(code = '') {
+function openJoin(code = '', fromQr = false) {
   liveStop();
   LV.role = '';
-  LV.st = { code: (code || '').toUpperCase() };
+  LV.st = { code: (code || '').toUpperCase(), fromQr };
   ui.setId = ui.setId || null;
+  // Kinder-Login über den QR-Code: ohne Formular direkt mitmachen
+  if (fromQr && isKid() && LV.st.code.length === 5) { go('live'); liveJoin(LV.st.code, kidName()); return; }
   go('live');
 }
 function joinFormHTML() {
   const name = isKid() ? kidName() : (sessionStorage.getItem?.('vokaboom.liveName') || '');
+  const qr = LV.st.fromQr && /^[A-Z0-9]{5}$/.test(LV.st.code || '');
   return `<section class="mode live-join"><div class="test-card">
-    <h2>Live-Spiel beitreten</h2>
+    <h2>${qr ? '🎯 Live-Spiel' : 'Live-Spiel beitreten'}</h2>
     <form id="join-form" class="auth-form" autocomplete="off">
-      <label class="field" for="join-code"><span class="label">Code (steht am Beamer)</span>
-        <input id="join-code" class="join-code" type="text" maxlength="5" autocapitalize="characters" spellcheck="false" value="${esc(LV.st.code || '')}" placeholder="ABCDE"></label>
+      ${qr ? `<p class="join-qr-code">Spiel <strong>${esc(LV.st.code)}</strong></p><input id="join-code" type="hidden" value="${esc(LV.st.code)}">`
+        : `<label class="field" for="join-code"><span class="label">Code (steht am Beamer)</span>
+        <input id="join-code" class="join-code" type="text" maxlength="5" autocapitalize="characters" spellcheck="false" value="${esc(LV.st.code || '')}" placeholder="ABCDE"></label>`}
       ${isKid() ? `<p>Du machst mit als <strong>${esc(name)}</strong>.</p>` : `<label class="field" for="join-name"><span class="label">Dein Vorname</span>
-        <input id="join-name" type="text" maxlength="24" value="${esc(name)}" placeholder="z. B. Lena"></label>`}
+        <input id="join-name" type="text" maxlength="16" value="${esc(name)}" placeholder="z. B. Lena" autocomplete="given-name"></label>`}
       <p class="form-error" id="join-error" role="alert"></p>
       <button class="btn primary big" type="submit" id="join-btn">Mitmachen ${icon('right')}</button>
     </form>
@@ -471,7 +510,8 @@ function bindJoinForm() {
     const name = isKid() ? kidName() : ($('#join-name')?.value || '').trim();
     const err = $('#join-error');
     if (code.length !== 5) { err.textContent = 'Der Code hat 5 Zeichen.'; return; }
-    if (!name) { err.textContent = 'Schreib deinen Vornamen.'; return; }
+    const bad = isKid() ? '' : liveNameProblem(name);
+    if (bad) { err.textContent = bad; $('#join-name')?.focus(); return; }
     try { sessionStorage.setItem('vokaboom.liveName', name); } catch { /* */ }
     $('#join-btn').disabled = true;
     await liveJoin(code, name);
@@ -491,13 +531,20 @@ async function liveJoin(code, name) {
     const err = $('#join-error'); if (err) err.textContent = 'Keine Verbindung. Bist du online?';
     return;
   }
-  const hello = () => LV.ch?.send({ t: 'join', id, name });
+  const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid() });
   hello();
   lvEvery(() => { if (!LV.st.kind) hello(); }, 2000); // bis die Lehrperson antwortet
   renderLive();
 }
 function playerMsg(m) {
   if (!m || LV.role !== 'player') return;
+  if (m.t === 'denied' && m.id === LV.me?.id) {
+    const code = LV.code;
+    liveStop(); LV.role = ''; LV.st = { code, fromQr: true };
+    renderLive();
+    const err = $('#join-error'); if (err) err.textContent = m.reason || 'Dieser Name geht nicht.';
+    return;
+  }
   const s = LV.st;
   if (m.t === 'state') {
     const first = !s.kind;
@@ -583,11 +630,11 @@ function playerHTML() {
   if (s.kind === 'quiz') {
     if (s.phase === 'q') {
       const q = s.q;
+      // Nur die vier Farbfelder – Frage und Wörter stehen am Beamer
       return `<section class="mode live-play">${head}
-        <p class="center muted">Frage ${q.i + 1} von ${q.total}</p>
-        <div class="quiz-prompt small">${q.pic ? (q.pic.kind === 'emoji' ? `<span class="quiz-emoji">${esc(q.pic.src)}</span>` : `<img class="quiz-pic" src="${esc(q.pic.src)}" alt="">`) : ''}<span class="quiz-de" lang="de">${esc(q.german)}</span></div>
-        <div class="quiz-opts player">${q.options.map((o, k) => `<button class="quiz-opt" style="${optStyle(k)}" data-action="quiz-pick" data-k="${k}" ${s.chosen != null ? 'disabled' : ''} ${s.chosen === k ? 'aria-pressed="true"' : ''}>
-          <span class="quiz-shape">${QUIZ_COLORS[k][1]}</span><span lang="${s.lang}">${esc(o)}</span></button>`).join('')}</div>
+        <p class="center muted">Frage ${q.i + 1} von ${q.total} · schau zum Beamer</p>
+        <div class="quiz-opts player only-colors">${Array.from({ length: q.n || 4 }, (_, k) => `<button class="quiz-opt" style="${optStyle(k)}" data-action="quiz-pick" data-k="${k}" ${s.chosen != null ? 'disabled' : ''} ${s.chosen === k ? 'aria-pressed="true"' : ''} aria-label="Antwort ${QUIZ_COLORS[k][1]}">
+          <span class="quiz-shape">${QUIZ_COLORS[k][1]}</span></button>`).join('')}</div>
         ${s.chosen != null ? '<p class="center lead">Antwort gesendet – warte auf die Auflösung …</p>' : ''}
       </section>`;
     }
@@ -632,6 +679,7 @@ const liveActions = {
   'quiz-start': () => quizStart(),
   'lv-n': (el) => { LV.cfg.n = el.dataset.v === 'all' ? 'all' : +el.dataset.v; liveRefreshLobby(); },
   'lv-time': (el) => { LV.cfg.time = +el.dataset.v; liveRefreshLobby(); },
+  'lv-dir': (el) => { LV.cfg.dir = el.dataset.v === 'fo' ? 'fo' : 'de'; liveRefreshLobby(); },
   'lv-auto': (el) => { LV.cfg.auto = +el.dataset.v; liveRefreshLobby(); },
   'lv-words': (el) => { LV.cfg.ids = new Set(el.dataset.v === 'all' ? liveEligible(LV.set, LV.kind).map((w) => w.id) : []); LV.ui = { ...(LV.ui || {}), wordsOpen: true }; liveRefreshLobby(); },
   'lv-lobby': () => {
@@ -674,6 +722,6 @@ function liveFromHash() {
   const m = location.hash.match(/^#live=([A-Za-z0-9]{5})$/);
   if (!m) return false;
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
-  openJoin(m[1]);
+  openJoin(m[1], true);
   return true;
 }

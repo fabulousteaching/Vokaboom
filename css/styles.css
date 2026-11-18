@@ -1482,6 +1482,11 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .quiz-result.good .qr-badge { background: var(--green); box-shadow: 0 0 0 10px var(--green-wash); }
 .quiz-result.bad .qr-badge { background: var(--red); box-shadow: 0 0 0 10px var(--red-wash); }
 .qr-pts { font: 800 1.8rem var(--font-display); margin: 0; color: var(--brand-ink); animation: pop .5s ease-out .2s both; }
+.quiz-opts.only-colors { gap: 14px; }
+.quiz-opts.only-colors .quiz-opt { min-height: clamp(120px, 28vh, 200px); justify-content: center; }
+.quiz-opts.only-colors .quiz-shape { width: 2.6em; height: 2.6em; font-size: 1.6rem; background: rgba(255, 255, 255, .28); }
+.join-qr-code { margin: 0 0 .4rem; font-size: 1.1rem; }
+.join-qr-code strong { letter-spacing: .12em; color: var(--brand-ink); }
 .qr-streak { max-width: 100%; box-sizing: border-box; text-align: center; margin: .2rem 0; padding: .45rem 1rem; border-radius: 99px; font: 800 1.15rem var(--font-display); color: #fff; background: linear-gradient(90deg, #F59E0B, #EC4899); box-shadow: 0 8px 20px -10px #EC4899; animation: streak-in .7s cubic-bezier(.3, 1.8, .5, 1) .35s both; }
 .qr-streak.s4, .qr-streak.s5 { font-size: 1.3rem; background: linear-gradient(90deg, #F97316, #EC4899, #7C3AED); }
 .qr-streak.s6 { font-size: 1.4rem; background: linear-gradient(90deg, #FFB703, #F97316, #EC4899, #7C3AED); background-size: 200% 100%; animation: streak-in .7s cubic-bezier(.3, 1.8, .5, 1) .35s both, streak-shine 1.6s linear 1s infinite; }
