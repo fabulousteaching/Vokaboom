@@ -137,7 +137,8 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 - Beides gilt für Klassen und für Portionen, die per Link oder QR-Code geteilt werden. Einzelne Kinder lassen sich zusätzlich unter **Klassen → Portionen → Für einzelne Kinder anpassen** ausnehmen.
 
 **Live in der Klasse** (mit oder ohne Konto starten, in der eigenen oder per Link bekommenen Portion; nicht im Kinder-Login):
-- **Quiz:** Die Fragen erscheinen am Beamer, die Kinder antworten auf ihren Geräten. Schnelle richtige Antworten geben mehr Punkte, am Schluss gibt es eine Rangliste.
+- **Einstellungen im Warteraum** (während die Kinder beitreten): Anzahl Fragen, Zeit pro Frage (10–60 s) und welche Wörter vorkommen; beim Hör-Bingo, welche Wörter und ob Vokaboom von Hand oder automatisch (alle 6/10/15 s) vorliest. Die Einstellungen werden gemerkt.
+- **Quiz:** Die Fragen erscheinen am Beamer, die Kinder antworten auf ihren Geräten. Schnelle richtige Antworten geben mehr Punkte. Nach jeder Frage zeigt der Beamer die Auflösung und eine Live-Tabelle (Plätze rutschen, Punkte zählen hoch); jedes Kind sieht auf seinem Gerät, ob es richtig war, wie viele Punkte es geholt hat und seinen Platz. Weiter geht es erst, wenn die Lehrperson „Nächste Frage“ drückt. Am Schluss: Siegerehrung mit Podest (Platz 3, Platz 2, Trommelwirbel, Platz 1); die Kinder sehen ihren Platz erst danach.
 - **Hör-Bingo:** Jedes Kind bekommt 9 Wortkarten. Die Lehrperson liest mit „Nächstes Wort“ vor; wer drei in einer Reihe hat, drückt BINGO, und Vokaboom prüft, ob alle Wörter schon vorgelesen wurden.
 - Die Kinder machen mit dem QR-Code oder über „Live-Spiel beitreten“ mit dem 5-stelligen Code mit (mit Kinder-Login automatisch mit Namen, sonst mit Vorname).
 - Dafür nutzt Vokaboom Supabase Realtime („Broadcast“). Das ist bei Supabase standardmässig eingeschaltet, es braucht keine Tabelle, und es wird nichts gespeichert.
