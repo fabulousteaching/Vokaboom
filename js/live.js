@@ -249,7 +249,11 @@ function quizReveal() {
     results[id] = { ok, pts, answered: true };
   });
   const ranking = quizRanking();
-  ranking.forEach((r, k) => { results[r.id] = { ...(results[r.id] || { ok: false, pts: 0, answered: false }), score: r.score, rank: k + 1, move: (s.prevRank.get(r.id) ?? k) - k }; });
+  ranking.forEach((r, k) => {
+    const ahead = ranking[k - 1], behind = ranking[k + 1];
+    results[r.id] = { ...(results[r.id] || { ok: false, pts: 0, answered: false }), score: r.score, rank: k + 1, move: (s.prevRank.get(r.id) ?? k) - k,
+      ahead: ahead ? { name: ahead.name, gap: ahead.score - r.score } : null, behind: behind ? { name: behind.name, gap: r.score - behind.score } : null };
+  });
   LV.ch.send({ t: 'reveal', i: s.i, correct: q.correct, answer: q.options[q.correct], results, total: ranking.length, last: s.i + 1 >= s.qs.length });
   sfx.win();
   renderLive();
@@ -510,7 +514,9 @@ function playerMsg(m) {
   }
   if (m.t === 'end') {
     const k = m.ranking.findIndex((x) => x.id === LV.me.id);
-    Object.assign(s, { phase: 'end', rank: k + 1, total: m.ranking.length, score: m.ranking[k]?.score || 0, endShown: false });
+    const me = m.ranking[k], ah = m.ranking[k - 1], be = m.ranking[k + 1];
+    Object.assign(s, { phase: 'end', rank: k + 1, total: m.ranking.length, score: me?.score || 0, endShown: false,
+      stand: me ? { rank: k + 1, ahead: ah ? { name: ah.name, gap: ah.score - me.score } : null, behind: be ? { name: be.name, gap: me.score - be.score } : null } : null });
     renderLive();
     // Spannung wie am Beamer: eigener Platz erst nach der Siegerehrung
     lvLater(() => { if (LV.st.phase !== 'end') return; LV.st.endShown = true; renderLive(); if (k >= 0 && k < 3) { sfx.win(); confetti(); } }, POD_T.p1 + 900);
@@ -526,6 +532,14 @@ function playerMsg(m) {
   } else if (m.t === 'bingo-result' && m.ok) {
     toast(`${m.name} hat BINGO! 🎉`);
   }
+}
+/** „Du bist aktuell auf dem 3. Platz – knapp hinter Mia“ */
+function standingText(r, now = 'aktuell ') {
+  if (!r || !r.rank) return '';
+  let tail = '';
+  if (r.rank > 1 && r.ahead) tail = r.ahead.gap === 0 ? ` – gleich viele Punkte wie ${esc(r.ahead.name)}` : ` – ${r.ahead.gap <= 300 ? 'knapp ' : ''}hinter ${esc(r.ahead.name)}`;
+  else if (r.rank === 1 && r.behind) tail = r.behind.gap === 0 ? ` – gleich viele Punkte wie ${esc(r.behind.name)}` : ` – ${r.behind.gap <= 300 ? 'knapp ' : ''}vor ${esc(r.behind.name)}`;
+  return `Du bist ${now}auf dem <strong>${r.rank}. Platz</strong>${tail}`;
 }
 function playerQuestion(q) {
   Object.assign(LV.st, { phase: 'q', q, qi: q.i, chosen: null, res: null });
@@ -561,13 +575,13 @@ function playerHTML() {
         <h2>${r.ok ? 'Richtig!' : (s.chosen == null ? 'Zu spät!' : 'Leider falsch')}</h2>
         <p class="qr-pts">${r.ok ? `+${r.pts} Punkte` : '+0 Punkte'}</p>
         ${r.ok ? '' : `<p class="lead">Richtig ist: <strong lang="${s.lang}">${esc(s.answerText || '')}</strong></p>`}
-        ${r.rank ? `<div class="qr-stand"><span>Platz <strong>${r.rank}</strong> von ${s.total || '?'}${r.move > 0 ? ` <i class="lt-up">▲${r.move}</i>` : ''}</span><span><strong>${r.score}</strong> Punkte total</span></div>` : ''}
+        ${r.rank ? `<div class="qr-stand"><span>${standingText(r)}${r.move > 0 ? ` <i class="lt-up">▲${r.move}</i>` : ''}</span><span><strong>${r.score}</strong> Punkte total</span></div>` : ''}
         <p class="small muted">${s.last ? 'Gleich kommt die Siegerehrung …' : 'Warte auf die nächste Frage …'}</p></div></section>`;
     }
     if (s.phase === 'end') {
       if (!s.endShown) return `<section class="mode live-play">${head}<div class="test-card center"><div class="game-end-art pd-drum-kid">🥁</div><h2>Siegerehrung!</h2><p class="lead">Schau nach vorne zum Beamer …</p></div></section>`;
       return `<section class="mode live-play">${head}<div class="test-card center kid-final ${s.rank && s.rank <= 3 ? 'top' : ''}"><div class="game-end-art">${s.rank && s.rank <= 3 ? ['🥇', '🥈', '🥉'][s.rank - 1] : '🏁'}</div>
-        <h2>Platz ${s.rank || '–'} von ${s.total}</h2><p class="lead">${s.score} Punkte</p><button class="btn ghost" data-action="live-leave">Fertig</button></div></section>`;
+        <h2>${s.rank === 1 ? 'Gewonnen! 🎉' : s.rank && s.rank <= 3 ? 'Aufs Podest geschafft!' : 'Geschafft!'}</h2><p class="lead">${s.stand ? standingText(s.stand, '') : ''}</p><p>${s.score} Punkte</p><button class="btn ghost" data-action="live-leave">Fertig</button></div></section>`;
     }
   }
   if (s.kind === 'bingo') {
