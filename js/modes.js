@@ -644,7 +644,7 @@ function speakZone(set, w) {
     const pct = Math.round((phState.progress || 0) * 100);
     return `<div class="ph-wait"><p class="mic-label">Die Lauterkennung wird geladen … <span id="ph-pct">${pct}</span> %</p>
       <div class="ph-progress"><span id="ph-bar" style="width:${pct}%"></span></div>
-      <p class="muted small">Nur beim ersten Mal: ca. ${PH.MB} MB. Danach ist sie auf diesem Gerät gespeichert.</p></div>`;
+      <p class="muted small">Nur beim ersten Mal: ca. ${phMB(set.lang)} MB. Danach ist sie auf diesem Gerät gespeichert.</p></div>`;
   }
   if (s === 'thinking') {
     return `<p class="mic-label"><span class="spinner"></span> Ich höre mir die Laute an …</p>`;
@@ -810,10 +810,10 @@ function markSpeakOk(w) {
 async function doListenPhonetic(set, w) {
   speakM.usingPh = true;
   try {
-    if (!phState.engine) {
+    if (!phReady(set.lang)) {
       speakM.state = 'loading';
       updateSpeakZone();
-      await loadPhoneticEngine();
+      await loadPhoneticEngine(set.lang);
       if (ui.view !== 'speak' || speakWord(set) !== w) return;
       speakM.state = 'starting';
     }
@@ -822,7 +822,7 @@ async function doListenPhonetic(set, w) {
       onStart: () => { if (speakWord(set) === w) { speakM.state = 'listening'; speakM.meter = true; updateSpeakZone(); } },
       onLevel: (lv) => { const b = $('#mic-level'); if (b) b.style.setProperty('--lv', lv.toFixed(3)); },
       onPhase: () => { speakM.state = 'thinking'; updateSpeakZone(); },
-    });
+    }, set.lang);
     if (ui.view !== 'speak' || speakWord(set) !== w) return;
     speakM.attempts++;
     if (res.silent) {

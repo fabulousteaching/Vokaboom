@@ -100,6 +100,8 @@ In den Einstellungen lässt sich eine **Lauterkennung** einschalten. Sie fragt n
 
 Alles läuft auf dem Gerät, keine Aufnahme verlässt es. Beim ersten Mal werden ca. 140 MB geladen (Sprachmodell [charsiu/en_w2v2_fc_10ms](https://huggingface.co/charsiu) über [charsiu-js](https://github.com/mnaoizy/charsiu-js), MIT; [onnxruntime-web](https://onnxruntime.ai), MIT) und im Browser gespeichert. Auf älteren Handys kann es langsam sein.
 
+**Französisch** hat eine eigene Lauterkennung auf dem Gerät (Modell [wav2vec2-french-phonemizer](https://huggingface.co/Cnam-LMSSC/wav2vec2-french-phonemizer) von Cnam-LMSSC, MIT, als ONNX ca. 95 MB; erwartete Lautschrift von eSpeak NG). Sie wird immer benutzt, auch beim ersten Mal (die Übung wartet kurz, bis sie geladen ist): Die Spracherkennung des Browsers würde falsch Gesagtes zum richtigen Wort „verbessern“. Je Laut zählt, wie klar er zu hören war; ein einziger deutlich falscher Laut („pan“ statt „pain“, „garcon“ mit k) oder ein zusätzlicher Laut („beaucoupe“) drückt die Punkte unter die Grenze. Übliche Varianten zählen als richtig (Zungen-r, „un“ wie „in“).
+
 Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie streng bewertet wird. Ab dieser Punktzahl ist das Wort richtig (grün) und das nächste kommt automatisch. Das Modell wurde mit erwachsenen Muttersprachlern trainiert; wie gut es Kinderstimmen bewertet, muss sich im Einsatz zeigen.
 
 ## Zusammen mit Einmaleins (Mathe)

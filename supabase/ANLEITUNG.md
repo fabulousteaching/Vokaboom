@@ -124,7 +124,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 
 - Französisch liest die Vokaboom-Stimme **Siwis** vor (Kokoro, Apache-2.0). Die Aufnahmen entstehen wie bei Englisch einmal auf dem Gerät der Lehrperson und kommen in den Audio-Speicher. Dafür lädt dieses Gerät zusätzlich die französische Lautschrift (eSpeak NG, ca. 6 MB, GPL-3.0, wird nur nachgeladen). Bis eine Aufnahme da ist, liest die beste französische Gerätestimme.
 - Beim Schreiben gehört der Artikel dazu: „chien“ statt „le chien“ ist fast richtig (Hinweis auf den Artikel), „la chien“ ist falsch.
-- Die Lauterkennung gibt es nur für Englisch; Französisch prüft die Spracherkennung des Browsers.
+- Beim Aussprechen prüft Französisch mit einer eigenen Lauterkennung auf dem Gerät, Laut für Laut (Modell [wav2vec2-french-phonemizer](https://huggingface.co/Cnam-LMSSC/wav2vec2-french-phonemizer), MIT, ca. 95 MB einmalig; erwartete Lautschrift von eSpeak NG). Die Spracherkennung des Browsers wird für Französisch nicht mehr benutzt: Sie „verbessert“ falsch Gesagtes zum richtigen Wort. Erlaubt sind übliche Varianten (Zungen-r, „un“ wie „in“), zusätzliche Laute wie „beaucoupe“ zählen als Fehler.
 - Damit die Suche weiss, welche Sprache eine Portion hat, `supabase/vokabelwelt.sql` nochmals ganz ausführen (neue Spalte `lang`).
 
 ## Vokabelspiele und Live in der Klasse
