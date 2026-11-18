@@ -208,7 +208,7 @@ function quizStart() {
   liveCfgSave();
   s.qs = quizQuestions(LV.set);
   s.i = -1;
-  LV.players.forEach((p) => { p.score = 0; p.gain = 0; p.right = 0; });
+  LV.players.forEach((p) => { p.score = 0; p.gain = 0; p.right = 0; p.streak = 0; });
   quizNext();
 }
 function quizNext() {
@@ -248,6 +248,13 @@ function quizReveal() {
     const p = LV.players.get(id); if (p) { p.score += pts; p.gain = pts; if (ok) p.right = (p.right || 0) + 1; }
     results[id] = { ok, pts, answered: true };
   });
+  // Serien: richtige Antworten hintereinander (nicht geantwortet = Serie vorbei)
+  LV.players.forEach((p, id) => {
+    const ok = !!results[id]?.ok;
+    const before = p.streak || 0;
+    p.streak = ok ? before + 1 : 0;
+    results[id] = { ...(results[id] || { ok: false, pts: 0, answered: false }), streak: p.streak, lost: ok ? 0 : before };
+  });
   const ranking = quizRanking();
   ranking.forEach((r, k) => {
     const ahead = ranking[k - 1], behind = ranking[k + 1];
@@ -273,7 +280,7 @@ function liveTableHTML() {
       const move = was - k;
       return `<li class="lt-row ${k < 3 ? `top top${k + 1}` : ''}" style="--d:${move};--k:${k}">
         <span class="lt-rank">${k + 1}</span>
-        <span class="lt-name">${esc(x.name)}${move > 0 ? `<i class="lt-up">▲${move}</i>` : ''}</span>
+        <span class="lt-name">${esc(x.name)}${move > 0 ? `<i class="lt-up">▲${move}</i>` : ''}${(p.streak || 0) >= 3 ? `<i class="lt-fire" title="${p.streak} richtig hintereinander">🔥${p.streak}</i>` : ''}</span>
         <span class="lt-bar"><i style="--w0:${((p.prev || 0) / max * 100).toFixed(1)}%;--w:${(x.score / max * 100).toFixed(1)}%"></i></span>
         <b class="lt-score" data-from="${p.prev || 0}" data-to="${x.score}">${p.prev || 0}</b>
         ${p.gain ? `<span class="lt-gain">+${p.gain}</span>` : '<span class="lt-gain zero">+0</span>'}
@@ -507,7 +514,7 @@ function playerMsg(m) {
   if (m.t === 'q') { playerQuestion(m); return; }
   if (m.t === 'reveal' && m.i === s.qi) {
     const r = m.results?.[LV.me.id] || { ok: false, pts: 0 };
-    Object.assign(s, { phase: 'reveal', res: r, answerText: m.answer, total: m.total, last: m.last });
+    Object.assign(s, { phase: 'reveal', res: r, answerText: m.answer, total: m.total, last: m.last, streakText: r.ok ? streakMsg(r.streak || 0) : streakLostMsg(r.lost || 0) });
     (r.ok ? sfx.good : sfx.bad)();
     renderLive();
     return;
@@ -532,6 +539,22 @@ function playerMsg(m) {
   } else if (m.t === 'bingo-result' && m.ok) {
     toast(`${m.name} hat BINGO! 🎉`);
   }
+}
+/** Serien-Nachrichten: je länger die Serie, desto grösser der Jubel (zufällig gewählt, damit es abwechselt) */
+const STREAK_MSG = {
+  2: ['Doppelt richtig! ✌️', 'Zwei in Folge – weiter so! 💪', 'Double! 👏'],
+  3: ['Hattrick! 3 in Folge! 🎩', '3 in a row! 🔥', 'Drei am Stück – stark! ⭐'],
+  4: ['Wow! 4 in a row! 🔥', 'Nicht zu stoppen – 4 in Folge! 🚀', 'Vier richtig hintereinander! 🤩'],
+  5: ['Unglaublich! 5 in Folge! 🌟', 'High five – 5 in a row! 🖐️🔥', 'Du bist on fire! 5 am Stück! 🔥🔥'],
+  6: ['{n} in Folge – Vokabel-Profi! 🏆', '{n} in a row! Legendär! 👑', 'Wahnsinn, {n} am Stück! 🔥🔥🔥', 'Unaufhaltsam: {n} richtig hintereinander! 🚀'],
+};
+function streakMsg(n) {
+  if (n < 2) return '';
+  const list = STREAK_MSG[Math.min(n, 6)];
+  return list[Math.floor(Math.random() * list.length)].replace('{n}', n);
+}
+function streakLostMsg(n) {
+  return n >= 3 ? `Serie gerissen – nach ${n} richtigen. Gleich die nächste starten! 💪` : '';
 }
 /** „Du bist aktuell auf dem 3. Platz – knapp hinter Mia“ */
 function standingText(r, now = 'aktuell ') {
@@ -574,6 +597,7 @@ function playerHTML() {
         <div class="qr-badge">${r.ok ? '✓' : '✗'}</div>
         <h2>${r.ok ? 'Richtig!' : (s.chosen == null ? 'Zu spät!' : 'Leider falsch')}</h2>
         <p class="qr-pts">${r.ok ? `+${r.pts} Punkte` : '+0 Punkte'}</p>
+        ${s.streakText ? `<p class="qr-streak ${r.ok ? `s${Math.min(r.streak, 6)}` : 'lost'}">${esc(s.streakText)}</p>` : ''}
         ${r.ok ? '' : `<p class="lead">Richtig ist: <strong lang="${s.lang}">${esc(s.answerText || '')}</strong></p>`}
         ${r.rank ? `<div class="qr-stand"><span>${standingText(r)}${r.move > 0 ? ` <i class="lt-up">▲${r.move}</i>` : ''}</span><span><strong>${r.score}</strong> Punkte total</span></div>` : ''}
         <p class="small muted">${s.last ? 'Gleich kommt die Siegerehrung …' : 'Warte auf die nächste Frage …'}</p></div></section>`;
