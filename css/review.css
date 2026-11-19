@@ -1,0 +1,31 @@
+/* Vokaboom – Wiederholen nach der Vergessenskurve */
+.rv-card {
+  display: grid; gap: .8rem; padding: 1.1rem 1.3rem; margin: 0 0 1.4rem; border-radius: 24px;
+  background: linear-gradient(135deg, var(--brand-wash), var(--paper)); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line));
+  box-shadow: var(--shadow-card);
+}
+.rv-card.done { background: var(--paper); border-color: var(--line); }
+.rv-card-main { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.rv-card-main > div { flex: 1 1 220px; display: grid; gap: .15rem; }
+.rv-card-main strong { font-size: 1.2rem; }
+.rv-card-main small { color: var(--ink-2); }
+.rv-icon { font-size: 2.2rem; line-height: 1; }
+.rv-meter { display: grid; gap: .3rem; }
+.rv-meter-bar { display: block; height: 10px; border-radius: 99px; background: var(--paper-2); overflow: hidden; border: 1px solid var(--line); }
+.rv-meter-bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 70%, #fff)); transition: width .4s; }
+.rv-meter small { color: var(--ink-2); }
+.kid-home .rv-card { margin: 1.2rem 0; }
+
+.rv-mode .q-prompt { display: grid; justify-items: center; gap: .6rem; }
+.rv-pic { width: min(160px, 40vw); }
+.rv-pic .card-pic { width: 100%; height: auto; }
+.rv-done { display: grid; place-items: center; }
+.rv-result { max-width: 560px; width: 100%; text-align: center; display: grid; gap: .8rem; justify-items: center; }
+.rv-big { font-size: 3.2rem; margin: 0; line-height: 1; }
+.rv-wrong { width: 100%; text-align: left; }
+.rv-wrong ul { list-style: none; padding: 0; margin: .3rem 0 0; display: grid; gap: .3rem; }
+.rv-wrong li { padding: .45rem .7rem; border-radius: 12px; background: var(--paper-2); }
+
+.rv-cell b { white-space: nowrap; }
+.rv-cell.stale { background: var(--red-wash); }
+.rv-setting .seg { flex-wrap: wrap; }

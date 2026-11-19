@@ -182,6 +182,19 @@ Danach mit dem neuen Passwort anmelden und es unter «Konto → Passwort ändern
 - **Datenschutz:** Gespeichert werden die E-Mail-Adresse (für die Anmeldung) und die Portionen: Vokabeln, Bilder-Auswahl und der Übungsstand dieses Geräts. Von Kindern nur Vorname, erster Buchstabe des Nachnamens, Benutzername, Bilder-Passwort und Übungsstand – keine E-Mail-Adressen. Kläre mit deiner Schule, ob das so erlaubt ist.
 - **Eigene Fotos** (hochgeladen oder eingefügt) werden mitgespeichert. Eine Portion darf im Konto höchstens ca. 3 MB gross sein.
 
+## Wiederholen nach der Vergessenskurve
+
+Vokaboom merkt sich bei jedem Wort, wann es wieder dran ist (Lernkartei mit 5 Fächern):
+**Fach 1:** nach 1 Tag · **2:** nach 3 Tagen · **3:** nach 1 Woche · **4:** nach 2 Wochen · **5:** nach 1 Monat („sicher“).
+Richtig → ein Fach weiter. Falsch → zurück ins 1. Fach (morgen wieder). Fast richtig (Tippfehler) → Fach bleibt, morgen nochmals.
+
+- Alle Übungen zählen mit (Aussprechen, Hören & Schreiben, Test, Spiele). Bei den Lernkarten schätzen sich die Kinder selbst ein – dort kommen Wörter nur neu in den Kasten, sie rücken nicht vor.
+- Auf der Startseite erscheint **„Heute wiederholen: 12 Wörter“** mit dem Knopf **Los geht's**. Eine Runde hat höchstens 20 Wörter aus allen Portionen gemischt. Am Schluss sehen die Kinder, welche Wörter morgen nochmals kommen und wie viele schon sicher sitzen. Richtige Antworten geben Münzen für den Avatar.
+- **Eintippen oder Auswählen:** Klasse → **Portionen** → **Wiederholen**. Eintippen: Deutsch sehen, Wort in der Fremdsprache schreiben (automatisch geprüft, Tippfehler zählen als „fast“). Auswählen: das richtige Wort aus 4. Ohne Einstellung wählt Vokaboom nach dem Klassennamen: „3a“, „4b“ → Auswählen, sonst Eintippen.
+- **Auswertung:** Klasse → **Auswertung** → Spalte **🧠 Wiederholen**: wie viele Wörter heute fällig sind, wie viele sicher sitzen und wann das Kind zuletzt wiederholt hat. Rot = fällige Wörter und seit mehr als 4 Tagen nicht wiederholt.
+- Erinnert werden die Kinder, wenn sie Vokaboom öffnen (keine Push-Nachrichten). Mit Login-Kärtchen ist der Stand auf jedem Gerät gleich; ohne Login nur auf diesem Gerät.
+- Für die Einstellung Eintippen/Auswählen `supabase/vokabelwelt.sql` nochmals ganz ausführen.
+
 ## Mein Avatar und Münzen (Kinder mit Login-Kärtchen)
 
 Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, Kleider, Schuhe, Extras, Haustier, Hintergrund). Das Basic-Set ist gratis, weitere Teile kosten Münzen, die sie beim Üben verdienen (Standard: 10 Punkte = 1 Münze, höchstens 40 Münzen pro Tag – im **Menü → Avatar & Münzen** einstellbar, dort auch Shop ein/aus und Bonus-Münzen). Verbundene Kinder haben in Vokaboom und Teilmal denselben Avatar und dieselben Münzen.

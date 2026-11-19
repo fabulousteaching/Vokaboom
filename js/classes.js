@@ -52,8 +52,8 @@ function kidLoadSession() {
   if (isKid()) STORE_KEY = KID_DB_KEY;
 }
 function kidSaveSession() {
-  const { token, first, initial, username, cls, sent, sso, e1 } = kid;
-  try { localStorage.setItem(KID_KEY, JSON.stringify({ token, first, initial, username, cls, sent, sso, e1 })); } catch { /* */ }
+  const { token, first, initial, username, cls, clsSettings, sent, sso, e1 } = kid;
+  try { localStorage.setItem(KID_KEY, JSON.stringify({ token, first, initial, username, cls, clsSettings, sent, sso, e1 })); } catch { /* */ }
 }
 
 function kidErrorText(e) {
@@ -106,6 +106,7 @@ async function kidRefresh() {
     throw error;
   }
   kid.first = data.student?.first || ''; kid.initial = data.student?.initial || ''; kid.cls = data.class?.name || '';
+  kid.clsSettings = data.class?.settings && typeof data.class.settings === 'object' ? data.class.settings : {};
   kid.username = data.student?.username || kid.username;
   kidCheckEinmaleins();
   const prog = new Map((data.progress || []).map((p) => [p.set_id, p.data]));
@@ -370,6 +371,7 @@ function kidHomeHTML() {
         <span class="row kid-hello-btns"><button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>
         ${kid.e1 && CLOUD_CFG.einmaleinsUrl ? '<button class="btn secondary other-tool" data-action="go-einmaleins"><span class="ot-tag">1×1</span> Rechnen üben</button>' : ''}</span></div>
     </div>
+    ${typeof reviewCardHTML === 'function' ? reviewCardHTML() : ''}
     ${typeof avatarSVG === 'function' && avatarOn() ? `<button class="av-home-card" data-action="avatar-open">
       <span class="av-home-fig">${AV.state ? avatarSVG(AV.state.avatar, { idle: true, label: 'Mein Avatar' }) : ''}</span>
       <span><strong>Mein Avatar${AV.state?.fresh ? '<span class="av-new">Neu</span>' : ''}</strong>
@@ -409,6 +411,7 @@ async function loadClasses() {
       // Datenbank noch ohne neue Spalten (SQL-Skript nicht neu ausgeführt)?
       klass.noRules = !!cl.data?.length && !('rules' in cl.data[0]);
       klass.noPw = !!cl.data?.length && !('class_pw' in cl.data[0]);
+      klass.noSettings = !!cl.data?.length && !('settings' in cl.data[0]);
       klass.oldPw = (st.data || []).some((x) => /-/.test(x.pw || '')); // Datenbank erzeugt noch lange Passwörter (altes SQL)
       if (cl.error) throw cl.error;
       if (st.error) throw st.error;
@@ -721,7 +724,35 @@ function classSetsHTML(c) {
         <span><strong>${flag(s.lang)} ${esc(s.name)}</strong><small>${LANGS[langOf(s)].name} · ${s.words.length} Vokabeln${!cloud.synced[s.id] ? ' · wird noch ins Konto gespeichert' : ''}</small></span>
       </label>${(c.set_ids || []).includes(s.id) ? kidRulesHTML(c, s) : ''}</li>`).join('')}</ul>` : '<p class="empty">Du hast noch keine Portion. Erstelle zuerst auf der Startseite eine.</p>'}
     ${missing.length ? `<p class="muted small">${missing.length} freigegebene ${missing.length === 1 ? 'Portion gibt' : 'Portionen gibt'} es nicht mehr. <button class="link-btn" data-action="class-clean-sets">Entfernen</button></p>` : ''}
+  </div>
+  ${classReviewHTML(c)}`;
+}
+/** Wiederholen nach der Vergessenskurve: wie die Kinder antworten */
+function classReviewHTML(c) {
+  const mode = reviewMode(c);
+  const auto = !(c.settings?.review);
+  return `<div class="panel rv-setting">
+    <h2>🧠 Wiederholen</h2>
+    <p class="hint">Vokaboom erinnert die Kinder auf ihrer Startseite an Wörter, die sie wieder anschauen sollten – nach 1 Tag, 3 Tagen, 1 Woche, 2 Wochen und 1 Monat (Vergessenskurve). Falsch beantwortete Wörter kommen am nächsten Tag nochmals.</p>
+    <div class="field"><span class="label">So antworten die Kinder beim Wiederholen</span>
+      <div class="seg" role="group" aria-label="Antwortart beim Wiederholen">
+        <button type="button" class="seg-btn" data-action="class-review" data-mode="type" aria-pressed="${mode === 'type'}">⌨️ Eintippen</button>
+        <button type="button" class="seg-btn" data-action="class-review" data-mode="choice" aria-pressed="${mode === 'choice'}">👆 Auswählen (aus 4)</button>
+      </div>
+      <small class="muted">${mode === 'type' ? 'Deutsch sehen, Wort in der Fremdsprache schreiben – automatisch geprüft (empfohlen ab der 5. Klasse).' : 'Deutsch sehen, das richtige Wort aus 4 auswählen – gut für die 3. und 4. Klasse.'}${auto ? ' Automatisch gewählt nach dem Klassennamen.' : ''}</small></div>
+    ${klass.noSettings ? '<p class="banner bad small">Damit die Einstellung bei den Kindern ankommt, zuerst <code>supabase/vokabelwelt.sql</code> in Supabase nochmals ausführen.</p>' : ''}
   </div>`;
+}
+async function saveClassReview(c, mode) {
+  const settings = { ...(c.settings || {}), review: mode };
+  try {
+    const cl = await cloudClient();
+    const { error } = await cl.from('vokaboom_classes').update({ settings }).eq('id', c.id);
+    if (error) throw error;
+    c.settings = settings;
+    toast(mode === 'type' ? 'Die Kinder tippen die Wörter beim Wiederholen ein.' : 'Die Kinder wählen die Wörter beim Wiederholen aus.');
+  } catch (e) { toast(/settings/.test(e?.message || '') ? 'Dafür zuerst supabase/vokabelwelt.sql in Supabase nochmals ausführen.' : classErrorText(e), 'bad'); }
+  render();
 }
 /* ---------- Ausnahmen: Portion oder einzelne Spiele für einzelne Kinder ausschalten ---------- */
 const kidRule = (c, kidId) => (c.rules || {})[kidId] || {};
@@ -1129,9 +1160,16 @@ function classStatsHTML(c, kids) {
   if (!kids.length || !sets.length) return `<div class="panel">${head}<p class="empty">${!kids.length ? 'Noch keine Kinder in dieser Klasse.' : 'Noch keine Portion freigegeben (Bereich „Portionen“).'}</p></div>`;
 
   const matrix = `<div class="stat-scroll"><table class="stat-table">
-    <thead><tr><th scope="col">Kind</th>${sets.map((s) => `<th scope="col">${esc(s.name)}</th>`).join('')}</tr></thead>
+    <thead><tr><th scope="col">Kind</th><th scope="col" title="Wiederholen nach der Vergessenskurve">🧠 Wiederholen</th>${sets.map((s) => `<th scope="col">${esc(s.name)}</th>`).join('')}</tr></thead>
     <tbody>${kids.map((st) => `<tr class="${klass.kidDetail === st.id ? 'sel' : ''}">
       <th scope="row"><button class="link-btn kid-link" data-action="stats-kid" data-id="${st.id}">${kidWordImg(st.username, 'kid-mini')}${esc(kidName(st))}</button></th>
+      ${(() => {
+        const r = kidSrsStats(prog[st.id], sets);
+        if (!r.inBox) return '<td class="cell empty">–</td>';
+        const stale = r.due && (!r.last || Date.now() - r.last > 4 * 864e5);
+        return `<td class="cell rv-cell ${stale ? 'stale' : ''}" title="${r.inBox} Wörter im Kasten">
+          <b>${r.due ? `${r.due} fällig` : 'nichts fällig'}</b><small>${r.safe} sicher</small><small class="muted">${r.last ? `wiederholt ${fmtDay(r.last)}` : 'noch nie wiederholt'}</small></td>`;
+      })()}
       ${sets.map((set) => {
         const k = kidSetStats(prog[st.id]?.[set.id], set);
         if (kidHidesSet(c, st.id, set.id)) return '<td class="cell empty" title="Für dieses Kind ausgeschaltet"><small>ausgenommen</small></td>';
@@ -1140,7 +1178,8 @@ function classStatsHTML(c, kids) {
           <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/4 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small><small class="muted">${fmtDay(k.last)}</small></td>`;
       }).join('')}
     </tr>`).join('')}</tbody></table></div>
-    <p class="muted small">Prozent = Anteil richtiger Antworten in allen Übungen (fast richtig zählt halb). Tippe auf ein Kind für seine schwierigsten Wörter.</p>`;
+    <p class="muted small">Prozent = Anteil richtiger Antworten in allen Übungen (fast richtig zählt halb). Tippe auf ein Kind für seine schwierigsten Wörter.
+      🧠 Wiederholen: „fällig“ = Wörter, die das Kind heute wiederholen sollte; „sicher“ = im 5. Fach (sitzt seit über 2 Wochen). Rot = fällige Wörter und seit mehr als 4 Tagen nicht wiederholt.</p>`;
 
   let detail = '';
   const st = kids.find((x) => x.id === klass.kidDetail);
@@ -1195,6 +1234,7 @@ const classActions = {
   'kid-delete-yes': (el) => kidDelete(el.dataset.id),
   'cards-pdf': () => downloadCardsPDF(),
   'stats-refresh': () => refreshStats(),
+  'class-review': (el) => { const c = currentClass(); if (c) saveClassReview(c, el.dataset.mode); },
   'stats-kid': (el) => { klass.kidDetail = klass.kidDetail === el.dataset.id ? '' : el.dataset.id; render(); if (klass.kidDetail) $('.kid-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   /* Kinder */
   'kid-login': () => openKidLogin(),

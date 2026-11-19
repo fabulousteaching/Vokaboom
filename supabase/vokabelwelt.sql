@@ -188,6 +188,11 @@ create table if not exists public.vokaboom_classes (
 create index if not exists vokaboom_classes_teacher on public.vokaboom_classes (teacher_id);
 -- Ausnahmen für einzelne Kinder: {"<Kind-ID>": {"h": [Portionen, die das Kind nicht sieht], "g": {"<Portion>": [ausgeschaltete Spiele]}}}
 alter table public.vokaboom_classes add column if not exists rules jsonb not null default '{}';
+-- Einstellungen der Klasse, z. B. {"review": "type"} (Wiederholen: eintippen) oder {"review": "choice"} (auswählen)
+alter table public.vokaboom_classes add column if not exists settings jsonb not null default '{}';
+alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_settings_check;
+alter table public.vokaboom_classes add constraint vokaboom_classes_settings_check
+  check (jsonb_typeof(settings) = 'object' and octet_length(settings::text) <= 5000);
 alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_rules_check;
 alter table public.vokaboom_classes add constraint vokaboom_classes_rules_check
   check (jsonb_typeof(rules) = 'object' and octet_length(rules::text) <= 200000);
@@ -276,7 +281,7 @@ alter table public.vokaboom_login_fails enable row level security;
 revoke all on public.vokaboom_classes, public.vokaboom_students, public.vokaboom_usernames,
   public.vokaboom_sessions, public.vokaboom_progress, public.vokaboom_login_fails from anon, authenticated;
 grant select, insert, delete on public.vokaboom_classes to authenticated;
-grant update (name, set_ids, rules, class_pw) on public.vokaboom_classes to authenticated;
+grant update (name, set_ids, rules, class_pw, settings) on public.vokaboom_classes to authenticated;
 grant select, delete on public.vokaboom_students to authenticated;
 grant update (first_name, last_initial, pics, pw, pw_prev) on public.vokaboom_students to authenticated;
 grant select on public.vokaboom_progress to authenticated;
@@ -394,7 +399,7 @@ begin
   mine := coalesce(cl.rules -> st.id::text, '{}'::jsonb); -- Ausnahmen nur für dieses Kind
   return jsonb_build_object(
     'student', jsonb_build_object('first', st.first_name, 'initial', st.last_initial, 'username', st.username),
-    'class', jsonb_build_object('name', cl.name),
+    'class', jsonb_build_object('name', cl.name, 'settings', cl.settings),
     'sets', coalesce((select jsonb_agg(jsonb_build_object('set_id', v.set_id, 'data', v.data - 'progress') order by array_position(cl.set_ids, v.set_id))
       from public.vokabelwelt_sets v where v.user_id = cl.teacher_id and v.set_id = any (cl.set_ids)
         and not coalesce(mine -> 'h', '[]'::jsonb) ? v.set_id), '[]'::jsonb),

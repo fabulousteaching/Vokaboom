@@ -25,6 +25,7 @@ function trackWord(set, wid, mode, result) {
   const by = s.by = s.by || {};
   const m = by[mode] = by[mode] || [0, 0];
   m[0]++; if (result === 'wrong') m[1]++;
+  if (typeof srsUpdate === 'function') srsUpdate(s, mode, result); // Wiederholen nach der Vergessenskurve (js/review.js)
   set.updated = Date.now();
   saveDB();
 }

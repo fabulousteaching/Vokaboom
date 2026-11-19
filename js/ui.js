@@ -89,7 +89,7 @@ function backTarget() {
   const v = ui.view;
   if (v === 'home') return null;
   if (v === 'class') return { view: 'classes', label: 'Zurück zu den Klassen' };
-  if (v === 'classes' || v === 'avatar') return { view: 'home', label: 'Zurück zur Startseite' };
+  if (v === 'classes' || v === 'avatar' || v === 'review') return { view: 'home', label: 'Zurück zur Startseite' };
   if (v === 'library') return typeof libCanGoUp === 'function' && libCanGoUp() ? { view: 'library', label: 'Eine Ebene zurück' } : { view: 'home', label: 'Zurück zur Startseite' };
   if (v === 'game' || v === 'match') return { view: 'games', label: 'Zurück zu den Spielen' };
   if (v === 'set' || !currentSet()) return { view: 'home', label: 'Zurück zur Startseite' };
@@ -111,6 +111,7 @@ function renderCrumbs() {
   if (ui.view === 'classes' || ui.view === 'class') { el.innerHTML = classesCrumbs(); return; }
   if (ui.view === 'avatar') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Mein Avatar</span>'; return; }
   if (ui.view === 'library') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Bibliothek</span>'; return; }
+  if (ui.view === 'review') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Wiederholen</span>'; return; }
   if (!set || ui.view === 'home') { el.innerHTML = ''; return; }
   let html = `<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="open-set" data-id="${set.id}">${flag(set.lang)}<span>${esc(set.name)}</span></button>`;
   if (['match', 'game'].includes(ui.view)) html += '<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="games"><span>Vokabelspiele</span></button>';
@@ -122,7 +123,7 @@ function renderCrumbs() {
 function render() {
   const v = $('#view');
   const set = currentSet();
-  if (!['home', 'classes', 'class', 'live', 'avatar', 'library'].includes(ui.view) && !set) ui.view = 'home';
+  if (!['home', 'classes', 'class', 'live', 'avatar', 'library', 'review'].includes(ui.view) && !set) ui.view = 'home';
   if (ui.view === 'avatar' && !isKid()) ui.view = 'home';
   if (isKid() && ['classes', 'class', 'pics', 'library'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
@@ -141,6 +142,7 @@ function render() {
     case 'class': renderClass(); break;
     case 'avatar': renderAvatar(); break;
     case 'library': renderLibrary(); break;
+    case 'review': renderReview(); break;
     default: v.innerHTML = viewHome(); bindHome();
   }
 }
@@ -274,6 +276,7 @@ function viewHome() {
       <p class="lead">Vokabeln einfügen und fertig. Und Bildvorschläge für die Karten macht dir Vokaboom auch gleich schon.</p>
       ${isTeacher() ? '' : `<button class="btn small secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>`}
     </div>
+    ${typeof reviewCardHTML === 'function' ? reviewCardHTML() : ''}
     <div class="seg lang-tabs" role="tablist" aria-label="Sprache">
       ${['en', 'fr'].map((l) => `<button type="button" class="seg-btn" role="tab" data-action="home-lang" data-lang="${l}" aria-selected="${lang === l}" aria-pressed="${lang === l}">${flag(l)}<span>${LANGS[l].name}</span>${count(l) ? `<small class="count">${count(l)}</small>` : ''}</button>`).join('')}
     </div>

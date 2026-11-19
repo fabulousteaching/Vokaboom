@@ -389,6 +389,7 @@ if (typeof liveActions === 'object') Object.assign(actions, liveActions); // Qui
 if (typeof avatarActions === 'object') Object.assign(actions, avatarActions); // Mein Avatar (js/avatar.js)
 if (typeof menuActions === 'object') Object.assign(actions, menuActions); // Menü für Lehrpersonen (js/menu.js)
 if (typeof libraryActions === 'object') Object.assign(actions, libraryActions); // Bibliothek (js/library.js)
+if (typeof reviewActions === 'object') Object.assign(actions, reviewActions); // Wiederholen (js/review.js)
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
