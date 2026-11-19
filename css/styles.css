@@ -1523,6 +1523,9 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 @keyframes pd-glow { to { box-shadow: 0 0 0 4px #fff, 0 0 34px 10px rgba(255, 183, 3, .7); } }
 .pd-name { font: 800 clamp(1rem, 2.8vw, 1.5rem) var(--font-display); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .p1 .pd-name { font-size: clamp(1.2rem, 3.4vw, 1.9rem); }
+.pd-avatar.has-av { padding: 0; overflow: hidden; background: #fff; }
+.pd-avatar.has-av .av-svg { width: 100%; height: 100%; }
+.live-chip { display: inline-flex; align-items: center; gap: .35rem; }
 .pd-person small { color: var(--ink-2); font-weight: 600; }
 .pd-rest { position: relative; z-index: 1; width: min(420px, 100%); box-sizing: border-box; margin: 1rem auto 0; padding-left: 2rem; text-align: left; opacity: 0; animation: pd-fade .6s ease 7s forwards; }
 .pd-rest li { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem 0; border-bottom: 1px dashed var(--line); font-weight: 600; }

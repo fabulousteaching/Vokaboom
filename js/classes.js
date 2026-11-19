@@ -111,7 +111,8 @@ async function kidRefresh() {
   kidSaveSession();
   saveNow();
   renderShell(); bindTopSearch();
-  if (ui.view !== 'home' && !currentSet()) ui.view = 'home';
+  if (typeof avatarLoad === 'function') avatarLoad(true).then(() => { if (ui.view === 'home' && isKid()) render(); });
+  if (ui.view !== 'home' && ui.view !== 'avatar' && !currentSet()) ui.view = 'home';
   if (['home', 'set'].includes(ui.view)) render(); else renderCrumbs();
 }
 
@@ -153,6 +154,7 @@ async function kidLogout() {
 function kidForget(rerender = true) {
   try { localStorage.removeItem(KID_KEY); localStorage.removeItem(KID_DB_KEY); } catch { /* */ }
   Object.assign(kid, { token: '', first: '', initial: '', username: '', cls: '', sent: {}, status: 'ok', sso: false, e1: false });
+  if (typeof AV === 'object') { AV.state = null; AV.draft = null; }
   STORE_KEY = MAIN_STORE_KEY;
   db = { sets: [], settings: structuredClone(DEFAULT_SETTINGS) };
   loadDB();
@@ -328,6 +330,12 @@ function kidHomeHTML() {
         <span class="row kid-hello-btns"><button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>
         ${kid.e1 && CLOUD_CFG.einmaleinsUrl ? '<button class="btn secondary other-tool" data-action="go-einmaleins"><span class="ot-tag">1×1</span> Rechnen üben</button>' : ''}</span></div>
     </div>
+    ${typeof avatarSVG === 'function' ? `<button class="av-home-card" data-action="avatar-open">
+      <span class="av-home-fig">${AV.state ? avatarSVG(AV.state.avatar, { idle: true, label: 'Mein Avatar' }) : ''}</span>
+      <span><strong>Mein Avatar${AV.state?.fresh ? '<span class="av-new">Neu</span>' : ''}</strong>
+        <span class="muted">${AV.state?.fresh ? 'Gestalte deine eigene Figur!' : 'Frisur, Kleider, Haustier …'}</span><br>
+        ${AV_COIN_SVG} <b class="av-coin-n">${AV.state?.coins ?? '…'}</b> Münzen – verdiene mehr beim Üben</span>
+    </button>` : ''}
     ${db.sets.length ? `<ul class="kid-sets">${db.sets.map((s) => {
       const p = s.progress || {};
       const done = steps.filter((k) => p[k]).length;

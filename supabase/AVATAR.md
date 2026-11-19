@@ -1,0 +1,44 @@
+# Mein Avatar – für Vokaboom und Teilmal
+
+Kinder mit Login-Kärtchen gestalten im Bereich **Mein Avatar** eine eigene Ganzkörper-Figur. Das **Basic-Set** ist gratis, weitere Teile kosten **Münzen**, die die Kinder beim Üben verdienen. Verbundene Kinder (gleiches Kärtchen in Vokaboom und Teilmal) haben **denselben Avatar und dieselben Münzen** in beiden Tools.
+
+## Einrichten (einmal)
+
+Im Supabase **SQL Editor** den Inhalt von `supabase/avatar.sql` einfügen und **Run** drücken. Das genügt für beide Tools (gleiches Supabase-Projekt). Mehrmals ausführen schadet nicht.
+
+## Was es gibt
+
+| Bereich | Basic (gratis) | Mit Münzen |
+|---|---|---|
+| Körper | 8 Hautfarben | – |
+| Gesicht | 6 Augen, 5 Münder, rote Bäckchen, 3 Brillen | Sternen- und Herzaugen, Zunge, Sommersprossen, Glitzer, Stern- und Herzbrille |
+| Haare | 9 Frisuren, 7 Haarfarben | Irokese, Wellen, Space-Dutts; Pink, Mint, Lila, Regenbogen |
+| Oberteil | T-Shirt, Hoodie, Ringel, Pulli mit Herz, Kleid, Trikot; 9 Farben | Superheld, Raumanzug, Anzug, Regenbogen, Kimono; Gold, Galaxie |
+| Unten | Hose, Shorts, Rock, Leggings; 7 Farben; Turnschuhe, Stiefel, Sandalen | Glitzerrock, Cargohose; Raketen- und Rollschuhe |
+| Extras | Cap, Mütze, Blume, Kopfhörer, Masche; Buch, Ball | Partyhut, Katzenohren, Wikingerhelm, Zauberhut, Krone; Zauberstab, Pokal, Gitarre; Umhang, Flügel, Jetpack, Drachenflügel |
+| Haustier | – | Katze, Hund, Hase, Eule, Mini-Drache |
+| Hintergrund | Flieder, Himmel, Minze, Pfirsich | Strand, Dschungel, Regenbogen, Weltall, Schloss |
+
+Preise: 5 bis 50 Münzen. **Anprobieren** geht immer – gekauft wird erst mit „Für … kaufen“. Weitere Ideen im Bereich: 🎲 Zufall (aus den eigenen Teilen), Avatar antippen = er hüpft, er atmet, blinzelt, das Haustier hüpft. In Live-Spielen erscheint der Avatar im Warteraum und auf dem Siegerpodest.
+
+## Münzen
+
+- **Vokaboom:** richtige Antwort 1 Punkt (Lernkarten „gewusst“ ½), ein Wort, das vorher schon falsch war, +½; Test ab 80 % +3, alles richtig +5; fertig gespieltes Spiel +1. **10 Punkte = 1 Münze.**
+- **Teilmal:** jede Münze, die ein Kind in den Übungen verdient, zählt auch für den Avatar.
+- Höchstens **40 Münzen pro Tag** (prüft die Datenbank). Preise, Besitz und Tageslimit prüft die Datenbank, nicht der Browser – Schummeln über die Entwicklerwerkzeuge bringt nichts.
+
+## In Teilmal einbauen
+
+Die Dateien `js/avatar.js`, `css/avatar.css` und `supabase/avatar.sql` sind in beiden Tools **gleich** – einfach aus Vokaboom kopieren. Danach in Teilmal:
+
+1. **index.html** – nach `css/styles.css`: `<link rel="stylesheet" href="css/avatar.css?v=1">`; vor `js/classes.js`:
+   ```html
+   <script>window.AVATAR_APP = 'einmaleins';</script>
+   <script src="js/avatar.js?v=1"></script>
+   ```
+2. **js/main.js** – nach `const actions = { … };`: `if (typeof avatarActions === 'object') Object.assign(actions, avatarActions);`
+3. **js/ui.js** – in `render()`: `case 'avatar': renderAvatar(); break;` und in `renderShell()` neben `#coin-slot`: `${isKid() ? '<span id="av-coin-slot">' + avCoinPillHTML() + '</span>' : ''}` (Zurück-Pfeil/Brotkrumen: „Mein Avatar“ → Startseite).
+4. **js/classes.js** – am Ende von `kidRefresh()`: `if (typeof avatarLoad === 'function') avatarLoad(true);`; beim Abmelden `AV.state = null;`; auf der Kinder-Startseite die Avatar-Karte (gleicher Baustein wie in Vokaboom `kidHomeHTML()`: `<button class="av-home-card" data-action="avatar-open">…`).
+5. **js/coins.js** – in `earnPoints()` nach `if (gained) coinGainFx(gained, from);`: `if (gained && typeof avatarEarnCoins === 'function') avatarEarnCoins(gained);`
+
+Ohne diese Schritte läuft Teilmal wie bisher; die Datenbank ist schon für beide vorbereitet (inkl. Zusammenführen, wenn ein Kind später verbunden wird).

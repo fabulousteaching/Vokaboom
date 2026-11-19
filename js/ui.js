@@ -71,6 +71,7 @@ function renderShell() {
         <nav class="crumbs" id="crumbs" aria-label="Wo du gerade bist"></nav>
         <div class="topbar-actions">
           ${searchSlotHTML()}
+          ${isKid() ? `<span id="av-coin-slot">${typeof avCoinPillHTML === 'function' ? avCoinPillHTML() : ''}</span>` : ''}
           <span id="account-slot">${accountButtonHTML()}</span>
           <button class="icon-btn" data-action="settings" aria-label="Einstellungen" title="Einstellungen">${icon('sliders')}</button>
         </div>
@@ -85,7 +86,7 @@ function backTarget() {
   const v = ui.view;
   if (v === 'home') return null;
   if (v === 'class') return { view: 'classes', label: 'Zurück zu den Klassen' };
-  if (v === 'classes') return { view: 'home', label: 'Zurück zur Startseite' };
+  if (v === 'classes' || v === 'avatar') return { view: 'home', label: 'Zurück zur Startseite' };
   if (v === 'game' || v === 'match') return { view: 'games', label: 'Zurück zu den Spielen' };
   if (v === 'set' || !currentSet()) return { view: 'home', label: 'Zurück zur Startseite' };
   return { view: 'set', label: 'Zurück zur Portion' };
@@ -104,6 +105,7 @@ function renderCrumbs() {
   if (!el) return;
   const set = currentSet();
   if (ui.view === 'classes' || ui.view === 'class') { el.innerHTML = classesCrumbs(); return; }
+  if (ui.view === 'avatar') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Mein Avatar</span>'; return; }
   if (!set || ui.view === 'home') { el.innerHTML = ''; return; }
   let html = `<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="open-set" data-id="${set.id}">${flag(set.lang)}<span>${esc(set.name)}</span></button>`;
   if (['match', 'game'].includes(ui.view)) html += '<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="games"><span>Vokabelspiele</span></button>';
@@ -115,7 +117,8 @@ function renderCrumbs() {
 function render() {
   const v = $('#view');
   const set = currentSet();
-  if (!['home', 'classes', 'class', 'live'].includes(ui.view) && !set) ui.view = 'home';
+  if (!['home', 'classes', 'class', 'live', 'avatar'].includes(ui.view) && !set) ui.view = 'home';
+  if (ui.view === 'avatar' && !isKid()) ui.view = 'home';
   if (isKid() && ['classes', 'class', 'pics'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
   switch (ui.view) {
@@ -131,6 +134,7 @@ function render() {
     case 'pics': v.innerHTML = viewPics(set); loadReview(set); break;
     case 'classes': renderClasses(); break;
     case 'class': renderClass(); break;
+    case 'avatar': renderAvatar(); break;
     default: v.innerHTML = viewHome(); bindHome();
   }
 }

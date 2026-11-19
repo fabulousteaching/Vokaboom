@@ -79,6 +79,7 @@ function gameRecord(set, id, score) {
   const prev = g[id]?.best || 0;
   g[id] = { best: Math.max(prev, score), last: score, date: Date.now() };
   saveDB(); // nicht set.updated: zählt nicht als Übung
+  if (score > 0 && typeof avatarEarnPoints === 'function') avatarEarnPoints(1); // fertig gespielt: 1 Punkt für Münzen
   return score > prev;
 }
 function gameShell(title, inner) {

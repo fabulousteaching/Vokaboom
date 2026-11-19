@@ -385,6 +385,7 @@ const actions = {
 Object.assign(actions, classActions); // Klassen und Kinder-Login (js/classes.js)
 Object.assign(actions, gameActions); // Vokabelspiele (js/games.js)
 if (typeof liveActions === 'object') Object.assign(actions, liveActions); // Quiz und Hör-Bingo (js/live.js)
+if (typeof avatarActions === 'object') Object.assign(actions, avatarActions); // Mein Avatar (js/avatar.js)
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');

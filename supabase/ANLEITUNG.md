@@ -161,3 +161,9 @@ Danach mit dem neuen Passwort anmelden und es unter «Konto → Passwort ändern
 - **Pause bei Gratis-Projekten:** Supabase pausiert Gratis-Projekte nach etwa 7 Tagen ohne Nutzung. Die Daten bleiben erhalten. Beim Projekt in Supabase **Restore** klicken, dann geht es nach ein paar Minuten weiter. Während der Pause meldet Vokaboom «Keine Verbindung zum Server»; auf dem Gerät gespeicherte Portionen funktionieren trotzdem.
 - **Datenschutz:** Gespeichert werden die E-Mail-Adresse (für die Anmeldung) und die Portionen: Vokabeln, Bilder-Auswahl und der Übungsstand dieses Geräts. Von Kindern nur Vorname, erster Buchstabe des Nachnamens, Benutzername, Bilder-Passwort und Übungsstand – keine E-Mail-Adressen. Kläre mit deiner Schule, ob das so erlaubt ist.
 - **Eigene Fotos** (hochgeladen oder eingefügt) werden mitgespeichert. Eine Portion darf im Konto höchstens ca. 3 MB gross sein.
+
+## Mein Avatar und Münzen (Kinder mit Login-Kärtchen)
+
+Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, Kleider, Schuhe, Extras, Haustier, Hintergrund). Das Basic-Set ist gratis, weitere Teile kosten Münzen, die sie beim Üben verdienen (10 Punkte = 1 Münze, höchstens 40 Münzen pro Tag). Verbundene Kinder haben in Vokaboom und Teilmal denselben Avatar und dieselben Münzen.
+
+**Einrichten:** `supabase/avatar.sql` einmal im SQL Editor ausführen. Details, Preise und die Schritte für Teilmal: `supabase/AVATAR.md`.

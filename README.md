@@ -16,6 +16,10 @@ Ein Vokabelspiel für Englisch. Vokabeln einfügen, und daraus werden:
 
 Ist eine Antwort richtig, geht es in allen Übungen nach einem kurzen Moment automatisch weiter.
 
+## Mein Avatar (Kinder mit Login)
+
+Kinder mit Login-Kärtchen gestalten eine eigene Ganzkörper-Figur und kaufen mit Münzen, die sie beim Üben verdienen, besondere Teile (Krone, Flügel, Mini-Drache …). Gemeinsam mit Teilmal. Siehe `supabase/AVATAR.md`.
+
 ## Portion in die andere Sprache verschieben
 
 Aus Versehen beim falschen Reiter gespeichert? Auf der Startseite die Portion am Griff ⠿ packen und auf den Reiter Englisch bzw. Französisch ziehen (am Handy erscheint beim Ziehen oben eine Ablage-Leiste). Automatisch gefundene Bilder werden danach für die neue Sprache neu gesucht; selbst gewählte Bilder bleiben.

@@ -16,6 +16,8 @@ function trackWord(set, wid, mode, result) {
   set.progress = set.progress || {};
   const words = set.progress.words = set.progress.words || {};
   const s = words[wid] = words[wid] || { n: 0, bad: 0, almost: 0 };
+  // Münzen für den Avatar (nur Kinder mit Login): richtige Antwort 1 Punkt, Lernkarten ½, vorher schon falsch +½
+  if (result === 'correct' && typeof avatarEarnPoints === 'function') avatarEarnPoints((mode === 'cards' ? 0.5 : 1) + (s.bad ? 0.5 : 0));
   s.n++;
   if (result === 'wrong') s.bad++;
   if (result === 'almost') s.almost = (s.almost || 0) + 1;
@@ -1197,6 +1199,7 @@ function nextQuestion() {
     const pct = Math.round((test.points / test.questions.length) * 100);
     const prev = set.progress?.test || {};
     if (!test.onlyIds) saveProgress(set, 'test', { best: Math.max(prev.best ?? 0, pct), last: pct, date: Date.now() });
+    if (typeof avatarEarnPoints === 'function' && pct >= 80) avatarEarnPoints(pct >= 100 ? 5 : 3);
     test.questions.forEach((q) => trackWord(set, q.wid, 'test', q.result));
     sfx.win();
     if (pct >= 80) confetti();

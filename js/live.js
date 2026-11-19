@@ -179,7 +179,7 @@ function hostMsg(m) {
   if (!m || LV.role !== 'host') return;
   if (m.t === 'join' && m.id) {
     if (!m.kid && liveNameProblem(m.name)) { LV.ch.send({ t: 'denied', id: m.id, reason: liveNameProblem(m.name) }); return; }
-    if (!LV.players.has(m.id)) LV.players.set(m.id, { name: String(m.name || 'Kind').slice(0, 24), score: 0 });
+    if (!LV.players.has(m.id)) LV.players.set(m.id, { name: String(m.name || 'Kind').slice(0, 24), score: 0, av: m.av && typeof m.av === 'object' && typeof avFill === 'function' ? avFill(m.av) : null });
     hostBroadcastState();
     if (LV.st.phase === 'lobby') { const pl = $('#live-players'); if (pl) pl.outerHTML = livePlayersHTML(); else renderLive(); liveRefreshLobby(); }
     else if (LV.kind === 'bingo') renderLive();
@@ -204,7 +204,7 @@ function livePlayersHTML() {
   return `<div class="live-players" id="live-players">
       <h2>${esc(LV.kind === 'quiz' ? `Quiz: ${LV.set.name}` : `Hör-Bingo: ${LV.set.name}`)}</h2>
       <p class="lead">${names.length} ${names.length === 1 ? 'Kind ist' : 'Kinder sind'} dabei</p>
-      <div class="live-chips">${names.map((n) => `<span class="live-chip">${esc(n)}</span>`).join('') || '<span class="muted">Warte auf die ersten Kinder …</span>'}</div>
+      <div class="live-chips">${[...LV.players.values()].map((p) => `<span class="live-chip">${p.av ? `<span class="av-mini">${avatarSVG(p.av, { crop: 'head', bg: false })}</span>` : ''}${esc(p.name)}</span>`).join('') || '<span class="muted">Warte auf die ersten Kinder …</span>'}</div>
     </div>`;
 }
 function lobbyHTML() {
@@ -383,7 +383,7 @@ function podiumHTML() {
     const cls = ['p1', 'p2', 'p3'][k];
     const right = x ? (LV.players.get(x.id)?.right || 0) : 0;
     return `<div class="pd-col ${cls}">
-      <div class="pd-person">${x ? `<span class="pd-medal">${['🥇', '🥈', '🥉'][k]}</span><span class="pd-avatar">${esc(x.name.charAt(0).toUpperCase())}</span><strong class="pd-name">${esc(x.name)}</strong><small>${x.score} Punkte · ${right} richtig</small>` : ''}</div>
+      <div class="pd-person">${x ? `<span class="pd-medal">${['🥇', '🥈', '🥉'][k]}</span><span class="pd-avatar ${LV.players.get(x.id)?.av ? 'has-av' : ''}">${LV.players.get(x.id)?.av ? avatarSVG(LV.players.get(x.id).av, { crop: 'head' }) : esc(x.name.charAt(0).toUpperCase())}</span><strong class="pd-name">${esc(x.name)}</strong><small>${x.score} Punkte · ${right} richtig</small>` : ''}</div>
       <div class="pd-block"><span>${k + 1}</span></div>
     </div>`;
   };
@@ -531,7 +531,8 @@ async function liveJoin(code, name) {
     const err = $('#join-error'); if (err) err.textContent = 'Keine Verbindung. Bist du online?';
     return;
   }
-  const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid() });
+  const av = typeof avMine === 'function' ? avMine() : null;
+  const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid(), av });
   hello();
   lvEvery(() => { if (!LV.st.kind) hello(); }, 2000); // bis die Lehrperson antwortet
   renderLive();
