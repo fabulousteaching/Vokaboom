@@ -958,6 +958,8 @@ function drawQR(ctx, url, qx, qy, qs, X, Y, L) {
  * Zeichnet ein Login-Kärtchen (x, y in mm; s = Pixel pro mm). Ohne Logo und ohne Namen eines Tools:
  * Es gilt für alle Tools, in denen das Kind dasselbe Login hat. Ein QR-Code: bei Kindern in beiden Tools mit der Frage
  * „bei Vokaboom“ oder „bei Teilmal“ (#w=…), sonst direkt ins Tool (#k=…). Gleiches Kärtchen in Vokaboom und Teilmal.
+ * Aufbau: oben „Login-Kärtchen“ (und Klasse), rechts der Name bzw. die Initialen; links Benutzername und Passwort
+ * untereinander, rechts unten der QR-Code.
  */
 async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
@@ -965,53 +967,52 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
   const cc = { ...(typeof cardCfg === 'function' ? cardCfg() : { names: 'full', qr: true, cls: true }), secret: kidSecretOf(st) };
   const both = cc.qr && !!einmaleinsLoginOf(st);
-  const pwMax = (cc.qr ? 56 : CARD_W - 4) - 4; // so breit darf der Passwort-Kasten höchstens werden
+  const colW = cc.qr ? 48 : CARD_W - 8; // Breite der linken Spalte (Benutzername, Passwort)
   ctx.save();
   // Karte: weiss, runde Ecken, feiner Rand, zwei weiche Farbflächen
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(4));
   ctx.fillStyle = '#fff'; ctx.fill();
   ctx.save(); ctx.clip();
   ctx.fillStyle = wash;
-  ctx.beginPath(); ctx.arc(X(CARD_W + 3), Y(-5), L(31), 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(CARD_W + 4), Y(-6), L(27), 0, Math.PI * 2); ctx.fill();
   ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(X(-7), Y(CARD_H + 9), L(17), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
   ctx.restore();
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(4));
   ctx.lineWidth = L(0.25); ctx.strokeStyle = '#E2E8F0'; ctx.stroke();
-  // Kopf: „Mein Login“ als Pille, Klasse rechts
+  // Kopf: „Login-Kärtchen“ als Pille (daneben die Klasse), rechts der Name bzw. die Initialen
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
   ctx.font = `800 ${L(2.6)}px ${disp}`;
-  const pillW = ctx.measureText('Mein Login').width + L(4.4);
+  const pillW = ctx.measureText('Login-Kärtchen').width + L(4.4);
   rrect(ctx, X(4), Y(4), pillW, L(5.4), L(2.7)); ctx.fillStyle = accent; ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.fillText('Mein Login', X(4) + L(2.2), Y(7.65));
+  ctx.fillStyle = '#fff'; ctx.fillText('Login-Kärtchen', X(4) + L(2.2), Y(7.65));
+  ctx.font = `800 ${L(4)}px ${disp}`;
+  const who = fitText(ctx, cc.names === 'initials' ? kidInitials(st) : kidName(st), L(32), (z) => `800 ${z}px ${disp}`, L(4));
+  const whoW = ctx.measureText(who).width;
+  ctx.textAlign = 'right'; ctx.fillStyle = '#1E293B'; ctx.fillText(who, X(CARD_W - 4.5), Y(8.2));
   if (cc.cls) {
-    ctx.textAlign = 'right'; ctx.fillStyle = accent;
-    ctx.fillText(fitText(ctx, className, L(42), (z) => `700 ${z}px ${body}`, L(2.6)), X(CARD_W - 4.5), Y(7.65));
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'left'; ctx.fillStyle = '#64748B';
+    const room = X(CARD_W - 4.5) - whoW - L(3) - (X(4) + pillW + L(2));
+    if (room > L(6)) ctx.fillText(fitText(ctx, className, room, (z) => `600 ${z}px ${body}`, L(2.5)), X(4) + pillW + L(2), Y(7.6));
   }
-  // Bild, Name, Benutzername
-  rrect(ctx, X(4), Y(13), L(15), L(15), L(4)); ctx.fillStyle = wash; ctx.fill();
-  const wimg = await svgImage(KID_WORDS[kidWordOf(st.username)] || '');
-  if (wimg) ctx.drawImage(wimg, X(5.6), Y(14.6), L(11.8), L(11.8));
-  ctx.fillStyle = '#1E293B';
-  ctx.fillText(fitText(ctx, cc.names === 'initials' ? kidInitials(st) : kidName(st), L(58), (z) => `600 ${z}px ${body}`, L(3.3)), X(22.5), Y(17));
-  ctx.fillStyle = '#94A3B8'; ctx.font = `600 ${L(2.1)}px ${body}`; ctx.fillText('Benutzername', X(22.5), Y(21));
+  ctx.textAlign = 'left';
+  // Links: Benutzername und Passwort untereinander
+  const label = (t, yy) => { ctx.fillStyle = '#94A3B8'; ctx.font = `600 ${L(2.2)}px ${body}`; ctx.fillText(t, X(4), Y(yy)); };
+  label('Benutzername', 17);
   ctx.fillStyle = accent;
-  ctx.fillText(fitText(ctx, displayUser(st.username), L(58.5), (z) => `800 ${z}px ${disp}`, L(6.4)), X(22.5), Y(27.6));
-  // Passwort: Kasten so gross wie das Passwort – oder die 3 Bilder
+  ctx.fillText(fitText(ctx, displayUser(st.username), L(colW), (z) => `800 ${z}px ${disp}`, L(6.6)), X(4), Y(24.6));
   const pics = picsList(st.pics);
-  ctx.fillStyle = '#94A3B8'; ctx.font = `600 ${L(2.1)}px ${body}`;
   if (cc.secret === 'password' || cc.secret === 'class') {
     const pwTxt = cc.secret === 'class' ? klass.list.find((c) => c.id === st.class_id)?.class_pw || '' : showPw(st.pw);
-    ctx.fillText(cc.secret === 'class' ? 'Passwort (für die ganze Klasse)' : 'Passwort', X(4), Y(35.2));
-    const t = fitText(ctx, pwTxt, L(pwMax - 6), (z) => `700 ${z}px ui-monospace, Menlo, Consolas, monospace`, L(5));
+    label(cc.secret === 'class' ? 'Passwort (für die ganze Klasse)' : 'Passwort', 32.2);
+    const t = fitText(ctx, pwTxt, L(colW - 6), (z) => `700 ${z}px ui-monospace, Menlo, Consolas, monospace`, L(5));
     const tw = ctx.measureText(t).width;
-    rrect(ctx, X(4), Y(37.4), tw + L(6), L(10.4), L(3.2));
+    rrect(ctx, X(4), Y(34.4), tw + L(6), L(10.4), L(3.2));
     ctx.fillStyle = wash; ctx.fill(); ctx.lineWidth = L(0.35); ctx.strokeStyle = accent; ctx.stroke();
-    ctx.fillStyle = '#1E293B'; ctx.fillText(t, X(7), Y(44.4));
+    ctx.fillStyle = '#1E293B'; ctx.fillText(t, X(7), Y(41.4));
   } else {
-    ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(35.2));
+    label('Passwort: diese 3 Bilder antippen', 32.2);
     for (let k = 0; k < 3; k++) {
-      const bx = 4 + k * 13, by = 37.4;
+      const bx = 4 + k * 13, by = 34.4;
       rrect(ctx, X(bx), Y(by), L(11), L(11), L(3));
       ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.4); ctx.strokeStyle = accent; ctx.stroke();
       const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
@@ -1024,12 +1025,12 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   ctx.restore();
   if (cc.qr) drawCardQR(ctx, st, both, X, Y, L);
 }
-/** Ein QR-Code in einem weissen Rahmen, ohne Text darunter */
+/** Ein grosser QR-Code rechts unten in einem weissen Rahmen, ohne Text darunter */
 function drawCardQR(ctx, st, both, X, Y, L) {
   ctx.save();
-  rrect(ctx, X(59.5), Y(28.5), L(21.5), L(21.5), L(3.2));
+  rrect(ctx, X(55), Y(23.5), L(26.5), L(26.5), L(3.4));
   ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.3); ctx.strokeStyle = '#E2E8F0'; ctx.stroke();
-  drawQR(ctx, cardQrUrl(st, both), 60.25, 29.25, 20, X, Y, L);
+  drawQR(ctx, cardQrUrl(st, both), 55.75, 24.25, 25, X, Y, L);
   ctx.restore();
 }
 async function cardFontsReady() {
