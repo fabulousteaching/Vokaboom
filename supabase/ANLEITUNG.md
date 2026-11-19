@@ -98,7 +98,7 @@ Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) 
 
 **Anmelden mit Bildern oder Passwort** (Menü → Klassen & Kärtchen): Was auf dem Kärtchen steht, wählst du:
 - **Bilder** – die Kinder tippen 3 Bilder an (ideal für die Unterstufe).
-- **Passwort pro Kind** – Vokaboom erzeugt für jedes Kind ein eigenes Passwort, z. B. `blau-tiger-47`.
+- **Passwort pro Kind** – Vokaboom erzeugt für jedes Kind ein eigenes einfaches Passwort: ein Wort und eine Zahl, z. B. `Teich23` (andere Wörter als bei den Benutzernamen).
 - **Klassenpasswort** – du legst für jede Klasse ein Passwort fest (mind. 4 Zeichen, z. B. `Sommer2026`). Einfach zu merken, dafür könnten sich Kinder gegenseitig anmelden. Klassen ohne Klassenpasswort bekommen Kärtchen mit Bildern.
 
 Alle drei funktionieren immer (auch der QR-Code). Gross/klein, Leerzeichen und Bindestriche spielen beim Eintippen keine Rolle. Im Kinder-Login wählen die Kinder „Mit Bildern“ oder „Mit Passwort“; das Gerät merkt sich die Wahl. Ausserdem: Name als Vorname + Anfangsbuchstabe oder **nur Initialen**, QR-Code und Klassenname ein/aus. In Teilmal geht das Passwort auch, wenn das Kind mit Vokaboom verbunden ist (gleiches Kärtchen).

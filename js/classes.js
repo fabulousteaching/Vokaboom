@@ -32,9 +32,12 @@ function kidSecretOf(st) {
   if (m === 'class' && klass.list.find((c) => c.id === st?.class_id)?.class_pw) return 'class';
   return 'pics';
 }
-const KID_PW_ADJ = ['rot', 'blau', 'gelb', 'gruen', 'lila', 'rosa', 'bunt', 'wild', 'mutig', 'schnell', 'klein', 'gross', 'lustig', 'schlau', 'frech', 'stark', 'leise', 'frisch', 'sonnig', 'flink'];
+// Passwort: ein Wort und eine Zahl („Teich23“) – gleiche Wörter wie in supabase/vokabelwelt.sql (vokaboom_new_pw)
+const KID_PW_WORDS = ['teich', 'wiese', 'wald', 'bach', 'see', 'hafen', 'garten', 'turm', 'strand', 'stein', 'regen', 'schnee', 'nebel', 'wind', 'blatt', 'nest', 'feder', 'kerze', 'lampe', 'tisch', 'stuhl', 'fenster', 'dach', 'zelt', 'kiste', 'korb', 'glocke', 'ring', 'perle', 'mantel', 'schal', 'socke', 'kappe', 'brille', 'pinsel', 'farbe', 'papier', 'karte', 'nudel', 'suppe', 'honig', 'butter', 'zucker', 'kakao', 'tomate', 'gurke', 'karotte', 'mais', 'nuss', 'beere', 'traube', 'zitrone', 'orange', 'flocke', 'welle', 'sonnenhut', 'kugel', 'besen', 'leiter', 'koffer'];
 const rndInt = (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
-const newKidPw = () => `${KID_PW_ADJ[rndInt(KID_PW_ADJ.length)]}-${KID_WORD_LIST[rndInt(KID_WORD_LIST.length)]}-${10 + rndInt(90)}`;
+const newKidPw = () => `${KID_PW_WORDS[rndInt(KID_PW_WORDS.length)]}${10 + rndInt(90)}`;
+/** Anzeige wie beim Benutzernamen: gross geschrieben („Teich23“); beim Eintippen spielt gross/klein keine Rolle */
+const showPw = (pw) => (pw ? pw.charAt(0).toUpperCase() + pw.slice(1) : '');
 const KID_MODE_KEY = 'vokaboom.kidLoginMode';
 const kidPwImg = (i, cls = '') => `<img class="${cls}" src="${kidSvgURL(KID_PW[i].svg)}" alt="${esc(KID_PW[i].de)}" draggable="false">`;
 const picsList = (pics) => String(pics || '').split(',').map(Number).filter((n) => n >= 0 && n < 12);
@@ -62,7 +65,7 @@ function kidErrorText(e) {
 }
 
 /** Meldet ein Kind an. Liefert true (angemeldet) oder false (Name oder Bilder falsch). */
-async function kidLogin(username, pics) { // pics: [3, 7, 11] oder Passwort-Text („blau-tiger-47“ / Klassenpasswort)
+async function kidLogin(username, pics) { // pics: [3, 7, 11] oder Passwort-Text („teich23“ oder Klassenpasswort)
   const c = await cloudClient();
   const user = String(username || '').trim().toLowerCase();
   const { data, error } = await c.rpc('vokaboom_student_login', { p_username: user, p_pics: Array.isArray(pics) ? pics.join(',') : String(pics || '').trim().slice(0, 80) });
@@ -574,7 +577,7 @@ function classKidsHTML(c, kids) {
     return `<li class="kid-row">
       <span class="kid-av-big" aria-hidden="true">${kidWordImg(s.username)}</span>
       <span class="kid-who"><strong>${esc(kidName(s))}</strong><small>${esc(displayUser(s.username))}${einmaleinsLoginOf(s) ? ' <span class="e1-tag" title="Gleiches Kärtchen wie in Teilmal">auch in Teilmal</span>' : ''}</small></span>
-      ${kidSecretOf(s) === 'password' ? `<span class="kid-pw-text" aria-label="Passwort">${esc(s.pw)}</span>`
+      ${kidSecretOf(s) === 'password' ? `<span class="kid-pw-text" aria-label="Passwort">${esc(showPw(s.pw))}</span>`
         : kidSecretOf(s) === 'class' ? '<span class="kid-pw-text muted" title="Klassenpasswort">Klassenpasswort</span>'
           : `<span class="kid-pw" aria-label="Bilder-Passwort">${picsList(s.pics).map((i) => `<span>${kidPwImg(i)}</span>`).join('')}</span>`}
       <span class="kid-actions">
@@ -936,7 +939,7 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const pics = picsList(st.pics);
   ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
   if (cc.secret === 'password' || cc.secret === 'class') {
-    const pwTxt = cc.secret === 'class' ? klass.list.find((c) => c.id === st.class_id)?.class_pw || '' : st.pw;
+    const pwTxt = cc.secret === 'class' ? klass.list.find((c) => c.id === st.class_id)?.class_pw || '' : showPw(st.pw);
     ctx.fillText(cc.secret === 'class' ? 'Passwort (für die ganze Klasse)' : 'Passwort', X(4), Y(35.2));
     rrect(ctx, X(4), Y(37.4), L(pwW), L(11.2), L(2.4));
     ctx.fillStyle = wash; ctx.fill(); ctx.lineWidth = L(0.4); ctx.strokeStyle = accent; ctx.stroke();

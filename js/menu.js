@@ -113,7 +113,7 @@ function menuSectionHTML(sec) {
           <p class="small muted">Gilt für die Kärtchen, die du ab jetzt druckst (Klasse → Kärtchen). Das Passwort bleibt gleich – nur die Darstellung ändert sich.</p>
           <div class="field"><span class="label">Passwort auf dem Kärtchen</span>
             <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="pics" ${c.secret === 'pics' ? 'checked' : ''}><span><b>Bilder</b> – die Kinder tippen 3 Bilder an (ideal für Unterstufe)</span></label>
-            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="password" ${c.secret === 'password' ? 'checked' : ''}><span><b>Passwort pro Kind</b> – Vokaboom erzeugt für jedes Kind ein eigenes Passwort, z. B. „blau-tiger-47“</span></label>
+            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="password" ${c.secret === 'password' ? 'checked' : ''}><span><b>Passwort pro Kind</b> – Vokaboom erzeugt für jedes Kind ein eigenes einfaches Passwort aus einem Wort und einer Zahl, z. B. „Teich23“</span></label>
             <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="class" ${c.secret === 'class' ? 'checked' : ''}><span><b>Klassenpasswort</b> – du legst ein Passwort für die ganze Klasse fest (einfach zu merken; dafür könnten sich Kinder gegenseitig anmelden)</span></label>
           </div>
           <div class="field"><span class="label">Name auf dem Kärtchen</span>
