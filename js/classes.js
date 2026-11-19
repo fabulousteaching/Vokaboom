@@ -23,6 +23,15 @@ const kidWordImg = (username, cls = '') => {
   const s = typeof KID_WORDS === 'object' && KID_WORDS[kidWordOf(username)];
   return s ? `<img class="${cls}" src="${kidSvgURL(s)}" alt="" draggable="false">` : '';
 };
+const kidInitials = (k) => `${(k.first || k.first_name || '?').trim().charAt(0).toUpperCase()}.${(k.initial ?? k.last_initial) ? ` ${(k.initial ?? k.last_initial).charAt(0).toUpperCase()}.` : ''}`;
+/** Passwort-Wörter („Erdbeere Velo Löwe“) → Bild-Nummern; null, wenn ein Wort nicht passt */
+const pwNorm = (w) => w.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z]/g, '');
+function kidWordsToPicks(text) {
+  const words = String(text || '').split(/[\s,;.\-–+/]+/).map(pwNorm).filter(Boolean);
+  if (words.length !== 3) return null;
+  const idx = words.map((w) => KID_PW.findIndex((p) => p.key === w || pwNorm(p.de) === w || (w === 'eis' && p.key === 'glace') || (w === 'fahrrad' && p.key === 'velo') || (w === 'hubschrauber' && p.key === 'helikopter')));
+  return idx.every((i) => i >= 0) ? idx : null;
+}
 const kidPwImg = (i, cls = '') => `<img class="${cls}" src="${kidSvgURL(KID_PW[i].svg)}" alt="${esc(KID_PW[i].de)}" draggable="false">`;
 const picsList = (pics) => String(pics || '').split(',').map(Number).filter((n) => n >= 0 && n < 12);
 const kidLoginUrl = (st) => `${siteUrl()}#k=${st.username}.${picsList(st.pics).join('-')}`;
@@ -249,9 +258,14 @@ function openKidLogin() {
     <form id="kid-form" class="auth-form kid-form" autocomplete="off" novalidate>
       <label class="field" for="kid-user"><span class="label">Dein Benutzername</span>
         <input id="kid-user" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" placeholder="z. B. Baum34" enterkeyhint="next"></label>
-      <p class="label">Tippe deine 3 Bilder der Reihe nach an</p>
-      <div class="kid-slots" id="kid-slots" aria-live="polite"></div>
-      <div class="kid-grid">${KID_PW.map((p, i) => `<button type="button" class="kid-pic" data-action="kid-pick" data-i="${i}" aria-label="${esc(p.de)}">${kidPwImg(i)}</button>`).join('')}</div>
+      <div class="kid-pw-pics" id="kid-pw-pics">
+        <p class="label">Tippe deine 3 Bilder der Reihe nach an</p>
+        <div class="kid-slots" id="kid-slots" aria-live="polite"></div>
+        <div class="kid-grid">${KID_PW.map((p, i) => `<button type="button" class="kid-pic" data-action="kid-pick" data-i="${i}" aria-label="${esc(p.de)}">${kidPwImg(i)}</button>`).join('')}</div>
+      </div>
+      <label class="field kid-pw-words" for="kid-pw" hidden><span class="label">Dein Passwort (3 Wörter)</span>
+        <input id="kid-pw" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="60" placeholder="z. B. Erdbeere Velo Löwe" enterkeyhint="go"></label>
+      <p class="small"><button type="button" class="link-btn" data-action="kid-pw-mode" id="kid-pw-mode">Passwort lieber eintippen</button></p>
       <p class="form-error" id="kid-error" role="alert"></p>
       <button class="btn primary big" type="submit" id="kid-submit">Los geht's ${icon('right')}</button>
     </form>
@@ -280,6 +294,12 @@ async function submitKidLogin() {
   if (!err) return;
   const user = input.value.trim().replace(/\s+/g, '');
   if (!user) { err.textContent = 'Schreib zuerst deinen Benutzernamen (er steht auf deinem Kärtchen).'; input.focus(); return; }
+  const typed = !$('.kid-pw-words')?.hidden;
+  if (typed) {
+    const pk = kidWordsToPicks($('#kid-pw')?.value);
+    if (!pk) { err.textContent = 'Schreib die 3 Wörter von deinem Kärtchen, z. B. „Erdbeere Velo Löwe“.'; $('#kid-pw')?.focus(); return; }
+    kidForm.picks = pk;
+  }
   if (kidForm.picks.length < 3) { err.textContent = 'Tippe deine 3 Bilder an.'; return; }
   err.textContent = '';
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Anmelden …';
@@ -290,6 +310,7 @@ async function submitKidLogin() {
       err.textContent = 'Das stimmt leider nicht. Schau genau auf dein Kärtchen und probier es nochmal.';
       sfx.bad();
       kidForm.picks = []; renderKidSlots();
+      if (typed) $('#kid-pw')?.select();
       btn.disabled = false; btn.innerHTML = `Los geht's ${icon('right')}`;
       return;
     }
@@ -330,7 +351,7 @@ function kidHomeHTML() {
         <span class="row kid-hello-btns"><button class="btn secondary live-join-btn" data-action="live-join">🎯 Live-Spiel beitreten</button>
         ${kid.e1 && CLOUD_CFG.einmaleinsUrl ? '<button class="btn secondary other-tool" data-action="go-einmaleins"><span class="ot-tag">1×1</span> Rechnen üben</button>' : ''}</span></div>
     </div>
-    ${typeof avatarSVG === 'function' ? `<button class="av-home-card" data-action="avatar-open">
+    ${typeof avatarSVG === 'function' && avatarOn() ? `<button class="av-home-card" data-action="avatar-open">
       <span class="av-home-fig">${AV.state ? avatarSVG(AV.state.avatar, { idle: true, label: 'Mein Avatar' }) : ''}</span>
       <span><strong>Mein Avatar${AV.state?.fresh ? '<span class="av-new">Neu</span>' : ''}</strong>
         <span class="muted">${AV.state?.fresh ? 'Gestalte deine eigene Figur!' : 'Frisur, Kleider, Haustier …'}</span><br>
@@ -774,9 +795,10 @@ function classCardsHTML(c, kids) {
   return `<div class="panel">
     <div class="cards-head">
       <div><h2>Login-Kärtchen</h2>
-        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen.</p>
+        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen (oder die 3 Passwort-Wörter eintippen).</p>
         <p class="hint">Die Kärtchen sind neutral, ohne Logo. ${kids.some((x) => einmaleinsLoginOf(x)) ? 'Kinder, die auch in Teilmal sind, bekommen zwei QR-Codes: <strong>ABC Vokabeln</strong> öffnet Vokaboom, <strong>1×1 Rechnen</strong> öffnet Teilmal – ein Kärtchen für beide Tools.' : 'Der QR-Code <strong>ABC Vokabeln</strong> öffnet Vokaboom.'}</p></div>
-      <button class="btn primary" data-action="cards-pdf" id="cards-pdf">${icon('down')} PDF herunterladen</button>
+      <span class="row"><button class="btn secondary" data-action="menu-sec" data-sec="klassen">${icon('sliders')} Kärtchen anpassen</button>
+      <button class="btn primary" data-action="cards-pdf" id="cards-pdf">${icon('down')} PDF herunterladen</button></span>
     </div>
     <div class="card-previews">${kids.map((s) => `<figure class="card-prev" data-sid="${s.id}"><span class="spinner"></span></figure>`).join('')}</div>
   </div>`;
@@ -849,7 +871,9 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
   const X = (mm) => (x + mm) * s, Y = (mm) => (y + mm) * s, L = (mm) => mm * s;
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
-  const e1Url = einmaleinsLoginOf(st);
+  const cc = typeof cardCfg === 'function' ? cardCfg() : { secret: 'pics', names: 'full', qr: true, cls: true };
+  const e1Url = cc.qr ? einmaleinsLoginOf(st) : '';
+  const pwW = cc.qr ? 43 : CARD_W - 8; // Platz fürs Passwort (links neben den QR-Codes)
   ctx.save();
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
   ctx.fillStyle = '#fff'; ctx.fill();
@@ -863,23 +887,37 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   ctx.fillStyle = '#fff'; ctx.font = `800 ${L(3.4)}px ${disp}`;
   ctx.fillText('Mein Login', X(4), Y(6.2));
   ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.9)';
-  ctx.fillText(fitText(ctx, className, L(44), (z) => `500 ${z}px ${body}`, L(2.8)), X(CARD_W - 4), Y(6));
+  if (cc.cls) ctx.fillText(fitText(ctx, className, L(44), (z) => `500 ${z}px ${body}`, L(2.8)), X(CARD_W - 4), Y(6));
   ctx.textAlign = 'left';
   // Bild, Name, Benutzername
   rrect(ctx, X(4), Y(12), L(16), L(16), L(3.5)); ctx.fillStyle = wash; ctx.fill();
   const wimg = await svgImage(KID_WORDS[kidWordOf(st.username)] || '');
   if (wimg) ctx.drawImage(wimg, X(5.5), Y(13.5), L(13), L(13));
   ctx.fillStyle = '#1E293B';
-  ctx.fillText(fitText(ctx, kidName(st), L(56), (z) => `600 ${z}px ${body}`, L(3.4)), X(23.5), Y(16.6));
+  ctx.fillText(fitText(ctx, cc.names === 'initials' ? kidInitials(st) : kidName(st), L(56), (z) => `600 ${z}px ${body}`, L(3.4)), X(23.5), Y(16.6));
   ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`; ctx.fillText('Benutzername', X(23.5), Y(21));
   ctx.fillStyle = accent;
   ctx.fillText(fitText(ctx, displayUser(st.username), L(56), (z) => `800 ${z}px ${disp}`, L(6.2)), X(23.5), Y(27.8));
-  // Bilder-Passwort
-  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
-  ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
+  // Passwort: Bilder, Wörter oder beides
   const pics = picsList(st.pics);
+  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
+  if (cc.secret === 'words') {
+    ctx.fillText('Passwort: diese 3 Wörter', X(4), Y(34.6));
+    for (let k = 0; k < 3; k++) {
+      const ty = 39.6 + k * 5.4;
+      ctx.beginPath(); ctx.arc(X(5.9), Y(ty - 1.05), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
+      ctx.fillText(String(k + 1), X(5.9), Y(ty - 0.15)); ctx.textAlign = 'left';
+      ctx.fillStyle = '#1E293B';
+      ctx.fillText(fitText(ctx, pics[k] != null ? KID_PW[pics[k]].de : '', L(pwW - 6), (z) => `700 ${z}px ${disp}`, L(4)), X(9.6), Y(ty + 0.3));
+    }
+    ctx.restore();
+    if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
+    return;
+  }
+  ctx.fillText(cc.secret === 'both' ? 'Passwort: 3 Bilder antippen oder Wörter tippen' : 'Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
   for (let k = 0; k < 3; k++) {
-    const bx = 4 + k * 13, by = 37;
+    const bx = 4 + k * 13, by = cc.secret === 'both' ? 36.2 : 37;
     rrect(ctx, X(bx), Y(by), L(11), L(11), L(2.2));
     ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.45); ctx.strokeStyle = accent; ctx.stroke();
     const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
@@ -887,8 +925,18 @@ async function drawKidCard(ctx, x, y, s, st, className) {
     ctx.beginPath(); ctx.arc(X(bx + 0.4), Y(by + 0.4), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
     ctx.fillText(String(k + 1), X(bx + 0.4), Y(by + 1.3)); ctx.textAlign = 'left';
+    if (cc.secret === 'both' && pics[k] != null) {
+      ctx.fillStyle = '#1E293B'; ctx.textAlign = 'center';
+      ctx.fillText(fitText(ctx, KID_PW[pics[k]].de, L(12.6), (z) => `700 ${z}px ${body}`, L(2.2)), X(bx + 5.5), Y(by + 14.2));
+      ctx.textAlign = 'left';
+    }
   }
-  // QR-Codes: einer pro Fach
+  ctx.restore();
+  if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
+}
+/** QR-Codes: einer pro Fach */
+function drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body) {
+  ctx.save();
   if (e1Url) {
     drawQR(ctx, kidLoginUrl(st), 46.5, 30.5, 17.5, X, Y, L);
     drawQR(ctx, e1Url, 65, 30.5, 17.5, X, Y, L);
@@ -1118,6 +1166,15 @@ const classActions = {
   'stats-kid': (el) => { klass.kidDetail = klass.kidDetail === el.dataset.id ? '' : el.dataset.id; render(); if (klass.kidDetail) $('.kid-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   /* Kinder */
   'kid-login': () => openKidLogin(),
+  'kid-pw-mode': () => {
+    const w = $('.kid-pw-words'), p = $('#kid-pw-pics'), b = $('#kid-pw-mode');
+    if (!w) return;
+    const toWords = w.hidden;
+    w.hidden = !toWords; p.hidden = toWords;
+    b.textContent = toWords ? 'Lieber Bilder antippen' : 'Passwort lieber eintippen';
+    kidForm.picks = []; renderKidSlots(); $('#kid-error').textContent = '';
+    (toWords ? $('#kid-pw') : $('#kid-user'))?.focus();
+  },
   'kid-pick': (el) => kidPick(+el.dataset.i),
   'kid-unpick': () => kidUnpick(),
   'kid-account': () => openKidAccount(),

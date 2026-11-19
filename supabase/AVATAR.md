@@ -23,9 +23,19 @@ Preise: 5 bis 50 Münzen. **Anprobieren** geht immer – gekauft wird erst mit �
 
 ## Münzen
 
-- **Vokaboom:** richtige Antwort 1 Punkt (Lernkarten „gewusst“ ½), ein Wort, das vorher schon falsch war, +½; Test ab 80 % +3, alles richtig +5; fertig gespieltes Spiel +1. **10 Punkte = 1 Münze.**
+- **Vokaboom:** richtige Antwort 1 Punkt (Lernkarten „gewusst“ ½), ein Wort, das vorher schon falsch war, +½; Test ab 80 % +3, alles richtig +5; fertig gespieltes Spiel +1. **10 Punkte = 1 Münze** (Lehrperson kann das ändern, siehe unten).
 - **Teilmal:** jede Münze, die ein Kind in den Übungen verdient, zählt auch für den Avatar.
-- Höchstens **40 Münzen pro Tag** (prüft die Datenbank). Preise, Besitz und Tageslimit prüft die Datenbank, nicht der Browser – Schummeln über die Entwicklerwerkzeuge bringt nichts.
+- Höchstens **40 Münzen pro Tag** (Lehrperson kann das ändern; prüft die Datenbank). Preise, Besitz und Tageslimit prüft die Datenbank, nicht der Browser – Schummeln über die Entwicklerwerkzeuge bringt nichts.
+
+## Einstellungen der Lehrperson
+
+Im **Menü → Avatar & Münzen** (Vokaboom, mit Konto) legt die Lehrperson fest – gilt für alle ihre Klassen, in Vokaboom und Teilmal (Tabelle `fab_teacher_settings`):
+
+- **Mein Avatar** für die Kinder ein/aus (aus: weder Avatar noch Münzen sichtbar)
+- **Münzen sammeln** ein/aus, **Tempo** (5, 10, 15 oder 20 Punkte pro Münze), **Höchstens pro Tag** (10–100 Münzen)
+- **Spiele geben Punkte** ein/aus
+- **Shop** ein/aus (aus: nur das Basic-Set und schon gekaufte Teile; die Datenbank lehnt Käufe ab)
+- **Bonus-Münzen** an ein Kind oder die ganze Klasse verteilen (höchstens 50 auf einmal, `fab_teacher_bonus`)
 
 ## In Teilmal einbauen
 

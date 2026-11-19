@@ -379,6 +379,7 @@ function cloudErrorText(e) {
 
 /* ---------- Oberfläche ---------- */
 function accountButtonHTML() {
+  if (!isKid() && typeof menuButtonHTML === 'function') return menuButtonHTML(); // ein Knopf „Menü“ mit Konto drin
   if (isKid()) return kidAccountButtonHTML();
   if (cloud.user) {
     const st = cloud.status === 'syncing' ? 'syncing' : cloud.status === 'error' ? 'error' : 'ok';
@@ -535,8 +536,15 @@ function openNewPassword() {
 }
 
 function openAccount() {
+  if (typeof openMenu === 'function') { openMenu('konto'); return; }
   openModal(`
     <header class="modal-head"><h2>Dein Konto</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
+    ${accountSectionHTML()}`, { label: 'Konto' });
+  bindAccountForms();
+}
+/** Konto: Karte, Abgleichen, Abmelden, Passwort und E-Mail ändern (im Menü und im Konto-Fenster) */
+function accountSectionHTML() {
+  return `
     <div class="account-card">
       <span class="account-avatar" aria-hidden="true">${esc(cloud.user.charAt(0).toUpperCase())}</span>
       <div><strong>${esc(cloud.user)}</strong><p class="small" id="acct-status">${accountStatusText()}</p></div>
@@ -564,8 +572,10 @@ function openAccount() {
         <p class="form-info" id="mail-info" role="status"></p>
         <button type="submit" class="btn small primary" id="mail-submit">E-Mail-Adresse ändern</button>
       </form>
-    </details>`, { label: 'Konto' });
-  $('#mail-form').addEventListener('submit', async (e) => {
+    </details>`;
+}
+function bindAccountForms() {
+  $('#mail-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('#mail-error'), info = $('#mail-info'), btn = $('#mail-submit');
     const email = normEmail($('#mail-new').value), pw = $('#mail-pw').value;
@@ -576,7 +586,7 @@ function openAccount() {
     try {
       const res = await cloudChangeEmail(email, pw);
       if (res === 'done') {
-        openAccount();
+        if (typeof openMenu === 'function') openMenu('konto'); else openAccount();
         toast(`Deine E-Mail-Adresse ist jetzt ${email}. Melde dich ab jetzt damit an.`);
         return;
       }
@@ -592,7 +602,7 @@ function openAccount() {
       if ($('#mail-submit')) btn.disabled = false;
     }
   });
-  $('#pw-form').addEventListener('submit', async (e) => {
+  $('#pw-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const pw = $('#pw-new').value, err = $('#pw-error');
     if (pw.length < 8) { err.textContent = 'Das Passwort braucht mindestens 8 Zeichen.'; return; }

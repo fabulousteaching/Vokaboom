@@ -33,6 +33,8 @@ const ICONS = {
   brush: '<path d="M14.5 4.5l5 5-7.5 7.5-5-5z"/><path d="M7 12c-2 0-4 1.5-4 4.5V20h3.5C9.5 20 11 18 11 16"/>',
   picto: '<circle cx="12" cy="5.5" r="2.5"/><path d="M12 9v6M7.5 11.5 12 9l4.5 2.5M9 21l3-6 3 6"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/>',
+  shield: '<path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   snail: '<path d="M3 18h15a3 3 0 0 0 3-3V9"/><path d="M19 6l1 3 1-3"/><circle cx="10" cy="12" r="5"/><path d="M10 12a1.8 1.8 0 1 1 1.8-1.8"/>',
 };
 const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
@@ -73,7 +75,7 @@ function renderShell() {
           ${searchSlotHTML()}
           ${isKid() ? `<span id="av-coin-slot">${typeof avCoinPillHTML === 'function' ? avCoinPillHTML() : ''}</span>` : ''}
           <span id="account-slot">${accountButtonHTML()}</span>
-          <button class="icon-btn" data-action="settings" aria-label="Einstellungen" title="Einstellungen">${icon('sliders')}</button>
+          ${isKid() || typeof menuButtonHTML !== 'function' ? `<button class="icon-btn" data-action="settings" aria-label="Einstellungen" title="Einstellungen">${icon('sliders')}</button>` : ''}
         </div>
       </div>
     </header>

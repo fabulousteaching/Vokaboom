@@ -1,0 +1,78 @@
+/* Vokaboom – Menü (Lehrperson): links die Bereiche, rechts die Einstellungen */
+.menu-btn {
+  position: relative; display: inline-flex; align-items: center; gap: .45rem; min-height: 44px;
+  padding: .3rem .95rem .3rem .45rem; border-radius: 99px; border: 1px solid var(--line); background: var(--paper);
+  font-weight: 700; color: var(--ink-2);
+}
+.menu-btn:not(.in) { padding-left: .8rem; }
+.menu-btn:hover { color: var(--ink); border-color: var(--line-2); background: var(--paper-2); }
+.menu-btn .icon { width: 20px; height: 20px; }
+.menu-who {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; flex: none;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: var(--on-brand); font-weight: 800; font-size: .95rem;
+}
+.menu-btn.in .icon { display: none; }
+.menu-btn .sync-dot { position: absolute; left: 30px; top: 6px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--paper); }
+
+.modal.menu-modal { width: min(100%, 920px); height: min(100%, 680px); padding: 0; overflow: hidden; display: block; }
+.menu { display: grid; grid-template-columns: 262px minmax(0, 1fr); height: 100%; }
+.menu-nav {
+  display: flex; flex-direction: column; gap: 4px; padding: 22px 12px; background: var(--paper-2);
+  border-right: 1px solid var(--line); overflow: auto;
+}
+.menu-title { font-weight: 800; font-size: 1.25rem; padding: 0 .7rem .6rem; color: var(--ink); }
+.menu-tab {
+  position: relative; display: flex; align-items: center; gap: .65rem; min-height: 46px; padding: .5rem .8rem;
+  border: 0; border-radius: 14px; background: transparent; color: var(--ink-2); font-weight: 600; text-align: left;
+}
+.menu-tab .icon { width: 20px; height: 20px; flex: none; color: var(--ink-3); }
+.menu-tab:hover { background: var(--paper); color: var(--ink); }
+.menu-tab.on { background: var(--paper); color: var(--brand); box-shadow: var(--shadow-card); }
+.menu-tab.on .icon { color: var(--brand); }
+.menu-tab.on::before { content: ''; position: absolute; left: -12px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--brand); }
+.menu-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); margin-left: auto; }
+.menu-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.menu-main > .modal-head { padding: 22px 26px 6px; align-items: center; }
+.menu-main > .modal-head h2 { margin-right: auto; }
+.menu-saved { display: inline-flex; align-items: center; gap: .3rem; color: var(--green); font-weight: 600; font-size: .92rem; opacity: 0; transition: opacity .25s; }
+.menu-saved.on { opacity: 1; }
+.menu-saved .icon { width: 18px; height: 18px; }
+.menu-body { flex: 1; overflow: auto; padding: 8px 26px 26px; display: grid; gap: 1rem; align-content: start; }
+.menu-group { display: grid; gap: .7rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 20px; margin: 0; min-width: 0; }
+.menu-group h3 { font-size: 1.05rem; margin: .2rem 0 0; }
+.menu-group[disabled] { opacity: .5; }
+.menu-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .8rem; }
+.menu-card {
+  display: grid; gap: .3rem; justify-items: start; text-align: left; padding: 1rem 1.1rem; border-radius: 20px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+.menu-card:hover { border-color: var(--brand); background: var(--brand-wash); }
+.menu-card .icon { width: 26px; height: 26px; color: var(--brand); }
+.menu-card small { color: var(--ink-2); font-size: .9rem; }
+.menu-empty { display: grid; justify-items: center; gap: .8rem; text-align: center; padding: 2rem 1rem; color: var(--ink-2); }
+.menu-empty > .icon { width: 40px; height: 40px; color: var(--ink-3); }
+.menu-list { margin: 0; padding-left: 1.2rem; display: grid; gap: .35rem; color: var(--ink-2); }
+.menu .radio { display: flex; align-items: flex-start; gap: .6rem; cursor: pointer; padding: .25rem 0; }
+.menu .radio input { width: 20px; height: 20px; margin-top: .1rem; accent-color: var(--brand); flex: none; }
+.menu .switch span small { display: block; color: var(--ink-3); font-weight: 400; font-size: .88rem; }
+.menu .switch.big { align-items: flex-start; }
+.menu .switch.big input { margin-top: .15rem; }
+.menu .field small { display: block; margin-top: .3rem; }
+.bonus-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.bonus-row select { flex: 1 1 150px; min-width: 0; }
+.danger-zone { border-color: var(--red-wash); }
+
+@media (max-width: 700px) {
+  .modal.menu-modal { height: 100%; border-radius: 22px; }
+  .menu { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .menu-nav { flex-direction: row; overflow-x: auto; padding: 10px; border-right: 0; border-bottom: 1px solid var(--line); scrollbar-width: none; }
+  .menu-title { display: none; }
+  .menu-tab { flex: none; min-height: 40px; padding: .4rem .75rem; font-size: .92rem; }
+  .menu-tab.on::before { display: none; }
+  .menu-main > .modal-head { padding: 14px 16px 4px; }
+  .menu-body { padding: 6px 16px 18px; }
+}
+@media (max-width: 560px) {
+  .menu-btn { padding-right: .75rem; gap: .35rem; }
+  .menu-btn:not(.in) .icon { display: none; }
+}

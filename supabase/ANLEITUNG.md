@@ -83,7 +83,9 @@ Oben in der Titelleiste gibt es die Suche „Portionen von anderen suchen“ (am
 
 ## Klassen und Kinder-Logins
 
-Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Klassen**.
+Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) den Knopf **Meine Klassen**.
+
+**Menü:** Oben rechts gibt es einen einzigen Knopf **Menü**. Links die Bereiche, rechts die Einstellungen: Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon · Daten & Hilfe.
 
 1. **Klasse anlegen**, z. B. „5a Englisch“.
 2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
@@ -93,6 +95,8 @@ Mit Konto gibt es auf der Startseite (und unter **Konto**) den Knopf **Meine Kla
 6. **Auswertung**: pro Kind und Portion der Anteil richtiger Antworten, wie viele Wörter und Übungen gemacht sind und der beste Test. Antippen eines Kindes zeigt seine schwierigsten Wörter; unten stehen die schwierigsten Wörter der ganzen Klasse.
 
 **Anmelden als Kind:** QR-Code auf dem Kärtchen mit der Kamera scannen – oder auf **Anmelden → Kinder-Login**, Benutzernamen eintippen und die 3 Bilder der Reihe nach antippen. Nach 8 falschen Versuchen ist 5 Minuten Pause. Auf einem Gerät, auf dem eine Lehrperson angemeldet ist, geht das Kinder-Login erst nach dem Abmelden.
+
+**Kärtchen anpassen** (Menü → Klassen & Kärtchen, oder in der Klasse unter Kärtchen → „Kärtchen anpassen“): Passwort als **Bilder**, als **Passwort-Wörter** (z. B. „Erdbeere Velo Löwe“ zum Eintippen) oder **beides**; Name als Vorname + Anfangsbuchstabe oder **nur Initialen**; QR-Code und Klassenname ein/aus. Das Passwort selbst bleibt gleich – die Kinder können im Kinder-Login jederzeit „Passwort lieber eintippen“ wählen.
 
 **Kärtchen verloren?** Beim Kind auf das Symbol mit den gekreuzten Pfeilen tippen: Es bekommt neue Bilder, das alte Kärtchen gilt nicht mehr.
 
@@ -164,6 +168,6 @@ Danach mit dem neuen Passwort anmelden und es unter «Konto → Passwort ändern
 
 ## Mein Avatar und Münzen (Kinder mit Login-Kärtchen)
 
-Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, Kleider, Schuhe, Extras, Haustier, Hintergrund). Das Basic-Set ist gratis, weitere Teile kosten Münzen, die sie beim Üben verdienen (10 Punkte = 1 Münze, höchstens 40 Münzen pro Tag). Verbundene Kinder haben in Vokaboom und Teilmal denselben Avatar und dieselben Münzen.
+Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, Kleider, Schuhe, Extras, Haustier, Hintergrund). Das Basic-Set ist gratis, weitere Teile kosten Münzen, die sie beim Üben verdienen (Standard: 10 Punkte = 1 Münze, höchstens 40 Münzen pro Tag – im **Menü → Avatar & Münzen** einstellbar, dort auch Shop ein/aus und Bonus-Münzen). Verbundene Kinder haben in Vokaboom und Teilmal denselben Avatar und dieselben Münzen.
 
-**Einrichten:** `supabase/avatar.sql` einmal im SQL Editor ausführen. Details, Preise und die Schritte für Teilmal: `supabase/AVATAR.md`.
+**Einrichten:** `supabase/avatar.sql` im SQL Editor ausführen (nach Updates nochmals ganz – bestehende Avatare und Münzen bleiben). Details, Preise und die Schritte für Teilmal: `supabase/AVATAR.md`.

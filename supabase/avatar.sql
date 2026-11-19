@@ -44,6 +44,45 @@ insert into public.fab_avatar_items (id, price) values
   ('bg:space', 20), ('bg:beach', 15), ('bg:jungle', 15), ('bg:rainbow', 18), ('bg:castle', 25)
 on conflict (id) do update set price = excluded.price;
 
+-- Einstellungen der Lehrperson (gelten für alle ihre Klassen, in beiden Tools):
+-- {"on": true, "coins": true, "shop": true, "games": true, "perCoin": 10, "dayMax": 40}
+create table if not exists public.fab_teacher_settings (
+  teacher_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  avatar jsonb not null default '{}' check (jsonb_typeof(avatar) = 'object' and octet_length(avatar::text) <= 2000),
+  updated_at timestamptz not null default now()
+);
+alter table public.fab_teacher_settings enable row level security;
+revoke all on public.fab_teacher_settings from anon, authenticated;
+grant select, insert, update on public.fab_teacher_settings to authenticated;
+drop policy if exists "eigene einstellungen" on public.fab_teacher_settings;
+create policy "eigene einstellungen" on public.fab_teacher_settings for all to authenticated
+  using ((select auth.uid()) = teacher_id) with check ((select auth.uid()) = teacher_id);
+
+-- Hilfe: Einstellungen der Lehrperson des Kindes (mit Standardwerten)
+create or replace function public.fab_kid_cfg(p_app text, p_token uuid)
+returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare tid uuid; cfg jsonb;
+begin
+  if p_app = 'vokaboom' and to_regclass('public.vokaboom_sessions') is not null then
+    select c.teacher_id into tid from public.vokaboom_sessions x join public.vokaboom_students s on s.id = x.student_id
+      join public.vokaboom_classes c on c.id = s.class_id where x.token = p_token;
+  elsif p_app in ('einmaleins', 'teilmal') and to_regclass('public.einmaleins_sessions') is not null then
+    select c.teacher_id into tid from public.einmaleins_sessions x join public.einmaleins_students s on s.id = x.student_id
+      join public.einmaleins_classes c on c.id = s.class_id where x.token = p_token;
+  end if;
+  select t.avatar into cfg from public.fab_teacher_settings t where t.teacher_id = tid;
+  cfg := coalesce(cfg, '{}'::jsonb);
+  return jsonb_build_object(
+    'on', coalesce((cfg ->> 'on')::boolean, true),
+    'coins', coalesce((cfg ->> 'coins')::boolean, true),
+    'shop', coalesce((cfg ->> 'shop')::boolean, true),
+    'games', coalesce((cfg ->> 'games')::boolean, true),
+    'perCoin', least(30, greatest(3, coalesce((cfg ->> 'perCoin')::integer, 10))),
+    'dayMax', least(100, greatest(0, coalesce((cfg ->> 'dayMax')::integer, 40))));
+end;
+$$;
+
 -- Hilfe: Schlüssel des Kindes aus dem Anmelde-Schlüssel (und verbundene Konten zusammenführen)
 create or replace function public.fab_kid_key(p_app text, p_token uuid)
 returns text
@@ -96,13 +135,15 @@ begin
 end;
 $$;
 
-create or replace function public.fab_avatar_state(k text)
+drop function if exists public.fab_avatar_state(text);
+create or replace function public.fab_avatar_state(k text, cfg jsonb default '{}'::jsonb)
 returns jsonb
 language sql stable security definer set search_path = '' as $$
   select coalesce((select jsonb_build_object('avatar', a.avatar, 'owned', to_jsonb(a.owned), 'coins', a.coins, 'earned', a.earned, 'spent', a.spent,
-    'today', case when a.day = current_date then a.day_coins else 0 end, 'dayMax', 40)
+    'today', case when a.day = current_date then a.day_coins else 0 end)
     from public.fab_avatars a where a.kid_key = k),
-    jsonb_build_object('avatar', '{}'::jsonb, 'owned', '[]'::jsonb, 'coins', 0, 'earned', 0, 'spent', 0, 'today', 0, 'dayMax', 40));
+    jsonb_build_object('avatar', '{}'::jsonb, 'owned', '[]'::jsonb, 'coins', 0, 'earned', 0, 'spent', 0, 'today', 0))
+    || jsonb_build_object('cfg', cfg, 'dayMax', coalesce((cfg ->> 'dayMax')::integer, 40));
 $$;
 
 -- Kind: Avatar, gekaufte Teile und Münzen holen
@@ -113,7 +154,7 @@ declare k text;
 begin
   k := public.fab_kid_key(p_app, p_token);
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
-  return public.fab_avatar_state(k);
+  return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
 end;
 $$;
 
@@ -132,7 +173,7 @@ begin
     where not (i.id = any (own)) limit 1;
   if bad is not null then raise exception 'not_owned' using errcode = 'P0001', detail = bad; end if;
   update public.fab_avatars set avatar = p_avatar, updated_at = now() where kid_key = k;
-  return public.fab_avatar_state(k);
+  return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
 end;
 $$;
 
@@ -144,31 +185,34 @@ declare k text; pr integer; a public.fab_avatars;
 begin
   k := public.fab_kid_key(p_app, p_token);
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  if not coalesce((public.fab_kid_cfg(p_app, p_token) ->> 'shop')::boolean, true) then raise exception 'shop_off' using errcode = 'P0001'; end if;
   select price into pr from public.fab_avatar_items where id = p_item;
   if pr is null then raise exception 'no_item' using errcode = 'P0001'; end if;
   insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
   select * into a from public.fab_avatars where kid_key = k for update;
-  if p_item = any (a.owned) then return public.fab_avatar_state(k); end if;
+  if p_item = any (a.owned) then return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token)); end if;
   if a.coins < pr then raise exception 'not_enough' using errcode = 'P0001'; end if;
   update public.fab_avatars set coins = coins - pr, spent = spent + pr, owned = array_append(owned, p_item), updated_at = now() where kid_key = k;
-  return public.fab_avatar_state(k);
+  return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
 end;
 $$;
 
--- Kind: verdiente Münzen gutschreiben (höchstens 5 pro Aufruf, 40 pro Tag)
+-- Kind: verdiente Münzen gutschreiben (höchstens 5 pro Aufruf, pro Tag so viele, wie die Lehrperson erlaubt – Standard 40)
 create or replace function public.fab_coins_earn(p_app text, p_token uuid, p_n integer)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare k text; a public.fab_avatars; n integer; today integer;
+declare k text; a public.fab_avatars; n integer; today integer; cfg jsonb; dmax integer;
 begin
   k := public.fab_kid_key(p_app, p_token);
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  cfg := public.fab_kid_cfg(p_app, p_token);
+  dmax := case when (cfg ->> 'coins')::boolean then (cfg ->> 'dayMax')::integer else 0 end;
   insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
   select * into a from public.fab_avatars where kid_key = k for update;
   today := case when a.day = current_date then a.day_coins else 0 end;
-  n := greatest(0, least(coalesce(p_n, 0), 5, 40 - today));
+  n := greatest(0, least(coalesce(p_n, 0), 5, dmax - today));
   update public.fab_avatars set coins = coins + n, earned = earned + n, day = current_date, day_coins = today + n, updated_at = now() where kid_key = k;
-  return public.fab_avatar_state(k) || jsonb_build_object('granted', n);
+  return public.fab_avatar_state(k, cfg) || jsonb_build_object('granted', n);
 end;
 $$;
 
@@ -185,7 +229,25 @@ begin
 end;
 $$;
 
-revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text) from public, anon, authenticated;
+-- Lehrperson: Bonus-Münzen für ein Kind (z. B. für eine besondere Leistung), höchstens 50 auf einmal
+create or replace function public.fab_teacher_bonus(p_student uuid, p_n integer)
+returns integer
+language plpgsql security definer set search_path = '' as $$
+declare k text; n integer;
+begin
+  if not exists (select 1 from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id where s.id = p_student and c.teacher_id = auth.uid()) then
+    raise exception 'not_allowed' using errcode = '42501';
+  end if;
+  n := greatest(1, least(coalesce(p_n, 0), 50));
+  k := 'v:' || p_student;
+  insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
+  update public.fab_avatars set coins = coins + n, earned = earned + n, updated_at = now() where kid_key = k;
+  return n;
+end;
+$$;
+
+revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid) from public, anon, authenticated;
+grant execute on function public.fab_teacher_bonus(uuid, integer) to authenticated;
 grant execute on function public.fab_avatar_get(text, uuid), public.fab_avatar_save(text, uuid, jsonb),
   public.fab_avatar_buy(text, uuid, text), public.fab_coins_earn(text, uuid, integer) to anon, authenticated;
 grant execute on function public.fab_class_avatars(uuid) to authenticated;

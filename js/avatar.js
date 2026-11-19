@@ -18,7 +18,12 @@ const AV_APP = window.AVATAR_APP || 'vokaboom';
 const avEsc = (x) => String(x ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const avAll = (sel) => [...document.querySelectorAll(sel)];
 const avToast = (msg, kind) => (typeof window.toast === 'function' ? window.toast(msg, kind) : console.log(msg));
-const AV_POINTS_PER_COIN = 10;
+const AV_POINTS_PER_COIN = 10; // Standard – die Lehrperson kann es im Menü ändern (cfg.perCoin)
+/** Einstellungen der Lehrperson (kommen mit dem Avatar-Zustand aus der Datenbank) */
+const avCfg = () => ({ on: true, coins: true, shop: true, games: true, perCoin: AV_POINTS_PER_COIN, ...(AV.state?.cfg || {}) });
+const avPPC = () => Math.max(1, +avCfg().perCoin || AV_POINTS_PER_COIN);
+/** Avatar für dieses Kind sichtbar? (solange nichts geladen ist: ja) */
+const avatarOn = () => avCfg().on !== false;
 const AV = { state: null, loading: null, draft: null, cat: 'body', tried: null, busy: false, pts: 0, capWarned: false };
 
 /* ---------------- Katalog ---------------- */
@@ -344,55 +349,57 @@ function avatarLoad(force = false) {
 const avMine = () => (isKid() && AV.state ? AV.state.avatar : null);
 
 /* ---------------- Münzen verdienen ----------------
-   Punkte beim Üben → alle 10 Punkte eine Münze (pro Tag höchstens 40 Münzen, prüft die Datenbank).
+   Punkte beim Üben → alle 10 Punkte eine Münze (Lehrperson kann 5–20 einstellen; pro Tag höchstens 40, prüft die Datenbank).
    Vokaboom: richtige Antwort 1 Punkt (Lernkarten „gewusst“ ½), ein Wort, das vorher schon mal falsch war, +½,
    Test ab 80 % +3, alles richtig +5, ein fertig gespieltes Spiel +1. Teilmal: jede verdiente Münze zählt hier auch. */
 const AV_PTS_KEY = () => `fab.avpts.${kid.username || ''}`;
 function avPtsGet() { try { return parseFloat(localStorage.getItem(AV_PTS_KEY())) || 0; } catch { return 0; } }
 function avPtsSet(v) { try { localStorage.setItem(AV_PTS_KEY(), String(Math.round(v * 100) / 100)); } catch { /* */ } }
-function avatarEarnPoints(pts, from = null) {
+function avatarEarnPoints(pts, from = null, kind = '') {
   if (!isKid() || !pts) return;
+  const c = avCfg();
+  if (!c.on || !c.coins || (kind === 'game' && !c.games)) return;
   avPtsSet(avPtsGet() + pts);
   avCoinUI();
-  if (avPtsGet() >= AV_POINTS_PER_COIN) avFlushPoints(from);
+  if (avPtsGet() >= avPPC()) avFlushPoints(from);
 }
 /** Münzen direkt gutschreiben (Teilmal: das Tool zeigt seine eigene Münz-Meldung, darum hier still) */
 function avatarEarnCoins(n, from = null, quiet = true) {
   if (!isKid() || !n) return;
   AV.quiet = quiet;
-  avatarEarnPoints(n * AV_POINTS_PER_COIN, from);
+  avatarEarnPoints(n * avPPC(), from);
 }
 let avFlushing = false;
 async function avFlushPoints(from = null) {
   if (avFlushing || !isKid()) return;
-  const n = Math.min(5, Math.floor(avPtsGet() / AV_POINTS_PER_COIN));
+  const n = Math.min(5, Math.floor(avPtsGet() / avPPC()));
   if (n < 1) return;
   avFlushing = true;
   let again = false;
   try {
     const st = await avRpc('fab_coins_earn', { p_n: n });
-    avPtsSet(Math.max(0, avPtsGet() - n * AV_POINTS_PER_COIN));
+    avPtsSet(Math.max(0, avPtsGet() - n * avPPC()));
     const keepAvatar = AV.state?.avatar;
     avApply(st);
     if (keepAvatar && AV.state.fresh) AV.state.avatar = keepAvatar;
     again = st.granted > 0;
     if (st.granted > 0 && AV.quiet) { const p = document.querySelector('.av-coin-pill'); p?.classList.remove('bump'); void p?.offsetWidth; p?.classList.add('bump'); }
     else if (st.granted > 0) { try { avCoinFx(st.granted, from); } catch (e) { console.warn('Münzen-Animation', e); } }
-    else if (!AV.capWarned) { AV.capWarned = true; avToast('Für heute hast du alle Münzen gesammelt (40). Morgen gibt es neue!'); }
+    else if (!AV.capWarned) { AV.capWarned = true; avToast(`Für heute hast du alle Münzen gesammelt (${st.dayMax ?? 40}). Morgen gibt es neue!`); }
   } catch (e) {
     console.warn('Münzen gutschreiben', e); // offline: Punkte bleiben gespeichert und werden später eingelöst
   } finally {
     avFlushing = false;
-    if (again && avPtsGet() >= AV_POINTS_PER_COIN) setTimeout(() => avFlushPoints(from), 400);
+    if (again && avPtsGet() >= avPPC()) setTimeout(() => avFlushPoints(from), 400);
   }
 }
 
 /* ---------------- Anzeige: Münzen ---------------- */
 const AV_COIN_SVG = '<svg class="av-coin" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="#F4B400"/><circle cx="20" cy="20" r="14.5" fill="#FFCF3F" stroke="#E09A00" stroke-width="1.6"/><path d="M20 11 l2.6 5.4 5.9.8 -4.3 4.1 1 5.8 -5.2 -2.8 -5.2 2.8 1 -5.8 -4.3 -4.1 5.9 -.8z" fill="#E09A00"/><path d="M9 14a12 12 0 0 1 9-7" stroke="#fff" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".75"/></svg>';
 function avCoinPillHTML() {
-  if (!isKid()) return '';
+  if (!isKid() || !avatarOn()) return '';
   const c = AV.state?.coins ?? '…';
-  const p = Math.min(100, (avPtsGet() / AV_POINTS_PER_COIN) * 100);
+  const p = Math.min(100, (avPtsGet() / avPPC()) * 100);
   return `<button class="av-coin-pill" data-action="avatar-open" title="Mein Avatar und meine Münzen" aria-label="${c} Münzen – Mein Avatar">
     <span class="av-pill-face">${AV.state ? avatarSVG(AV.state.avatar, { crop: 'head', bg: false }) : ''}</span>${AV_COIN_SVG}<b class="av-coin-n">${c}</b><i class="av-coin-prog" aria-hidden="true"><i style="width:${p}%"></i></i></button>`;
 }
@@ -400,7 +407,7 @@ function avCoinUI() {
   const slot = document.getElementById('av-coin-slot');
   if (slot) slot.innerHTML = avCoinPillHTML();
   avAll('.av-coin-n').forEach((el) => { if (AV.state) el.textContent = AV.state.coins; });
-  const w = Math.min(100, (avPtsGet() / AV_POINTS_PER_COIN) * 100);
+  const w = Math.min(100, (avPtsGet() / avPPC()) * 100);
   avAll('.av-coin-prog > i').forEach((el) => { el.style.width = `${w}%`; });
 }
 function avCoinFx(n, from) {
@@ -445,15 +452,21 @@ function renderAvatar() {
     avatarLoad(true).then(() => { if (AV.state) renderAvatar(); else v.innerHTML = `<section class="av-page"><p class="banner bad">Der Avatar konnte nicht geladen werden. Bist du online?</p></section>`; });
     return;
   }
+  if (!avatarOn()) {
+    v.innerHTML = `<section class="av-page"><div class="av-loading">Der Avatar ist bei deiner Klasse gerade ausgeschaltet.</div></section>`;
+    return;
+  }
   if (!AV.draft) AV.draft = { ...AV.state.avatar };
+  const shop = avCfg().shop;
   const cat = AV_CATS.find((c) => c[0] === AV.cat) || AV_CATS[0];
+  if (!shop) for (const [sl, id] of Object.entries(AV.draft)) if (!avOwned(sl, id)) AV.draft[sl] = AV.state.avatar[sl];
   const unpaid = Object.entries(AV.draft).filter(([s, id]) => !avOwned(s, id));
   const cost = unpaid.reduce((a, [s, id]) => a + avPrice(s, id), 0);
   const changed = JSON.stringify(avFill(AV.draft)) !== JSON.stringify(avFill(AV.state.avatar));
   v.innerHTML = `<section class="av-page">
     <header class="av-top">
       <div><p class="eyebrow">Gestalte dich selbst</p><h1>Mein Avatar</h1></div>
-      <button class="av-wallet" data-action="avatar-coins" title="So verdienst du Münzen">${AV_COIN_SVG}<b class="av-coin-n">${AV.state.coins}</b><span>Münzen</span><i class="av-coin-prog"><i style="width:${Math.min(100, (avPtsGet() / AV_POINTS_PER_COIN) * 100)}%"></i></i></button>
+      <button class="av-wallet" data-action="avatar-coins" title="So verdienst du Münzen">${AV_COIN_SVG}<b class="av-coin-n">${AV.state.coins}</b><span>Münzen</span><i class="av-coin-prog"><i style="width:${Math.min(100, (avPtsGet() / avPPC()) * 100)}%"></i></i></button>
     </header>
     <div class="av-layout">
       <div class="av-prev-box"><button class="av-preview" id="av-preview" data-action="avatar-poke" aria-label="Avatar antippen">${avatarSVG(AV.draft, { idle: true, label: 'Dein Avatar' })}</button>
@@ -473,6 +486,7 @@ function renderAvatar() {
         <p class="small muted center">${AV_APP === 'vokaboom' ? 'Dein Avatar gilt auch in Teilmal.' : 'Dein Avatar gilt auch in Vokaboom.'}</p>
       </div>
       <div class="av-shop">
+        ${shop ? '' : '<p class="small muted av-shop-off">🔒 Der Shop ist gerade geschlossen – du kannst mit deinen Teilen gestalten.</p>'}
         <nav class="av-tabs" role="tablist">${AV_CATS.map(([id, emo, name]) => `<button class="av-tab ${id === cat[0] ? 'on' : ''}" role="tab" aria-selected="${id === cat[0]}" data-action="avatar-cat" data-cat="${id}"><span>${emo}</span><small>${name}</small></button>`).join('')}</nav>
         ${cat[3].map((slot) => avSlotHTML(slot)).join('')}
       </div>
@@ -480,7 +494,7 @@ function renderAvatar() {
   </section>`;
 }
 function avSlotHTML(slot) {
-  const opts = avOptions(slot);
+  const opts = avOptions(slot).filter((o) => avCfg().shop || avOwned(slot, o.id));
   const crop = { hair: 'head', hairc: 'head', eyes: 'head', mouth: 'head', face: 'head', glasses: 'head', hat: 'head', top: 'top', topc: 'top', bottom: 'legs', bottomc: 'legs', shoes: 'legs', pet: 'pet' }[slot] || 'full';
   return `<div class="av-slot"><h3>${avEsc(AV_SLOT_NAMES[slot])}</h3><div class="av-grid ${AV_COLORS[slot] ? 'colors' : ''}">${opts.map((o) => {
     const sel = AV.draft[slot] === o.id;
@@ -501,17 +515,18 @@ function avPoke() {
 }
 function avCoinsInfo() {
   const st = AV.state || { coins: 0, earned: 0, spent: 0, today: 0, dayMax: 40 };
-  const left = Math.max(0, Math.ceil((AV_POINTS_PER_COIN - avPtsGet()) * 10) / 10);
+  const cfg = avCfg();
+  const left = Math.max(0, Math.ceil((avPPC() - avPtsGet()) * 10) / 10);
   const html = `<div class="av-modal" role="dialog" aria-modal="true" aria-label="Meine Münzen"><div class="av-modal-card">
     <button class="av-modal-x" data-action="avatar-modal-close" aria-label="Schliessen">✕</button>
     <div class="av-coins-hero">${AV_COIN_SVG}<b>${st.coins}</b><span>${st.coins === 1 ? 'Münze' : 'Münzen'}</span></div>
-    <div class="av-next"><span>Nächste Münze</span><i class="av-coin-prog big"><i style="width:${Math.min(100, (avPtsGet() / AV_POINTS_PER_COIN) * 100)}%"></i></i><small>noch ${String(left).replace('.', ',')} Punkte</small></div>
+    <div class="av-next"><span>Nächste Münze</span><i class="av-coin-prog big"><i style="width:${Math.min(100, (avPtsGet() / avPPC()) * 100)}%"></i></i><small>noch ${String(left).replace('.', ',')} Punkte</small></div>
     <ul class="av-rules">
       ${AV_APP === 'vokaboom' ? `<li><b>Richtige Antwort = 1 Punkt</b> (beim Aussprechen, Hören & Schreiben, im Test und in den Übungen; Lernkarten „gewusst“ ½ Punkt).</li>
       <li><b>Dranbleiben lohnt sich:</b> Ein Wort, das du vorher schon mal falsch hattest, gibt ½ Punkt extra.</li>
       <li><b>Test ab 80 %:</b> 3 Punkte Bonus, alles richtig: 5 Punkte.</li>
-      <li><b>Spiel fertig gespielt:</b> 1 Punkt.</li>` : '<li><b>Jede Münze aus den Übungen</b> zählt auch für deinen Avatar.</li>'}
-      <li><b>10 Punkte = 1 Münze.</b> Pro Tag kannst du bis zu ${st.dayMax} Münzen sammeln (heute: ${st.today}).</li>
+      ${cfg.games ? '<li><b>Spiel fertig gespielt:</b> 1 Punkt.</li>' : ''}` : '<li><b>Jede Münze aus den Übungen</b> zählt auch für deinen Avatar.</li>'}
+      ${cfg.coins ? `<li><b>${avPPC()} Punkte = 1 Münze.</b> Pro Tag kannst du bis zu ${st.dayMax} Münzen sammeln (heute: ${st.today}).</li>` : '<li><b>Münzen sammeln ist gerade ausgeschaltet.</b> Deine Lehrperson kann dir aber Bonus-Münzen schenken.</li>'}
       <li><b>Münzen gelten in Vokaboom und Teilmal</b> – wenn du in beiden mit demselben Kärtchen angemeldet bist.</li>
     </ul>
     <p class="muted small">Bisher verdient: ${st.earned} · ausgegeben: ${st.spent}</p>
@@ -523,6 +538,7 @@ async function avBuy(slot, id) {
   if (AV.busy) return;
   const o = avOptions(slot).find((x) => x.id === id);
   if (!o || avOwned(slot, id)) return;
+  if (!avCfg().shop) { avToast('Der Shop ist gerade geschlossen.'); return; }
   if ((AV.state.coins || 0) < o.price) { avToast(`Dir fehlen noch ${o.price - AV.state.coins} Münzen.`); return; }
   AV.busy = true;
   try {
@@ -535,7 +551,7 @@ async function avBuy(slot, id) {
     avToast(`„${o.name}“ gehört jetzt dir! 🎉`);
     renderAvatar();
   } catch (e) {
-    avToast(/not_enough/.test(e?.message || '') ? 'Nicht genug Münzen.' : 'Kaufen hat nicht geklappt. Bist du online?', 'bad');
+    avToast(/not_enough/.test(e?.message || '') ? 'Nicht genug Münzen.' : /shop_off/.test(e?.message || '') ? 'Der Shop ist gerade geschlossen.' : 'Kaufen hat nicht geklappt. Bist du online?', 'bad');
   } finally { AV.busy = false; }
 }
 async function avSave() {
