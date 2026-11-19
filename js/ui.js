@@ -22,6 +22,7 @@ const ICONS = {
   stack: '<rect x="7" y="3" width="13" height="16" rx="2"/><path d="M4 7v12a2 2 0 0 0 2 2h10"/>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>',
+  book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8 7h8"/>',
   sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/>',
@@ -89,6 +90,7 @@ function backTarget() {
   if (v === 'home') return null;
   if (v === 'class') return { view: 'classes', label: 'Zurück zu den Klassen' };
   if (v === 'classes' || v === 'avatar') return { view: 'home', label: 'Zurück zur Startseite' };
+  if (v === 'library') return typeof libCanGoUp === 'function' && libCanGoUp() ? { view: 'library', label: 'Eine Ebene zurück' } : { view: 'home', label: 'Zurück zur Startseite' };
   if (v === 'game' || v === 'match') return { view: 'games', label: 'Zurück zu den Spielen' };
   if (v === 'set' || !currentSet()) return { view: 'home', label: 'Zurück zur Startseite' };
   return { view: 'set', label: 'Zurück zur Portion' };
@@ -108,6 +110,7 @@ function renderCrumbs() {
   const set = currentSet();
   if (ui.view === 'classes' || ui.view === 'class') { el.innerHTML = classesCrumbs(); return; }
   if (ui.view === 'avatar') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Mein Avatar</span>'; return; }
+  if (ui.view === 'library') { el.innerHTML = '<span class="crumb-sep" aria-hidden="true">/</span><span class="crumb current">Bibliothek</span>'; return; }
   if (!set || ui.view === 'home') { el.innerHTML = ''; return; }
   let html = `<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="open-set" data-id="${set.id}">${flag(set.lang)}<span>${esc(set.name)}</span></button>`;
   if (['match', 'game'].includes(ui.view)) html += '<span class="crumb-sep" aria-hidden="true">/</span><button class="crumb" data-action="games"><span>Vokabelspiele</span></button>';
@@ -119,9 +122,9 @@ function renderCrumbs() {
 function render() {
   const v = $('#view');
   const set = currentSet();
-  if (!['home', 'classes', 'class', 'live', 'avatar'].includes(ui.view) && !set) ui.view = 'home';
+  if (!['home', 'classes', 'class', 'live', 'avatar', 'library'].includes(ui.view) && !set) ui.view = 'home';
   if (ui.view === 'avatar' && !isKid()) ui.view = 'home';
-  if (isKid() && ['classes', 'class', 'pics'].includes(ui.view)) ui.view = 'home';
+  if (isKid() && ['classes', 'class', 'pics', 'library'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
   switch (ui.view) {
     case 'set': v.innerHTML = viewSet(set); break;
@@ -137,6 +140,7 @@ function render() {
     case 'classes': renderClasses(); break;
     case 'class': renderClass(); break;
     case 'avatar': renderAvatar(); break;
+    case 'library': renderLibrary(); break;
     default: v.innerHTML = viewHome(); bindHome();
   }
 }
@@ -508,6 +512,7 @@ function viewSet(set) {
       ${locked ? '' : `<div class="set-tools">
         <button class="btn ghost" data-action="edit-words">${icon('edit')} Bearbeiten</button>
         <button class="btn ghost" data-action="share">${icon(isFramed ? 'copy' : 'link')} ${isFramed ? 'Liste kopieren' : 'Teilen'}</button>
+        ${cloud.user && !isFramed ? `<button class="btn ghost ${set.published ? 'lib-on' : ''}" data-action="lib-assign" title="${set.published && set.libUnit && typeof libPath === 'function' ? esc(libPath(set.libUnit)) : 'In der Bibliothek teilen'}">${icon('book')} ${set.published ? 'In der Bibliothek' : 'Bibliothek'}</button>` : ''}
       </div>`}
     </header>
 
@@ -1210,10 +1215,10 @@ async function openShare(set) {
         : `<p class="warn">Für einen QR-Code sind es zu viele Wörter. Teile die Portion in zwei kleinere auf – oder kopiere den Link.</p>
         <div class="row center"><button type="button" class="btn primary" data-action="copy-link">${icon('link')} Link kopieren</button></div>`}
       ${hasUploads ? '<p class="muted small">Eigene Fotos sind zu groß für den QR-Code. Dort erscheinen bei den Kindern automatisch gesuchte Bilder.</p>' : ''}
-      ${publishBoxHTML(set)}
+      ${libStatusHTML(set)}
       ${location.protocol === 'file:' ? '<p class="warn">Du hast Vokaboom als Datei geöffnet. Damit der QR-Code bei anderen funktioniert, muss Vokaboom im Internet liegen (zum Beispiel über GitHub Pages).</p>' : ''}
     </div>`, { cls: 'share-modal', label: 'Teilen' });
-  bindPublishBox(set);
+  libStatusRefresh(set);
 }
 
 function copyText(text) {

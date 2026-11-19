@@ -1,0 +1,84 @@
+/* Vokaboom – Bibliothek: Fach → Lehrmittel → Schuljahr → Unit → Portion */
+.lib-btn {
+  display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: .35rem .95rem .35rem .75rem;
+  border-radius: 99px; border: 1px solid var(--line); background: var(--paper); color: var(--ink-2); font-weight: 600;
+}
+.lib-btn:hover { color: var(--ink); border-color: var(--line-2); background: var(--paper-2); }
+.lib-btn .icon { width: 20px; height: 20px; }
+@media (max-width: 560px) { .lib-btn span { display: none; } .lib-btn { padding: .35rem .65rem; } }
+
+.libr { display: grid; gap: 1.2rem; max-width: 860px; margin: 0 auto; }
+.libr-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+.libr-head h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.libr-search {
+  flex: 1 1 300px; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: 0 .9rem;
+  border: 1px solid var(--line); border-radius: 99px; background: var(--paper);
+}
+.libr-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 18%, transparent); }
+.libr-search .icon { color: var(--ink-3); flex: none; }
+.libr-search input { flex: 1; min-width: 0; height: 46px; border: 0; background: transparent; box-shadow: none; padding: 0; font-size: 1rem; }
+.libr-search input:focus { box-shadow: none; }
+.libr-loading { padding: 3rem 0; text-align: center; color: var(--ink-2); }
+
+.libr-path { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .35rem; font-size: .95rem; }
+.libr-crumb { border: 0; background: none; padding: .3rem .5rem; border-radius: 10px; color: var(--brand); font-weight: 600; }
+button.libr-crumb:hover { background: var(--brand-wash); }
+.libr-crumb.current { color: var(--ink); font-weight: 700; }
+.libr-sep { color: var(--ink-3); }
+.libr-body { display: grid; gap: 1rem; }
+.libr-h { font-size: 1.05rem; margin: .4rem 0 0; color: var(--ink-2); }
+
+.libr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.libr-tile {
+  display: grid; justify-items: start; gap: .35rem; padding: 1.4rem 1.5rem; border-radius: 24px; text-align: left;
+  border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow-card); color: var(--ink);
+  transition: transform .15s, border-color .15s;
+}
+.libr-tile:hover { transform: translateY(-2px); border-color: var(--brand); }
+.libr-tile strong { font-size: 1.4rem; }
+.libr-tile small { color: var(--ink-2); }
+.libr-flag { font-size: 2rem; line-height: 1; }
+.libr-flag .flag { width: 44px; height: auto; }
+
+.libr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.libr-row {
+  width: 100%; display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; text-align: left;
+  border-radius: 18px; border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+.libr-row:hover { border-color: var(--brand); background: var(--brand-wash); }
+.libr-row > .icon { color: var(--ink-3); flex: none; }
+.libr-row-text { flex: 1; min-width: 0; display: grid; }
+.libr-row-text strong { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.libr-row-text small { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.libr-count { min-width: 2.2rem; text-align: center; padding: .15rem .55rem; border-radius: 99px; background: var(--paper-2); color: var(--ink-2); font-weight: 600; font-size: .88rem; }
+.libr-list.loose .libr-row { border-style: dashed; }
+.libr-add { display: flex; gap: .4rem; align-items: flex-start; }
+.libr-add .icon { flex: none; width: 18px; height: 18px; margin-top: .1rem; }
+.libr-items .lib-open > .icon { color: var(--ink-3); flex: none; margin-left: auto; }
+
+/* Einordnen mit Häkchen */
+.asg { display: grid; gap: 1rem; }
+.asg-step { display: grid; gap: .6rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 20px; }
+.asg-step.off { opacity: .45; }
+.asg-step h3 { display: flex; align-items: center; gap: .6rem; font-size: 1.05rem; margin: 0; }
+.asg-n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--paper-2); color: var(--ink-2); font-size: .9rem; font-weight: 700; flex: none; }
+.asg-n.done { background: var(--green); color: #fff; }
+.asg-n .icon { width: 16px; height: 16px; }
+.asg-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .45rem; max-height: 240px; overflow: auto; }
+.asg-opt {
+  width: 100%; display: flex; align-items: center; gap: .55rem; padding: .55rem .75rem; text-align: left;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-weight: 550;
+}
+.asg-opt:hover { border-color: var(--line-2); background: var(--paper-2); }
+.asg-opt.on { border-color: var(--brand); background: var(--brand-wash); color: var(--brand); }
+.asg-tick { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--line-2); flex: none; }
+.asg-tick.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.asg-tick .icon { width: 14px; height: 14px; stroke-width: 3; }
+.asg-grades { display: flex; flex-wrap: wrap; gap: .45rem; }
+.asg-opt.chip { width: auto; }
+.asg-new { display: flex; gap: .5rem; }
+.asg-new input { flex: 1; min-width: 0; }
+.asg-msg { margin: 0; padding: .55rem .8rem; border-radius: 12px; background: var(--amber-wash); color: var(--ink); font-size: .92rem; }
+.lib-status p { margin: 0; display: flex; gap: .4rem; align-items: flex-start; }
+.lib-status .icon { flex: none; width: 18px; height: 18px; margin-top: .15rem; }
+.btn.lib-on { color: var(--green); }

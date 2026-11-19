@@ -24,6 +24,7 @@ const actions = {
     if (t.view === 'set') openSet(ui.setId);
     else if (t.view === 'games') { if (typeof stopGame === 'function') stopGame(); openGames(); }
     else if (t.view === 'classes') openClasses();
+    else if (t.view === 'library') libUp();
     else go('home');
   },
   'open-set': (el) => openSet(el.dataset.id),
@@ -387,6 +388,7 @@ Object.assign(actions, gameActions); // Vokabelspiele (js/games.js)
 if (typeof liveActions === 'object') Object.assign(actions, liveActions); // Quiz und Hör-Bingo (js/live.js)
 if (typeof avatarActions === 'object') Object.assign(actions, avatarActions); // Mein Avatar (js/avatar.js)
 if (typeof menuActions === 'object') Object.assign(actions, menuActions); // Menü für Lehrpersonen (js/menu.js)
+if (typeof libraryActions === 'object') Object.assign(actions, libraryActions); // Bibliothek (js/library.js)
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');

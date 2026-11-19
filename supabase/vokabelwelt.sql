@@ -110,6 +110,62 @@ create trigger vokabelwelt_public_touch before update on public.vokabelwelt_publ
   for each row execute function public.vokabelwelt_public_touch();
 
 -- ---------------------------------------------------------------------------
+-- Bibliothek: Fach (Sprache) → Lehrmittel → Schuljahr → Unit → Portion.
+-- Lehrmittel und Units legen Lehrpersonen selbst an. Gleiche Namen (auch anders geschrieben:
+-- gross/klein, Leerzeichen, Akzente, Satzzeichen) gibt es nur einmal – die Datenbank lehnt Doppelte ab.
+
+create or replace function public.vokaboom_lib_key(t text)
+returns text
+language sql immutable set search_path = '' as $$
+  select regexp_replace(translate(lower(coalesce(t, '')), 'àáâãäåçèéêëìíîïñòóôõöùúûüýÿœæß', 'aaaaaaceeeeiiiinooooouuuuyyoas'), '[^a-z0-9]', '', 'g');
+$$;
+
+create table if not exists public.vokaboom_lib_lehrmittel (
+  id uuid primary key default gen_random_uuid(),
+  lang text not null check (lang in ('en', 'fr')),
+  name text not null check (char_length(btrim(name)) between 2 and 60),
+  key text generated always as (public.vokaboom_lib_key(name)) stored,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  check (char_length(public.vokaboom_lib_key(name)) >= 2)
+);
+create unique index if not exists vokaboom_lib_lehrmittel_key on public.vokaboom_lib_lehrmittel (lang, key);
+
+-- Schuljahr: 1–9 = 1. bis 9. Klasse, 10 = ab 10. Schuljahr
+create table if not exists public.vokaboom_lib_units (
+  id uuid primary key default gen_random_uuid(),
+  lehrmittel_id uuid not null references public.vokaboom_lib_lehrmittel (id) on delete cascade,
+  grade smallint not null check (grade between 1 and 10),
+  name text not null check (char_length(btrim(name)) between 1 and 60),
+  key text generated always as (public.vokaboom_lib_key(name)) stored,
+  created_by uuid default auth.uid() references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  check (char_length(public.vokaboom_lib_key(name)) >= 1)
+);
+create unique index if not exists vokaboom_lib_units_key on public.vokaboom_lib_units (lehrmittel_id, grade, key);
+
+alter table public.vokaboom_lib_lehrmittel enable row level security;
+alter table public.vokaboom_lib_units enable row level security;
+revoke all on public.vokaboom_lib_lehrmittel, public.vokaboom_lib_units from anon, authenticated;
+grant select (id, lang, name, key, created_at) on public.vokaboom_lib_lehrmittel to anon, authenticated;
+grant select (id, lehrmittel_id, grade, name, key, created_at) on public.vokaboom_lib_units to anon, authenticated;
+grant insert (lang, name) on public.vokaboom_lib_lehrmittel to authenticated;
+grant insert (lehrmittel_id, grade, name) on public.vokaboom_lib_units to authenticated;
+drop policy if exists "bibliothek lesen" on public.vokaboom_lib_lehrmittel;
+drop policy if exists "bibliothek anlegen" on public.vokaboom_lib_lehrmittel;
+drop policy if exists "bibliothek lesen" on public.vokaboom_lib_units;
+drop policy if exists "bibliothek anlegen" on public.vokaboom_lib_units;
+create policy "bibliothek lesen" on public.vokaboom_lib_lehrmittel for select to anon, authenticated using (true);
+create policy "bibliothek anlegen" on public.vokaboom_lib_lehrmittel for insert to authenticated with check ((select auth.uid()) = created_by);
+create policy "bibliothek lesen" on public.vokaboom_lib_units for select to anon, authenticated using (true);
+create policy "bibliothek anlegen" on public.vokaboom_lib_units for insert to authenticated with check ((select auth.uid()) = created_by);
+
+-- Portion einer Unit zuordnen (leer = noch nicht eingeordnet)
+alter table public.vokabelwelt_public add column if not exists unit_id uuid references public.vokaboom_lib_units (id) on delete set null;
+create index if not exists vokabelwelt_public_unit on public.vokabelwelt_public (unit_id);
+grant select (unit_id) on public.vokabelwelt_public to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Klassen und Kinder-Logins
 -- Die Lehrperson legt Klassen an, trägt Vorname + ersten Buchstaben des Nachnamens ein
 -- und gibt Portionen frei. Kinder melden sich mit Benutzername (z. B. Baum34) und drei

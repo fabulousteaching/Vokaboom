@@ -623,7 +623,9 @@ function publicCopy(set) {
     return code ? [w.foreign, w.german || '', code] : [w.foreign, w.german || ''];
   });
   const search = [set.name, ...words.flatMap(([f, g]) => [f, g])].join(' | ').toLowerCase().slice(0, 20000);
-  return { user_id: cloud.uid, set_id: set.id, name: String(set.name || 'Vokabeln').slice(0, 200), words, search, pic_style: set.picStyle || 'picto', lang: langOf(set) };
+  const row = { user_id: cloud.uid, set_id: set.id, name: String(set.name || 'Vokabeln').slice(0, 200), words, search, pic_style: set.picStyle || 'picto', lang: langOf(set) };
+  if (set.libUnit) row.unit_id = set.libUnit; // Bibliothek: Lehrmittel › Schuljahr › Unit
+  return row;
 }
 async function cloudPublish(sets) {
   const list = [].concat(sets).filter((s) => s && s.published && s.words.some((w) => w.foreign));
@@ -631,7 +633,7 @@ async function cloudPublish(sets) {
   const c = await cloudClient();
   let { error } = await c.from(PUBLIC_TABLE).upsert(list.map(publicCopy), { onConflict: 'user_id,set_id' });
   // Spalte „lang“ fehlt noch (SQL nicht neu ausgeführt): ohne Sprache speichern
-  if (error && /lang/i.test(error.message || '')) ({ error } = await c.from(PUBLIC_TABLE).upsert(list.map((s) => { const x = publicCopy(s); delete x.lang; return x; }), { onConflict: 'user_id,set_id' }));
+  if (error && /lang|unit_id/i.test(error.message || '')) ({ error } = await c.from(PUBLIC_TABLE).upsert(list.map((s) => { const x = publicCopy(s); if (/lang/i.test(error.message)) delete x.lang; delete x.unit_id; return x; }), { onConflict: 'user_id,set_id' }));
   if (error) throw error;
 }
 async function cloudUnpublish(setId) {
@@ -655,18 +657,9 @@ async function publicSearch(q) {
   return (data || []).filter((r) => r && Array.isArray(r.words) && r.words.length);
 }
 
-/** Suchfeld in der Titelleiste (am Handy hinter der Lupe) */
+/** Oben: Knopf „Bibliothek“ (die Suche ist jetzt in der Bibliothek) */
 function searchSlotHTML() {
-  if (!cloudConfigured() || isKid()) return '';
-  return `<div class="top-search" id="top-search">
-    <button type="button" class="icon-btn search-toggle" data-action="search-open" aria-label="Portionen von anderen suchen" title="Portionen von anderen suchen">${icon('search')}</button>
-    <form class="top-search-form" id="pub-form" role="search" autocomplete="off">
-      ${icon('search')}
-      <input id="pub-q" type="search" placeholder="Portionen von anderen suchen" aria-label="Portionen von anderen suchen" aria-controls="pub-pop" aria-expanded="false" enterkeyhint="search">
-      <button type="button" class="icon-btn subtle search-close" data-action="search-close" aria-label="Suche schließen">${icon('x')}</button>
-    </form>
-    <div class="pub-pop" id="pub-pop" hidden><div id="pub-results" aria-live="polite"></div></div>
-  </div>`;
+  return typeof libraryButtonHTML === 'function' ? libraryButtonHTML() : '';
 }
 function pubResultsHTML() {
   const head = pub.q ? `Treffer für „${esc(pub.q)}“` : 'Neu in der Suche';
@@ -761,34 +754,3 @@ function takePublicSet(i) {
   toast(`„${set.name}“ ist jetzt bei deinen Portionen.`);
 }
 
-/** Schalter im Teilen-Fenster */
-function publishBoxHTML(set) {
-  if (!cloudConfigured()) return '';
-  return `<div class="pub-box">
-    <label class="switch"><input type="checkbox" id="pub-on" ${set.published ? 'checked' : ''} ${cloud.user ? '' : 'disabled'}><span>In der Suche zeigen</span></label>
-    <p class="muted small">Dann finden andere „${esc(set.name)}“ über die Suche oben und können sie übernehmen. Geteilt werden nur die Vokabeln und die Bildauswahl – keine eigenen Fotos, kein Übungsstand, nicht deine E-Mail-Adresse.</p>
-    ${cloud.user ? '' : '<p class="small">Dafür musst du angemeldet sein. <button type="button" class="link-btn" data-action="login">Anmelden</button></p>'}
-    <p class="form-error" id="pub-error" role="alert"></p>
-  </div>`;
-}
-function bindPublishBox(set) {
-  const cb = $('#pub-on');
-  if (!cb) return;
-  cb.addEventListener('change', async () => {
-    const on = cb.checked, err = $('#pub-error');
-    err.textContent = '';
-    cb.disabled = true;
-    set.published = on;
-    try {
-      if (on) await cloudPublish(set); else await cloudUnpublish(set.id);
-      saveDB();
-      toast(on ? `„${set.name}“ ist jetzt in der Suche zu finden.` : `„${set.name}“ ist nicht mehr in der Suche.`);
-    } catch (e) {
-      set.published = !on;
-      cb.checked = !on;
-      if ($('#pub-error')) err.textContent = cloudErrorText(e);
-    } finally {
-      cb.disabled = false;
-    }
-  });
-}

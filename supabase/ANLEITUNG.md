@@ -71,15 +71,24 @@ Nach dem Speichern (Commit) ist die Anmeldung nach ein bis zwei Minuten auf GitH
 - Ohne Internet geht alles weiter wie bisher; gespeichert wird beim nächsten Mal mit Verbindung.
 - Unter **Konto** (oben rechts auf deinen Namen) lassen sich **Passwort** und **E-Mail-Adresse ändern**. Für eine neue E-Mail-Adresse fragt Vokaboom zur Sicherheit das aktuelle Passwort ab. Ist «Confirm email» ausgeschaltet, gilt die neue Adresse sofort. Ist es eingeschaltet, schickt Supabase einen Bestätigungs-Link an die neue Adresse (mit «Secure email change» auch einen an die bisherige); erst nach dem Klick gilt die neue Adresse.
 
-## Portionen von anderen finden
+## Bibliothek: Portionen von anderen
 
-Oben in der Titelleiste gibt es die Suche „Portionen von anderen suchen“ (am Handy hinter der Lupe). Dort erscheinen nur Portionen, die ihr Besitzer selbst freigegeben hat: **Teilen → „In der Suche zeigen“** (dafür braucht es ein Konto).
+Oben in der Titelleiste gibt es den Knopf **Bibliothek**. Dort sind die geteilten Portionen geordnet:
+**Fach** (Englisch / Französisch) → **Lehrmittel** → **Schuljahr** → **Unit / Unité** → Portion. Oben auf der Seite kann man auch suchen (Lehrmittel, Unit, Name oder ein Wort aus den Vokabeln).
 
-- Öffentlich gespeichert wird nur eine Kopie mit Name, Vokabeln und Bildauswahl. Eigene Fotos, der Übungsstand und die E-Mail-Adresse werden **nicht** geteilt; wer eine Portion freigegeben hat, sehen andere nicht.
-- Ändert der Besitzer die Portion, wird die Kopie in der Suche ein paar Sekunden später nachgeführt. Schalter aus oder Portion löschen entfernt sie aus der Suche.
-- Suchen und „Übernehmen“ geht auch ohne Konto. Übernommene Portionen sind eigenständige Kopien.
-- Dafür braucht es die Tabelle `vokabelwelt_public`: einfach `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
-- Unpassende Einträge kannst du in Supabase unter **Table Editor → vokabelwelt_public** löschen.
+**Eigene Portion teilen** (mit Konto): Portion öffnen → **Bibliothek** (oder Teilen → „In der Bibliothek teilen“). Dann mit Häkchen wählen:
+1. **Lehrmittel** – gibt es das Lehrmittel noch nicht, unten den Namen eintippen und **Anlegen**.
+2. **Schuljahr** – 1. bis 9. Klasse oder ab 10. Schuljahr (feste Auswahl).
+3. **Unit / Unité** – wie beim Lehrmittel auswählen oder neu anlegen.
+
+Jedes Lehrmittel und jede Unit gibt es nur einmal. Wer „new world“ anlegen will, obwohl es „New World“ schon gibt, bekommt die Meldung **„Dieses Lehrmittel existiert bereits“**, und das bestehende ist gleich ausgewählt (gross/klein, Leerzeichen, Bindestriche und Akzente zählen nicht). Gleich bei den Units – innerhalb desselben Lehrmittels und Schuljahrs.
+
+- Öffentlich gespeichert wird nur eine Kopie mit Name, Vokabeln und Bildauswahl. Eigene Fotos, der Übungsstand und die E-Mail-Adresse werden **nicht** geteilt; wer eine Portion geteilt hat, sehen andere nicht.
+- Ändert der Besitzer die Portion, wird die Kopie ein paar Sekunden später nachgeführt. „Aus der Bibliothek nehmen“ oder Portion löschen entfernt sie.
+- Ansehen und „Übernehmen“ geht auch ohne Konto. Übernommene Portionen sind eigenständige Kopien.
+- Früher geteilte Portionen stehen unter **„Noch nicht eingeordnet“**, bis ihr Besitzer sie einordnet (Portion öffnen → In der Bibliothek → Einordnung ändern). Lehrmittel und Units ohne Portion werden nicht angezeigt.
+- Dafür `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
+- Unpassende Einträge kannst du in Supabase im **Table Editor** löschen: Portionen in `vokabelwelt_public`, Lehrmittel in `vokaboom_lib_lehrmittel`, Units in `vokaboom_lib_units`. Tippfehler korrigierst du dort direkt in der Spalte `name`.
 
 ## Klassen und Kinder-Logins
 
