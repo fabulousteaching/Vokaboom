@@ -78,7 +78,7 @@ Oben in der Titelleiste gibt es den Knopf **Bibliothek**. Dort sind die geteilte
 
 **Eigene Portion teilen** (mit Konto): Portion öffnen → **Bibliothek** (oder Teilen → „In der Bibliothek teilen“). Dann mit Häkchen wählen:
 1. **Lehrmittel** – gibt es das Lehrmittel noch nicht, unten den Namen eintippen und **Anlegen**.
-2. **Schuljahr** – 1. bis 9. Klasse oder ab 10. Schuljahr (feste Auswahl).
+2. **Schuljahr** – 3. bis 9. Klasse (feste Auswahl; angezeigt werden die Schuljahre, für die das Lehrmittel Bände hat – „Anderes Schuljahr“ zeigt alle).
 3. **Unit / Unité** – wie beim Lehrmittel auswählen oder neu anlegen.
 
 Jedes Lehrmittel und jede Unit gibt es nur einmal. Wer „new world“ anlegen will, obwohl es „New World“ schon gibt, bekommt die Meldung **„Dieses Lehrmittel existiert bereits“**, und das bestehende ist gleich ausgewählt (gross/klein, Leerzeichen, Bindestriche und Akzente zählen nicht). Gleich bei den Units – innerhalb desselben Lehrmittels und Schuljahrs.

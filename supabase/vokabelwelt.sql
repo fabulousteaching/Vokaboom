@@ -131,11 +131,11 @@ create table if not exists public.vokaboom_lib_lehrmittel (
 );
 create unique index if not exists vokaboom_lib_lehrmittel_key on public.vokaboom_lib_lehrmittel (lang, key);
 
--- Schuljahr: 1–9 = 1. bis 9. Klasse, 10 = ab 10. Schuljahr
+-- Schuljahr: 3 bis 9 (Fremdsprachen 3. bis 9. Klasse)
 create table if not exists public.vokaboom_lib_units (
   id uuid primary key default gen_random_uuid(),
   lehrmittel_id uuid not null references public.vokaboom_lib_lehrmittel (id) on delete cascade,
-  grade smallint not null check (grade between 1 and 10),
+  grade smallint not null check (grade between 3 and 9),
   name text not null check (char_length(btrim(name)) between 1 and 60),
   key text generated always as (public.vokaboom_lib_key(name)) stored,
   created_by uuid default auth.uid() references auth.users (id) on delete set null,
@@ -143,6 +143,10 @@ create table if not exists public.vokaboom_lib_units (
   check (char_length(public.vokaboom_lib_key(name)) >= 1)
 );
 create unique index if not exists vokaboom_lib_units_key on public.vokaboom_lib_units (lehrmittel_id, grade, key);
+-- früher waren 1.–10. Schuljahr möglich: auf 3.–9. Klasse beschränken (Portionen solcher Units werden „noch nicht eingeordnet“)
+delete from public.vokaboom_lib_units where grade not between 3 and 9;
+alter table public.vokaboom_lib_units drop constraint if exists vokaboom_lib_units_grade_check;
+alter table public.vokaboom_lib_units add constraint vokaboom_lib_units_grade_check check (grade between 3 and 9);
 
 alter table public.vokaboom_lib_lehrmittel enable row level security;
 alter table public.vokaboom_lib_units enable row level security;

@@ -6,8 +6,8 @@
 'use strict';
 
 const LIB = { lang: '', lm: '', grade: 0, unit: '', loose: false, q: '', hits: null, data: null, loading: null, err: '', noSql: false, seq: 0 };
-const LIB_GRADES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const gradeName = (g) => (g >= 10 ? 'ab 10. Schuljahr' : `${g}. Klasse`);
+const LIB_GRADES = [3, 4, 5, 6, 7, 8, 9]; // Fremdsprachen: 3. bis 9. Klasse
+const gradeName = (g) => `${g}. Klasse`;
 const unitWord = (lang) => (lang === 'fr' ? 'Unité' : 'Unit');
 /** gleich wie vokaboom_lib_key in der Datenbank */
 const libKey = (t) => String(t || '').toLowerCase().replace(/œ/g, 'o').replace(/æ/g, 'a').replace(/ß/g, 's')
@@ -208,7 +208,9 @@ async function libOpenItem(setId) {
 }
 
 /* ---------------- Eigene Portion einordnen (Häkchen) ---------------- */
-const ASG = { setId: '', lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false };
+const ASG = { setId: '', lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, allGrades: false };
+/** Schuljahre, für die das Lehrmittel Bände hat (neues Lehrmittel: alle) */
+const lmGrades = (lmId) => LIB_GRADES.filter((g) => LIB.data?.units.some((u) => u.lehrmittel_id === lmId && u.grade === g));
 async function openLibAssign(set) {
   if (!set) return;
   if (!cloud.uid) { openLogin(); return; }
@@ -244,7 +246,8 @@ function asgRender() {
     <div class="asg">
       ${step(1, 'Lehrmittel', !!ASG.lm, `${lms.length ? `<ul class="asg-list">${lms.map((l) => `<li><button type="button" class="asg-opt ${ASG.lm === l.id ? 'on' : ''}" data-action="asg-pick" data-k="lm" data-v="${l.id}" aria-pressed="${ASG.lm === l.id}">${tick(ASG.lm === l.id)}${esc(l.name)}</button></li>`).join('')}</ul>` : '<p class="small muted">Noch keine Lehrmittel – leg das erste an.</p>'}
         ${newForm('lm', 'Neues Lehrmittel, z. B. ' + (lang === 'fr' ? 'dis donc!' : 'New World'))}`)}
-      ${step(2, 'Schuljahr', !!ASG.grade, `<div class="asg-grades">${LIB_GRADES.map((g) => `<button type="button" class="asg-opt chip ${ASG.grade === g ? 'on' : ''}" data-action="asg-pick" data-k="grade" data-v="${g}" aria-pressed="${ASG.grade === g}">${tick(ASG.grade === g)}${gradeName(g)}</button>`).join('')}</div>`, !!ASG.lm)}
+      ${step(2, 'Schuljahr', !!ASG.grade, `<div class="asg-grades">${asgGrades().map((g) => `<button type="button" class="asg-opt chip ${ASG.grade === g ? 'on' : ''}" data-action="asg-pick" data-k="grade" data-v="${g}" aria-pressed="${ASG.grade === g}">${tick(ASG.grade === g)}${gradeName(g)}</button>`).join('')}</div>
+        ${!ASG.allGrades && asgGrades().length < LIB_GRADES.length ? '<button type="button" class="link-btn small" data-action="asg-all-grades">Anderes Schuljahr</button>' : ''}`, !!ASG.lm)}
       ${step(3, unitWord(lang), !!ASG.unit, `${units.length ? `<ul class="asg-list">${units.map((u) => `<li><button type="button" class="asg-opt ${ASG.unit === u.id ? 'on' : ''}" data-action="asg-pick" data-k="unit" data-v="${u.id}" aria-pressed="${ASG.unit === u.id}">${tick(ASG.unit === u.id)}${esc(u.name)}</button></li>`).join('')}</ul>` : `<p class="small muted">Noch keine ${unitWord(lang)} für dieses Schuljahr – leg sie an.</p>`}
         ${newForm('unit', `Neue ${unitWord(lang)}, z. B. ${unitWord(lang)} 3`)}`, !!ASG.lm && !!ASG.grade)}
       <p class="small muted">Geteilt werden nur Name, Vokabeln und Bildauswahl – keine eigenen Fotos, kein Übungsstand, nicht deine E-Mail-Adresse.</p>
@@ -255,8 +258,12 @@ function asgRender() {
       <button type="button" class="btn primary" data-action="asg-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('book')} ${set.published ? 'Speichern' : 'Teilen'}</button>
     </footer>`;
 }
+function asgGrades() {
+  const own = lmGrades(ASG.lm);
+  return ASG.allGrades || !own.length ? LIB_GRADES : [...new Set([...own, ...(ASG.grade ? [ASG.grade] : [])])].sort((a, b) => a - b);
+}
 function asgPick(k, v) {
-  if (k === 'lm') { if (ASG.lm !== v) Object.assign(ASG, { lm: v, unit: '' }); }
+  if (k === 'lm') { if (ASG.lm !== v) Object.assign(ASG, { lm: v, unit: '', allGrades: false, grade: lmGrades(v).includes(ASG.grade) || !lmGrades(v).length ? ASG.grade : 0 }); }
   else if (k === 'grade') { if (ASG.grade !== +v) Object.assign(ASG, { grade: +v, unit: '' }); }
   else ASG.unit = v;
   ASG.msg = { lm: '', unit: '' };
@@ -369,5 +376,6 @@ const libraryActions = {
   'lib-assign': () => openLibAssign(currentSet()),
   'asg-pick': (el) => asgPick(el.dataset.k, el.dataset.v),
   'asg-save': () => asgSave(),
+  'asg-all-grades': () => { ASG.allGrades = true; asgRender(); },
   'asg-remove': () => asgRemove(),
 };
