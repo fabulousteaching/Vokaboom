@@ -1,6 +1,6 @@
 /* Vokaboom – Menü für Lehrpersonen (und alle ohne Kinder-Login)
  * Links die Bereiche, rechts die Einstellungen des gewählten Bereichs:
- * Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon · Daten & Hilfe
+ * Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon
  */
 'use strict';
 
@@ -11,7 +11,6 @@ const MENU_SECTIONS = [
   ['avatar', 'sparkle', 'Avatar & Münzen'],
   ['stimme', 'speaker', 'Stimme & Aussprache'],
   ['mikro', 'mic', 'Mikrofon'],
-  ['daten', 'shield', 'Daten & Hilfe'],
 ];
 const CARD_DEFAULTS = { secret: 'pics', names: 'full', qr: true, cls: true };
 const cardCfg = () => {
@@ -179,26 +178,6 @@ function menuSectionHTML(sec) {
            <div class="mic-level big" id="mic-test-level" aria-hidden="true"><span></span></div>
            <p class="small" id="mic-test-out" aria-live="polite">Tippe auf „Mikrofon testen“ und sag ein Wort. Der Balken sollte sich beim Sprechen bewegen.</p>`
         : `<p class="muted small">${speechBrowserMissing ? 'Dieser Browser (Brave oder Opera) hat keine Spracherkennung. Am besten Chrome, Edge oder Safari benutzen.' : esc(micErrorText('not-supported', 'en'))}</p>`;
-    case 'daten':
-      return `<section class="menu-group">
-          <h3>Wo sind die Daten?</h3>
-          <ul class="menu-list">
-            <li>${cloud.user ? `Deine Portionen sind in deinem Konto gespeichert (<strong>${esc(cloud.user)}</strong>) und auf diesem Gerät.` : 'Ohne Anmeldung bleibt alles nur in diesem Browser.'}</li>
-            <li>Kinder mit Login: Vorname, Anfangsbuchstabe, Übungsstand, Avatar und Münzen – bis du das Kind oder die Klasse löschst.</li>
-            <li>Aussprechen: Die Lauterkennung läuft auf dem Gerät, Aufnahmen werden nicht gespeichert.</li>
-            <li>Live-Spiele: Es wird nichts gespeichert.</li>
-          </ul>
-        </section>
-        <section class="menu-group">
-          <h3>Hilfe</h3>
-          <div class="row"><a class="btn small secondary" href="https://github.com/fabulousteaching/Vokaboom/blob/claude/vokabelwelt-app/supabase/ANLEITUNG.md" target="_blank" rel="noopener">${icon('link')} Anleitung öffnen</a></div>
-        </section>
-        <section class="menu-group danger-zone">
-          <h3>Alles löschen</h3>
-          <p class="small muted">Löscht alle Portionen und Einstellungen auf diesem Gerät${cloud.user ? ' (nicht im Konto)' : ''}.</p>
-          <button type="button" class="btn small danger-ghost" data-action="wipe">${icon('trash')} Alles löschen</button>
-        </section>
-        <p class="muted small app-version">Vokaboom · Version ${esc(typeof APP_VERSION === 'string' && APP_VERSION ? APP_VERSION.replace(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?$/, '$3.$2.$1 $4:$5') : 'lokal')}</p>`;
     default: return '';
   }
 }

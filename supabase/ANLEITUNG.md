@@ -85,7 +85,7 @@ Oben in der Titelleiste gibt es die Suche „Portionen von anderen suchen“ (am
 
 Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) den Knopf **Meine Klassen**.
 
-**Menü:** Oben rechts gibt es einen einzigen Knopf **Menü**. Links die Bereiche, rechts die Einstellungen: Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon · Daten & Hilfe.
+**Menü:** Oben rechts gibt es einen einzigen Knopf **Menü**. Links die Bereiche, rechts die Einstellungen: Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon.
 
 1. **Klasse anlegen**, z. B. „5a Englisch“.
 2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
