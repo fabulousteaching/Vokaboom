@@ -171,8 +171,11 @@ alter table public.vokaboom_classes add constraint vokaboom_classes_class_pw_che
   check (class_pw is null or (char_length(class_pw) <= 40 and length(public.vokaboom_pw_norm(class_pw)) >= 4));
 alter table public.vokaboom_students add column if not exists pw text;
 alter table public.vokaboom_students drop constraint if exists vokaboom_students_pw_check;
--- einfache Passwörter: frühere lange Passwörter („blau-tiger-47“) einmalig durch kurze ersetzen
-update public.vokaboom_students set pw = public.vokaboom_new_pw() where pw is null or pw like '%-%';
+-- einfache Passwörter: frühere lange Passwörter („blau-tiger-47“) einmalig durch kurze ersetzen.
+-- Das alte Passwort bleibt in pw_prev gültig (gedruckte Kärtchen), bis die Lehrperson „neues Passwort“ wählt.
+alter table public.vokaboom_students add column if not exists pw_prev text check (pw_prev is null or char_length(pw_prev) <= 40);
+update public.vokaboom_students set pw_prev = case when pw like '%-%' then pw else pw_prev end, pw = public.vokaboom_new_pw()
+  where pw is null or pw like '%-%';
 alter table public.vokaboom_students alter column pw set default public.vokaboom_new_pw();
 alter table public.vokaboom_students alter column pw set not null;
 alter table public.vokaboom_students add constraint vokaboom_students_pw_check check (pw ~ '^[a-z]{3,12}[0-9]{2}$');
@@ -215,7 +218,7 @@ revoke all on public.vokaboom_classes, public.vokaboom_students, public.vokaboom
 grant select, insert, delete on public.vokaboom_classes to authenticated;
 grant update (name, set_ids, rules, class_pw) on public.vokaboom_classes to authenticated;
 grant select, delete on public.vokaboom_students to authenticated;
-grant update (first_name, last_initial, pics, pw) on public.vokaboom_students to authenticated;
+grant update (first_name, last_initial, pics, pw, pw_prev) on public.vokaboom_students to authenticated;
 grant select on public.vokaboom_progress to authenticated;
 
 drop policy if exists "klassen eigene" on public.vokaboom_classes;
@@ -237,6 +240,16 @@ drop policy if exists "übungsstand lesen" on public.vokaboom_progress;
 create policy "übungsstand lesen" on public.vokaboom_progress for select to authenticated
   using (exists (select 1 from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id
     where s.id = student_id and c.teacher_id = (select auth.uid())));
+
+-- Hilfe: Passwort eines Kindes prüfen – eigenes, früheres oder Klassenpasswort (auch für Teilmal)
+create or replace function public.vokaboom_kid_pw_ok(p_vid uuid, p_input text)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select public.vokaboom_pw_ok(s.pw, p_input) or public.vokaboom_pw_ok(s.pw_prev, p_input)
+      or public.vokaboom_pw_ok(c.class_pw, p_input)
+    from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id where s.id = p_vid), false);
+$$;
+revoke execute on function public.vokaboom_kid_pw_ok(uuid, text) from public, anon, authenticated;
 
 -- Lehrperson: Kinder hinzufügen. Erzeugt eindeutige Benutzernamen und ein Bilder-Passwort.
 -- p_students: [{"first": "Lena", "initial": "M"}, …]
@@ -292,9 +305,8 @@ begin
     raise exception 'too_many_attempts' using errcode = 'P0001';
   end if;
   select * into st from public.vokaboom_students x where x.username = p_username;
-  -- richtig: die 3 Bilder („3,7,11“), das eigene Passwort („teich23“) oder das Klassenpasswort
-  if not found or (st.pics is distinct from p_pics and not public.vokaboom_pw_ok(st.pw, p_pics)
-      and not public.vokaboom_pw_ok((select c.class_pw from public.vokaboom_classes c where c.id = st.class_id), p_pics)) then
+  -- richtig: die 3 Bilder („3,7,11“), das eigene Passwort („teich23“, auch das frühere) oder das Klassenpasswort
+  if not found or (st.pics is distinct from p_pics and not public.vokaboom_kid_pw_ok(st.id, p_pics)) then
     insert into public.vokaboom_login_fails as lf (username, fails, last_at) values (p_username, 1, now())
       on conflict (username) do update set
         fails = case when lf.last_at < now() - interval '5 minutes' then 1 else lf.fails + 1 end,

@@ -691,9 +691,9 @@ async function kidNewPics(id) {
   const pw = newKidPw();
   try {
     const cl = await cloudClient();
-    const { error } = await cl.from('vokaboom_students').update(s.pw ? { pics, pw } : { pics }).eq('id', id);
+    const { error } = await cl.from('vokaboom_students').update(s.pw ? { pics, pw, ...('pw_prev' in s ? { pw_prev: null } : {}) } : { pics }).eq('id', id); // altes Kärtchen gilt nicht mehr
     if (error) throw error;
-    s.pics = pics; if (s.pw) s.pw = pw;
+    s.pics = pics; if (s.pw) s.pw = pw; if ('pw_prev' in s) s.pw_prev = null;
     render();
     toast(`${kidName(s)} hat ein neues Passwort und neue Bilder. Das alte Kärtchen gilt nicht mehr – druck ein neues aus.`);
   } catch (e) { toast(classErrorText(e), 'bad'); }
