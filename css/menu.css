@@ -76,3 +76,5 @@
   .menu-btn { padding-right: .75rem; gap: .35rem; }
   .menu-btn:not(.in) .icon { display: none; }
 }
+.range-ends { display: flex; justify-content: space-between; font-size: .8rem; color: var(--ink-3); margin-top: -.15rem; }
+.menu .field b { color: var(--brand); }

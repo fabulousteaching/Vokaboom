@@ -62,6 +62,8 @@ function menuBindOnce(m) {
   const s = db.settings;
   m.addEventListener('input', (e) => {
     if (e.target.id === 'ph-min') { const v = $('#ph-min-val'); if (v) v.textContent = e.target.value; }
+    if (e.target.id === 'av-percoin') { $('#av-percoin-val').textContent = e.target.value; $('#av-percoin-hint').textContent = menuCoinHint(+e.target.value); }
+    if (e.target.id === 'av-daymax') $('#av-daymax-val').textContent = e.target.value;
   });
   m.addEventListener('change', (e) => {
     const t = e.target;
@@ -83,6 +85,9 @@ function menuBindOnce(m) {
     saveDB();
   });
 }
+
+/** Beispiel zum Tempo: wie viele Münzen eine Lektion mit 50 richtigen Antworten bringt */
+const menuCoinHint = (pc) => `1 richtige Antwort = 1 Punkt (Lernkarten ½). Eine Lektion mit 50 richtigen Antworten gibt ${Math.floor(50 / pc)} ${Math.floor(50 / pc) === 1 ? 'Münze' : 'Münzen'}.`;
 
 /* ---------- Inhalte der Bereiche ---------- */
 function menuSectionHTML(sec) {
@@ -141,11 +146,13 @@ function menuSectionHTML(sec) {
         <fieldset class="menu-group" ${a.on ? '' : 'disabled'}>
           <h3>Münzen</h3>
           <label class="switch"><input type="checkbox" data-av="coins" ${a.coins ? 'checked' : ''}><span>Kinder sammeln Münzen beim Üben</span></label>
-          <label class="field"><span class="label">Tempo: Punkte pro Münze</span>
-            <select data-av="perCoin">${[[5, '5 – schnell (viele Münzen)'], [10, '10 – normal'], [15, '15 – gemütlich'], [20, '20 – sparsam']].map(([v, t]) => `<option value="${v}" ${a.perCoin === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
-            <small class="muted">1 richtige Antwort = 1 Punkt (Lernkarten ½). Bei 10 Punkten pro Münze gibt eine Lektion mit 50 richtigen Antworten 5 Münzen.</small></label>
-          <label class="field"><span class="label">Höchstens pro Tag</span>
-            <select data-av="dayMax">${[10, 20, 40, 60, 100].map((v) => `<option value="${v}" ${a.dayMax === v ? 'selected' : ''}>${v} Münzen</option>`).join('')}</select></label>
+          <label class="field" for="av-percoin"><span class="label">Tempo: <b id="av-percoin-val">${a.perCoin}</b> Punkte pro Münze</span>
+            <input type="range" id="av-percoin" data-av="perCoin" min="3" max="30" step="1" value="${a.perCoin}">
+            <span class="range-ends"><span>schnell, viele Münzen</span><span>sparsam</span></span>
+            <small class="muted" id="av-percoin-hint">${menuCoinHint(a.perCoin)}</small></label>
+          <label class="field" for="av-daymax"><span class="label">Höchstens <b id="av-daymax-val">${a.dayMax}</b> Münzen pro Tag</span>
+            <input type="range" id="av-daymax" data-av="dayMax" min="5" max="100" step="5" value="${a.dayMax}">
+            <span class="range-ends"><span>5</span><span>100</span></span></label>
           <label class="switch"><input type="checkbox" data-av="games" ${a.games ? 'checked' : ''}><span>Auch Spiele geben Punkte (1 Punkt pro fertigem Spiel)</span></label>
           <h3>Shop</h3>
           <label class="switch"><input type="checkbox" data-av="shop" ${a.shop ? 'checked' : ''}><span>Kinder dürfen mit Münzen besondere Teile kaufen<small>Ausgeschaltet: nur das Basic-Set (gekaufte Teile bleiben).</small></span></label>
