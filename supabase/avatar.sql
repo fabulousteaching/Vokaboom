@@ -238,11 +238,16 @@ returns integer
 language plpgsql security definer set search_path = '' as $$
 declare k text; n integer;
 begin
-  if not exists (select 1 from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id where s.id = p_student and c.teacher_id = auth.uid()) then
-    raise exception 'not_allowed' using errcode = '42501';
+  -- p_student: Vokaboom-Kind oder Teilmal-Kind der Lehrperson (verbunden → derselbe Avatar wie in Vokaboom)
+  if exists (select 1 from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id where s.id = p_student and c.teacher_id = auth.uid()) then
+    k := 'v:' || p_student;
+  elsif to_regclass('public.einmaleins_students') is not null then
+    execute 'select case when e.vokaboom_id is not null then ''v:'' || e.vokaboom_id else ''e:'' || e.id end
+      from public.einmaleins_students e join public.einmaleins_classes c on c.id = e.class_id where e.id = $1 and c.teacher_id = auth.uid()'
+      into k using p_student;
   end if;
+  if k is null then raise exception 'not_allowed' using errcode = '42501'; end if;
   n := greatest(1, least(coalesce(p_n, 0), 50));
-  k := 'v:' || p_student;
   insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
   update public.fab_avatars set coins = coins + n, earned = earned + n, updated_at = now() where kid_key = k;
   return n;
