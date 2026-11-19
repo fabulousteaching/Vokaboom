@@ -526,7 +526,7 @@ function avCoinsInfo() {
       <li><b>Dranbleiben lohnt sich:</b> Ein Wort, das du vorher schon mal falsch hattest, gibt ½ Punkt extra.</li>
       <li><b>Test ab 80 %:</b> 3 Punkte Bonus, alles richtig: 5 Punkte.</li>
       ${cfg.games ? '<li><b>Spiel fertig gespielt:</b> 1 Punkt.</li>' : ''}` : '<li><b>Jede Münze aus den Übungen</b> zählt auch für deinen Avatar.</li>'}
-      ${cfg.coins ? `<li><b>${avPPC()} Punkte = 1 Münze.</b> Pro Tag kannst du bis zu ${st.dayMax} Münzen sammeln (heute: ${st.today}).</li>` : '<li><b>Münzen sammeln ist gerade ausgeschaltet.</b> Deine Lehrperson kann dir aber Bonus-Münzen schenken.</li>'}
+      ${cfg.coins ? `<li>${AV_APP === 'vokaboom' ? `<b>${avPPC()} Punkte = 1 Münze.</b> ` : ''}Pro Tag kannst du bis zu ${st.dayMax} Münzen sammeln (heute: ${st.today}).</li>` : '<li><b>Münzen sammeln ist gerade ausgeschaltet.</b> Deine Lehrperson kann dir aber Bonus-Münzen schenken.</li>'}
       <li><b>Münzen gelten in Vokaboom und Teilmal</b> – wenn du in beiden mit demselben Kärtchen angemeldet bist.</li>
     </ul>
     <p class="muted small">Bisher verdient: ${st.earned} · ausgegeben: ${st.spent}</p>
