@@ -495,6 +495,8 @@ async function boot() {
   else cloudInit().finally(() => kidSsoCheck());
   setTimeout(checkForUpdate, 1500);
   // Datenpakete im Hintergrund: zuerst die Lauterkennung (für alle), danach die Stimmen (ohne Anmeldung)
-  setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => phInBackground().then(() => voicesInBackground())), 3000);
+  // Nur die KI-Stimme im Hintergrund laden. Die Lauterkennung (Englisch 123 MB, Französisch 90 MB) lädt erst beim
+  // Aussprechen – alle drei Modelle zusammen brauchten zu viel Arbeitsspeicher („Out of Memory“ beim Neuladen).
+  setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => voicesInBackground()), 3000);
 }
 boot();

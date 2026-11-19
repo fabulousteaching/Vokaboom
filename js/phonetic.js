@@ -99,10 +99,20 @@ async function phIsCached() {
   try { const c = await caches.open(PH.CACHE); return !!(await c.match(PH.MODEL)); } catch { return false; }
 }
 
+/** Immer nur ein Lauterkennungs-Modell im Speicher halten (jedes braucht mehrere hundert MB) */
+function phRelease(which) {
+  const key = which === 'fr' ? 'fr' : 'engine';
+  const eng = phState[key];
+  if (!eng) return;
+  try { eng.session?.release?.(); } catch { /* */ }
+  phState[key] = null;
+  if (which === 'fr') phState.frLoading = null; else phState.loading = null;
+}
 function loadPhoneticEngine(lang = 'en') {
   if (lang === 'fr') return loadFrenchEngine();
   if (phState.engine) return Promise.resolve(phState.engine);
   if (phState.loading) return phState.loading;
+  if (phState.fr || !phState.frLoading) phRelease('fr'); // Französisch freigeben (ausser es lädt gerade)
   phState.status = 'loading'; phState.progress = 0; phState.error = ''; phNotify();
   phState.loading = (async () => {
     const [core, assetsWeb] = await Promise.all([
@@ -369,6 +379,7 @@ const FR_ID2P = Object.fromEntries(Object.entries(PH_FR.VOCAB).map(([k, v]) => [
 function loadFrenchEngine() {
   if (phState.fr) return Promise.resolve(phState.fr);
   if (phState.frLoading) return phState.frLoading;
+  if (phState.engine || !phState.loading) phRelease('en'); // Englisch freigeben (ausser es lädt gerade)
   phState.status = 'loading'; phState.progress = 0; phState.error = ''; phNotify();
   phState.frLoading = (async () => {
     const [esp] = await Promise.all([import(`${PH_FR.ESPEAK}/espeak.mjs`), loadScriptOnce(PH.ORT_URL)]);
