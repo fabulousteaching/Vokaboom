@@ -406,6 +406,7 @@ async function loadClasses() {
       const [cl0, st] = await Promise.all([
         c.from('vokaboom_classes').select('*').order('created_at'),
         c.from('vokaboom_students').select('*').order('first_name'),
+        typeof loadCardCfg === 'function' ? loadCardCfg() : null, // Kärtchen-Einstellungen (gleich wie in Teilmal)
       ]);
       const cl = cl0;
       // Datenbank noch ohne neue Spalten (SQL-Skript nicht neu ausgeführt)?

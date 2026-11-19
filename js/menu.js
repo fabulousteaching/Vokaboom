@@ -19,6 +19,42 @@ const cardCfg = () => {
   if (!['pics', 'password', 'class'].includes(c.secret)) c.secret = 'pics'; // alte Werte („words“, „both“)
   return c;
 };
+/* Die Kärtchen-Einstellungen gelten in Vokaboom und Teilmal gleich: Sie liegen bei der Lehrperson in
+ * fab_teacher_settings.cards (supabase/avatar.sql) und zusätzlich in diesem Browser (db.settings.cards). */
+const CARD_SYNC = { uid: '', at: 0, missing: false };
+async function loadCardCfg(force = false) {
+  if (!cloud.uid || isKid()) return false;
+  if (!force && CARD_SYNC.uid === cloud.uid && Date.now() - CARD_SYNC.at < 20000) return false;
+  try {
+    const c = await cloudClient();
+    const { data, error } = await c.from('fab_teacher_settings').select('cards').eq('teacher_id', cloud.uid).maybeSingle();
+    if (error) throw error;
+    CARD_SYNC.uid = cloud.uid; CARD_SYNC.at = Date.now(); CARD_SYNC.missing = false;
+    const remote = data?.cards && typeof data.cards === 'object' ? data.cards : {};
+    if (Object.keys(remote).length) {
+      const before = JSON.stringify(cardCfg());
+      db.settings.cards = { ...CARD_DEFAULTS, ...remote };
+      if (JSON.stringify(cardCfg()) !== before) { saveDB(); return true; }
+    } else if (db.settings.cards && Object.keys(db.settings.cards).length) saveCardCfg(); // zum ersten Mal: Einstellung dieses Browsers übernehmen
+  } catch (e) { CARD_SYNC.missing = /cards|column|schema cache|fab_teacher_settings/i.test(e?.message || ''); }
+  return false;
+}
+let cardSaveTimer = null;
+function saveCardCfg() {
+  clearTimeout(cardSaveTimer);
+  cardSaveTimer = setTimeout(async () => {
+    if (!cloud.uid) return;
+    try {
+      const c = await cloudClient();
+      const { error } = await c.from('fab_teacher_settings').upsert({ teacher_id: cloud.uid, cards: cardCfg(), updated_at: new Date().toISOString() }, { onConflict: 'teacher_id' });
+      if (error) throw error;
+      CARD_SYNC.missing = false; CARD_SYNC.uid = cloud.uid; CARD_SYNC.at = Date.now();
+    } catch (e) {
+      CARD_SYNC.missing = /cards|column|schema cache|fab_teacher_settings/i.test(e?.message || '');
+      if (!CARD_SYNC.missing) toast('Die Kärtchen-Einstellung konnte nicht gespeichert werden. Bist du online?', 'bad');
+    }
+  }, 300);
+}
 
 /** Knopf oben rechts: ein einziger „Menü“-Knopf mit Konto-Status */
 function menuButtonHTML() {
@@ -54,6 +90,7 @@ function openMenu(sec) {
 function menuAfterRender() {
   if (MENU.sec === 'konto' && cloud.user) bindAccountForms();
   if (MENU.sec === 'mikro') fillMicSelect();
+  if (MENU.sec === 'klassen' && cloud.uid) loadCardCfg().then((changed) => { if ((changed || CARD_SYNC.missing) && MENU.sec === 'klassen' && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML('klassen'); });
   if (MENU.sec === 'stimme') updatePhSettings();
   if (MENU.sec === 'avatar' && cloud.uid && !MENU.avCfg && !MENU.avLoading) menuLoadAvatarCfg();
   const sec = MENU.sec;
@@ -72,7 +109,7 @@ function menuBindOnce(m) {
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
     if (t.id === 'ph-min') { s.phonetic = { ...(s.phonetic || {}), passMin: parseInt(t.value, 10) || 60 }; applyTeacherPrefs(); }
     if (t.dataset.card) {
-      s.cards = { ...cardCfg(), [t.dataset.card]: t.type === 'checkbox' ? t.checked : t.value }; MENU.cardsChanged = true; menuSaved();
+      s.cards = { ...cardCfg(), [t.dataset.card]: t.type === 'checkbox' ? t.checked : t.value }; MENU.cardsChanged = true; menuSaved(); saveCardCfg();
       if (t.dataset.card === 'secret') { saveDB(); $('#menu-body').innerHTML = menuSectionHTML('klassen'); return; }
     }
     if (t.dataset.classPw) { saveClassPw(t.dataset.classPw, t.value).then((ok) => { if (ok) { MENU.cardsChanged = true; menuSaved(); } }); return; }
@@ -130,7 +167,8 @@ function menuSectionHTML(sec) {
       const c = cardCfg();
       return `<section class="menu-group">
           <h3>Login-Kärtchen</h3>
-          <p class="small muted">Gilt für die Kärtchen, die du ab jetzt druckst (Klasse → Kärtchen). Das Passwort bleibt gleich – nur die Darstellung ändert sich.</p>
+          <p class="small muted">Gilt für die Kärtchen, die du ab jetzt druckst (Klasse → Kärtchen) – in Vokaboom und in Teilmal gleich. Das Passwort bleibt gleich – nur die Darstellung ändert sich.</p>
+          ${CARD_SYNC.missing ? '<p class="banner bad small">Damit diese Einstellung auch in Teilmal gilt, <code>supabase/avatar.sql</code> in Supabase nochmals ganz ausführen. Bis dahin gilt sie nur in diesem Browser.</p>' : ''}
           <div class="field"><span class="label">Passwort auf dem Kärtchen</span>
             <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="pics" ${c.secret === 'pics' ? 'checked' : ''}><span><b>Bilder</b> – die Kinder tippen 3 Bilder an (ideal für Unterstufe)</span></label>
             <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="password" ${c.secret === 'password' ? 'checked' : ''}><span><b>Passwort pro Kind</b> – Vokaboom erzeugt für jedes Kind ein eigenes einfaches Passwort aus einem Wort und einer Zahl, z. B. „Teich23“</span></label>

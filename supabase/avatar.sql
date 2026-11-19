@@ -51,6 +51,9 @@ create table if not exists public.fab_teacher_settings (
   avatar jsonb not null default '{}' check (jsonb_typeof(avatar) = 'object' and octet_length(avatar::text) <= 2000),
   updated_at timestamptz not null default now()
 );
+-- Login-Kärtchen (gelten in Vokaboom und Teilmal gleich): {"secret": "pics|password|class", "names": "full|initials", "qr": true, "cls": true}
+alter table public.fab_teacher_settings add column if not exists cards jsonb not null default '{}'
+  check (jsonb_typeof(cards) = 'object' and octet_length(cards::text) <= 500);
 alter table public.fab_teacher_settings enable row level security;
 revoke all on public.fab_teacher_settings from anon, authenticated;
 grant select, insert, update on public.fab_teacher_settings to authenticated;
