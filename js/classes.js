@@ -23,7 +23,13 @@ const kidWordImg = (username, cls = '') => {
   const s = typeof KID_WORDS === 'object' && KID_WORDS[kidWordOf(username)];
   return s ? `<img class="${cls}" src="${kidSvgURL(s)}" alt="" draggable="false">` : '';
 };
-const kidInitials = (k) => `${(k.first || k.first_name || '?').trim().charAt(0).toUpperCase()}.${(k.initial ?? k.last_initial) ? ` ${(k.initial ?? k.last_initial).charAt(0).toUpperCase()}.` : ''}`;
+// Kurzform fürs Kärtchen: die ersten zwei Buchstaben des Vornamens und der Anfangsbuchstabe („Le. M.“) –
+// so sind Kinder mit gleichen Initialen trotzdem auseinanderzuhalten
+const kidInitials = (k) => {
+  const f = Array.from(String(k.first || k.first_name || '?').trim());
+  const li = String((k.initial ?? k.last_initial) || '');
+  return `${(f[0] || '?').toUpperCase()}${(f[1] || '').toLowerCase()}.${li ? ` ${li.charAt(0).toUpperCase()}.` : ''}`;
+};
 /** Was auf dem Kärtchen steht: 'pics' (3 Bilder), 'password' (eigenes Passwort pro Kind, Spalte pw) oder
  *  'class' (Klassenpasswort der Lehrperson, Spalte class_pw). Fehlt das Passwort, gelten die Bilder. */
 function kidSecretOf(st) {

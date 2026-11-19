@@ -176,7 +176,7 @@ function menuSectionHTML(sec) {
           </div>
           <div class="field"><span class="label">Name auf dem Kärtchen</span>
             <label class="radio"><input type="radio" name="card-names" data-card="names" value="full" ${c.names === 'full' ? 'checked' : ''}><span>Vorname und Anfangsbuchstabe („Lena M.“)</span></label>
-            <label class="radio"><input type="radio" name="card-names" data-card="names" value="initials" ${c.names === 'initials' ? 'checked' : ''}><span>Nur Initialen („L. M.“) – datensparsam, z. B. für Kärtchen, die herumliegen</span></label>
+            <label class="radio"><input type="radio" name="card-names" data-card="names" value="initials" ${c.names === 'initials' ? 'checked' : ''}><span>Nur Initialen mit den ersten zwei Buchstaben („Le. M.“) – datensparsam, z. B. für Kärtchen, die herumliegen</span></label>
           </div>
           ${c.secret === 'class' ? `<div class="field class-pw-list"><span class="label">Klassenpasswörter</span>
             ${(klass.list || []).length ? klass.list.map((k) => `<label class="class-pw-row"><span>${esc(k.name)}</span>
