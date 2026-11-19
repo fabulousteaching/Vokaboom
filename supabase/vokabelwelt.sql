@@ -143,6 +143,44 @@ create table if not exists public.vokaboom_students (
 );
 create index if not exists vokaboom_students_class on public.vokaboom_students (class_id);
 
+-- Passwort zum Eintippen (Alternative zu den Bildern), von der Plattform erzeugt, z. B. „blau-tiger-47“.
+-- Jedes Kind hat beides: Bilder und Passwort. Welches auf dem Kärtchen steht, wählt die Lehrperson.
+create or replace function public.vokaboom_new_pw()
+returns text
+language sql volatile set search_path = '' as $$
+  select (array['rot', 'blau', 'gelb', 'gruen', 'lila', 'rosa', 'bunt', 'wild', 'mutig', 'schnell', 'klein', 'gross',
+                'lustig', 'schlau', 'frech', 'stark', 'leise', 'frisch', 'sonnig', 'flink'])[1 + floor(random() * 20)::integer]
+    || '-' || (array['baum', 'sonne', 'mond', 'stern', 'fisch', 'katze', 'hund', 'apfel', 'blume', 'wolke', 'pilz', 'vogel',
+                'fuchs', 'igel', 'frosch', 'biene', 'ball', 'boot', 'haus', 'herz', 'drache', 'pferd', 'maus', 'eule', 'wal',
+                'hase', 'kuh', 'panda', 'tiger', 'zebra', 'rakete', 'zug', 'auto', 'kirsche', 'birne', 'banane', 'keks',
+                'pizza', 'torte', 'krone', 'schiff', 'blitz', 'feuer', 'berg', 'insel', 'muschel', 'schnecke', 'raupe',
+                'kaktus', 'palme', 'ballon', 'gitarre', 'trommel', 'buch', 'stift', 'uhr', 'schuh', 'hut'])[1 + floor(random() * 58)::integer]
+    || '-' || (10 + floor(random() * 90)::integer)::text;
+$$;
+-- Eingabe prüfen: Gross/klein, Leerzeichen, Bindestriche und ä/ö/ü (statt ae/oe/ue) spielen keine Rolle
+create or replace function public.vokaboom_pw_norm(t text)
+returns text
+language sql immutable set search_path = '' as $$
+  select regexp_replace(replace(replace(replace(replace(lower(coalesce(t, '')), 'ä', 'ae'), 'ö', 'oe'), 'ü', 'ue'), 'ß', 'ss'), '[^a-z0-9]', '', 'g');
+$$;
+create or replace function public.vokaboom_pw_ok(p_pw text, p_input text)
+returns boolean
+language sql immutable set search_path = '' as $$
+  select p_pw is not null and p_input is not null and length(p_input) <= 80
+    and length(public.vokaboom_pw_norm(p_pw)) >= 4 and public.vokaboom_pw_norm(p_pw) = public.vokaboom_pw_norm(p_input);
+$$;
+-- Klassenpasswort: eines für alle Kinder der Klasse, von der Lehrperson festgelegt (leer = keines)
+alter table public.vokaboom_classes add column if not exists class_pw text;
+alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_class_pw_check;
+alter table public.vokaboom_classes add constraint vokaboom_classes_class_pw_check
+  check (class_pw is null or (char_length(class_pw) <= 40 and length(public.vokaboom_pw_norm(class_pw)) >= 4));
+alter table public.vokaboom_students add column if not exists pw text;
+update public.vokaboom_students set pw = public.vokaboom_new_pw() where pw is null;
+alter table public.vokaboom_students alter column pw set default public.vokaboom_new_pw();
+alter table public.vokaboom_students alter column pw set not null;
+alter table public.vokaboom_students drop constraint if exists vokaboom_students_pw_check;
+alter table public.vokaboom_students add constraint vokaboom_students_pw_check check (pw ~ '^[a-z]+-[a-z]+-[0-9]{2}$');
+
 -- Jeder Benutzername wird nur einmal vergeben, auch wenn das Kind später gelöscht wird
 create table if not exists public.vokaboom_usernames (username text primary key);
 
@@ -179,9 +217,9 @@ alter table public.vokaboom_login_fails enable row level security;
 revoke all on public.vokaboom_classes, public.vokaboom_students, public.vokaboom_usernames,
   public.vokaboom_sessions, public.vokaboom_progress, public.vokaboom_login_fails from anon, authenticated;
 grant select, insert, delete on public.vokaboom_classes to authenticated;
-grant update (name, set_ids, rules) on public.vokaboom_classes to authenticated;
+grant update (name, set_ids, rules, class_pw) on public.vokaboom_classes to authenticated;
 grant select, delete on public.vokaboom_students to authenticated;
-grant update (first_name, last_initial, pics) on public.vokaboom_students to authenticated;
+grant update (first_name, last_initial, pics, pw) on public.vokaboom_students to authenticated;
 grant select on public.vokaboom_progress to authenticated;
 
 drop policy if exists "klassen eigene" on public.vokaboom_classes;
@@ -245,7 +283,7 @@ begin
 end;
 $$;
 
--- Kind: anmelden. Liefert einen Anmelde-Schlüssel oder null (falsch). Nach 8 Fehlversuchen 5 Minuten Pause.
+-- Kind: anmelden (p_pics: Bilder oder Passwort). Liefert einen Anmelde-Schlüssel oder null (falsch). Nach 8 Fehlversuchen 5 Minuten Pause.
 create or replace function public.vokaboom_student_login(p_username text, p_pics text)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -258,7 +296,9 @@ begin
     raise exception 'too_many_attempts' using errcode = 'P0001';
   end if;
   select * into st from public.vokaboom_students x where x.username = p_username;
-  if not found or st.pics is distinct from p_pics then
+  -- richtig: die 3 Bilder („3,7,11“), das eigene Passwort („blau-tiger-47“) oder das Klassenpasswort
+  if not found or (st.pics is distinct from p_pics and not public.vokaboom_pw_ok(st.pw, p_pics)
+      and not public.vokaboom_pw_ok((select c.class_pw from public.vokaboom_classes c where c.id = st.class_id), p_pics)) then
     insert into public.vokaboom_login_fails as lf (username, fails, last_at) values (p_username, 1, now())
       on conflict (username) do update set
         fails = case when lf.last_at < now() - interval '5 minutes' then 1 else lf.fails + 1 end,

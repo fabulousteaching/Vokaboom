@@ -24,14 +24,18 @@ const kidWordImg = (username, cls = '') => {
   return s ? `<img class="${cls}" src="${kidSvgURL(s)}" alt="" draggable="false">` : '';
 };
 const kidInitials = (k) => `${(k.first || k.first_name || '?').trim().charAt(0).toUpperCase()}.${(k.initial ?? k.last_initial) ? ` ${(k.initial ?? k.last_initial).charAt(0).toUpperCase()}.` : ''}`;
-/** Passwort-Wörter („Erdbeere Velo Löwe“) → Bild-Nummern; null, wenn ein Wort nicht passt */
-const pwNorm = (w) => w.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss').replace(/[^a-z]/g, '');
-function kidWordsToPicks(text) {
-  const words = String(text || '').split(/[\s,;.\-–+/]+/).map(pwNorm).filter(Boolean);
-  if (words.length !== 3) return null;
-  const idx = words.map((w) => KID_PW.findIndex((p) => p.key === w || pwNorm(p.de) === w || (w === 'eis' && p.key === 'glace') || (w === 'fahrrad' && p.key === 'velo') || (w === 'hubschrauber' && p.key === 'helikopter')));
-  return idx.every((i) => i >= 0) ? idx : null;
+/** Was auf dem Kärtchen steht: 'pics' (3 Bilder), 'password' (eigenes Passwort pro Kind, Spalte pw) oder
+ *  'class' (Klassenpasswort der Lehrperson, Spalte class_pw). Fehlt das Passwort, gelten die Bilder. */
+function kidSecretOf(st) {
+  const m = typeof cardCfg === 'function' ? cardCfg().secret : 'pics';
+  if (m === 'password' && st?.pw) return 'password';
+  if (m === 'class' && klass.list.find((c) => c.id === st?.class_id)?.class_pw) return 'class';
+  return 'pics';
 }
+const KID_PW_ADJ = ['rot', 'blau', 'gelb', 'gruen', 'lila', 'rosa', 'bunt', 'wild', 'mutig', 'schnell', 'klein', 'gross', 'lustig', 'schlau', 'frech', 'stark', 'leise', 'frisch', 'sonnig', 'flink'];
+const rndInt = (n) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+const newKidPw = () => `${KID_PW_ADJ[rndInt(KID_PW_ADJ.length)]}-${KID_WORD_LIST[rndInt(KID_WORD_LIST.length)]}-${10 + rndInt(90)}`;
+const KID_MODE_KEY = 'vokaboom.kidLoginMode';
 const kidPwImg = (i, cls = '') => `<img class="${cls}" src="${kidSvgURL(KID_PW[i].svg)}" alt="${esc(KID_PW[i].de)}" draggable="false">`;
 const picsList = (pics) => String(pics || '').split(',').map(Number).filter((n) => n >= 0 && n < 12);
 const kidLoginUrl = (st) => `${siteUrl()}#k=${st.username}.${picsList(st.pics).join('-')}`;
@@ -58,10 +62,10 @@ function kidErrorText(e) {
 }
 
 /** Meldet ein Kind an. Liefert true (angemeldet) oder false (Name oder Bilder falsch). */
-async function kidLogin(username, pics) {
+async function kidLogin(username, pics) { // pics: [3, 7, 11] oder Passwort-Text („blau-tiger-47“ / Klassenpasswort)
   const c = await cloudClient();
   const user = String(username || '').trim().toLowerCase();
-  const { data, error } = await c.rpc('vokaboom_student_login', { p_username: user, p_pics: pics.join(',') });
+  const { data, error } = await c.rpc('vokaboom_student_login', { p_username: user, p_pics: Array.isArray(pics) ? pics.join(',') : String(pics || '').trim().slice(0, 80) });
   if (error) throw error;
   if (!data || !data.token) return false;
   await kidStart(data.token, user);
@@ -258,22 +262,37 @@ function openKidLogin() {
     <form id="kid-form" class="auth-form kid-form" autocomplete="off" novalidate>
       <label class="field" for="kid-user"><span class="label">Dein Benutzername</span>
         <input id="kid-user" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" placeholder="z. B. Baum34" enterkeyhint="next"></label>
+      <div class="seg kid-mode" role="group" aria-label="Wie meldest du dich an?">
+        <button type="button" class="seg-btn" data-action="kid-pw-mode" data-mode="pics" aria-pressed="true">${icon('image')} Mit Bildern</button>
+        <button type="button" class="seg-btn" data-action="kid-pw-mode" data-mode="password" aria-pressed="false">${icon('edit')} Mit Passwort</button>
+      </div>
       <div class="kid-pw-pics" id="kid-pw-pics">
         <p class="label">Tippe deine 3 Bilder der Reihe nach an</p>
         <div class="kid-slots" id="kid-slots" aria-live="polite"></div>
         <div class="kid-grid">${KID_PW.map((p, i) => `<button type="button" class="kid-pic" data-action="kid-pick" data-i="${i}" aria-label="${esc(p.de)}">${kidPwImg(i)}</button>`).join('')}</div>
       </div>
-      <label class="field kid-pw-words" for="kid-pw" hidden><span class="label">Dein Passwort (3 Wörter)</span>
-        <input id="kid-pw" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="60" placeholder="z. B. Erdbeere Velo Löwe" enterkeyhint="go"></label>
-      <p class="small"><button type="button" class="link-btn" data-action="kid-pw-mode" id="kid-pw-mode">Passwort lieber eintippen</button></p>
+      <label class="field kid-pw-words" for="kid-pw" hidden><span class="label">Dein Passwort</span>
+        <input id="kid-pw" type="text" autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false" maxlength="60" placeholder="steht auf deinem Kärtchen" enterkeyhint="go"></label>
       <p class="form-error" id="kid-error" role="alert"></p>
       <button class="btn primary big" type="submit" id="kid-submit">Los geht's ${icon('right')}</button>
     </form>
     <p class="muted small">${icon('image')} Oder scanne den QR-Code auf deinem Kärtchen mit der Kamera.</p>
     <p class="small"><button type="button" class="link-btn" data-action="login-choose">Zurück</button></p>`, { label: 'Kinder-Login', cls: 'auth-modal kid-modal' });
   renderKidSlots();
+  let mode = 'pics'; try { mode = localStorage.getItem(KID_MODE_KEY) || 'pics'; } catch { /* */ }
+  setKidLoginMode(mode === 'password' ? 'password' : 'pics', false);
   setTimeout(() => $('#kid-user')?.focus(), 60);
   $('#kid-form').addEventListener('submit', (e) => { e.preventDefault(); submitKidLogin(); });
+}
+function setKidLoginMode(mode, focus = true) {
+  const w = $('.kid-pw-words'), p = $('#kid-pw-pics');
+  if (!w) return;
+  w.hidden = mode !== 'password'; p.hidden = mode === 'password';
+  $$('.kid-mode .seg-btn').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  try { localStorage.setItem(KID_MODE_KEY, mode); } catch { /* */ }
+  kidForm.picks = []; renderKidSlots();
+  const e = $('#kid-error'); if (e) e.textContent = '';
+  if (focus) (!$('#kid-user')?.value.trim() ? $('#kid-user') : mode === 'password' ? $('#kid-pw') : null)?.focus();
 }
 function renderKidSlots() {
   const box = $('#kid-slots');
@@ -295,19 +314,16 @@ async function submitKidLogin() {
   const user = input.value.trim().replace(/\s+/g, '');
   if (!user) { err.textContent = 'Schreib zuerst deinen Benutzernamen (er steht auf deinem Kärtchen).'; input.focus(); return; }
   const typed = !$('.kid-pw-words')?.hidden;
-  if (typed) {
-    const pk = kidWordsToPicks($('#kid-pw')?.value);
-    if (!pk) { err.textContent = 'Schreib die 3 Wörter von deinem Kärtchen, z. B. „Erdbeere Velo Löwe“.'; $('#kid-pw')?.focus(); return; }
-    kidForm.picks = pk;
-  }
-  if (kidForm.picks.length < 3) { err.textContent = 'Tippe deine 3 Bilder an.'; return; }
+  const pwText = ($('#kid-pw')?.value || '').trim();
+  if (typed && pwText.replace(/[^a-z0-9äöü]/gi, '').length < 4) { err.textContent = 'Schreib dein Passwort vom Kärtchen.'; $('#kid-pw')?.focus(); return; }
+  if (!typed && kidForm.picks.length < 3) { err.textContent = 'Tippe deine 3 Bilder an.'; return; }
   err.textContent = '';
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Anmelden …';
   try {
-    const ok = await kidLogin(user, kidForm.picks);
+    const ok = await kidLogin(user, typed ? pwText : kidForm.picks);
     if (!ok) {
       if (!$('#kid-error')) return;
-      err.textContent = 'Das stimmt leider nicht. Schau genau auf dein Kärtchen und probier es nochmal.';
+      err.textContent = typed ? 'Benutzername oder Passwort stimmt leider nicht. Schau genau auf dein Kärtchen und probier es nochmal.' : 'Das stimmt leider nicht. Schau genau auf dein Kärtchen und probier es nochmal.';
       sfx.bad();
       kidForm.picks = []; renderKidSlots();
       if (typed) $('#kid-pw')?.select();
@@ -383,15 +399,13 @@ async function loadClasses() {
     try {
       const c = await cloudClient();
       const [cl0, st] = await Promise.all([
-        c.from('vokaboom_classes').select('id,name,set_ids,rules,created_at').order('created_at'),
-        c.from('vokaboom_students').select('id,class_id,first_name,last_initial,username,pics,created_at').order('first_name'),
+        c.from('vokaboom_classes').select('*').order('created_at'),
+        c.from('vokaboom_students').select('*').order('first_name'),
       ]);
-      let cl = cl0;
-      klass.noRules = false;
-      if (cl.error && /rules/.test(cl.error.message || '')) { // Datenbank noch ohne Spalte „rules“ (SQL-Skript nicht neu ausgeführt)
-        klass.noRules = true;
-        cl = await c.from('vokaboom_classes').select('id,name,set_ids,created_at').order('created_at');
-      }
+      const cl = cl0;
+      // Datenbank noch ohne neue Spalten (SQL-Skript nicht neu ausgeführt)?
+      klass.noRules = !!cl.data?.length && !('rules' in cl.data[0]);
+      klass.noPw = !!cl.data?.length && !('class_pw' in cl.data[0]);
       if (cl.error) throw cl.error;
       if (st.error) throw st.error;
       klass.list = (cl.data || []).map((x) => ({ ...x, rules: x.rules && typeof x.rules === 'object' && !Array.isArray(x.rules) ? x.rules : {} }));
@@ -560,9 +574,11 @@ function classKidsHTML(c, kids) {
     return `<li class="kid-row">
       <span class="kid-av-big" aria-hidden="true">${kidWordImg(s.username)}</span>
       <span class="kid-who"><strong>${esc(kidName(s))}</strong><small>${esc(displayUser(s.username))}${einmaleinsLoginOf(s) ? ' <span class="e1-tag" title="Gleiches Kärtchen wie in Teilmal">auch in Teilmal</span>' : ''}</small></span>
-      <span class="kid-pw" aria-label="Bilder-Passwort">${picsList(s.pics).map((i) => `<span>${kidPwImg(i)}</span>`).join('')}</span>
+      ${kidSecretOf(s) === 'password' ? `<span class="kid-pw-text" aria-label="Passwort">${esc(s.pw)}</span>`
+        : kidSecretOf(s) === 'class' ? '<span class="kid-pw-text muted" title="Klassenpasswort">Klassenpasswort</span>'
+          : `<span class="kid-pw" aria-label="Bilder-Passwort">${picsList(s.pics).map((i) => `<span>${kidPwImg(i)}</span>`).join('')}</span>`}
       <span class="kid-actions">
-        <button class="icon-btn subtle" data-action="kid-newpics" data-id="${s.id}" title="Neue Bilder (neues Passwort)" aria-label="Neue Bilder für ${esc(kidName(s))}">${icon('shuffle')}</button>
+        <button class="icon-btn subtle" data-action="kid-newpics" data-id="${s.id}" title="Neues Passwort (neue Bilder)" aria-label="Neues Passwort für ${esc(kidName(s))}">${icon('shuffle')}</button>
         <button class="icon-btn subtle" data-action="kid-delete" data-id="${s.id}" title="Löschen" aria-label="${esc(kidName(s))} löschen">${icon('trash')}</button>
       </span>
     </li>`;
@@ -640,6 +656,23 @@ async function addKids(c, list) {
   } catch (e) { toast(classErrorText(e), 'bad'); } finally { klass.busy = false; }
 }
 
+/** Klassenpasswort (eines für alle Kinder der Klasse); leer = keines */
+async function saveClassPw(cid, raw) {
+  const c = klass.list.find((x) => x.id === cid);
+  if (!c) return false;
+  const v = String(raw || '').trim().slice(0, 40);
+  if (v && v.replace(/[^a-z0-9äöü]/gi, '').length < 4) { toast('Das Klassenpasswort braucht mindestens 4 Buchstaben oder Zahlen.', 'bad'); return false; }
+  try {
+    const cl = await cloudClient();
+    const { error } = await cl.from('vokaboom_classes').update({ class_pw: v || null }).eq('id', cid);
+    if (error) throw error;
+    c.class_pw = v || null;
+    return true;
+  } catch (e) {
+    toast(/class_pw/.test(e?.message || '') ? 'Dafür zuerst supabase/vokabelwelt.sql in Supabase nochmals ausführen.' : classErrorText(e), 'bad');
+    return false;
+  }
+}
 function randomPics() {
   const all = [...Array(12).keys()];
   for (let i = all.length - 1; i > 0; i--) { const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1); [all[i], all[j]] = [all[j], all[i]]; }
@@ -651,13 +684,14 @@ async function kidNewPics(id) {
   if (!s) return;
   let pics = randomPics();
   while (pics === s.pics) pics = randomPics();
+  const pw = newKidPw();
   try {
     const cl = await cloudClient();
-    const { error } = await cl.from('vokaboom_students').update({ pics }).eq('id', id);
+    const { error } = await cl.from('vokaboom_students').update(s.pw ? { pics, pw } : { pics }).eq('id', id);
     if (error) throw error;
-    s.pics = pics;
+    s.pics = pics; if (s.pw) s.pw = pw;
     render();
-    toast(`${kidName(s)} hat neue Bilder. Das alte Kärtchen gilt nicht mehr – druck ein neues aus.`);
+    toast(`${kidName(s)} hat ein neues Passwort und neue Bilder. Das alte Kärtchen gilt nicht mehr – druck ein neues aus.`);
   } catch (e) { toast(classErrorText(e), 'bad'); }
 }
 async function kidDelete(id) {
@@ -795,7 +829,7 @@ function classCardsHTML(c, kids) {
   return `<div class="panel">
     <div class="cards-head">
       <div><h2>Login-Kärtchen</h2>
-        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen (oder die 3 Passwort-Wörter eintippen).</p>
+        <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen – oder mit Passwort, wenn du das im Menü so eingestellt hast.</p>
         <p class="hint">Die Kärtchen sind neutral, ohne Logo. ${kids.some((x) => einmaleinsLoginOf(x)) ? 'Kinder, die auch in Teilmal sind, bekommen zwei QR-Codes: <strong>ABC Vokabeln</strong> öffnet Vokaboom, <strong>1×1 Rechnen</strong> öffnet Teilmal – ein Kärtchen für beide Tools.' : 'Der QR-Code <strong>ABC Vokabeln</strong> öffnet Vokaboom.'}</p></div>
       <span class="row"><button class="btn secondary" data-action="menu-sec" data-sec="klassen">${icon('sliders')} Kärtchen anpassen</button>
       <button class="btn primary" data-action="cards-pdf" id="cards-pdf">${icon('down')} PDF herunterladen</button></span>
@@ -871,7 +905,7 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
   const X = (mm) => (x + mm) * s, Y = (mm) => (y + mm) * s, L = (mm) => mm * s;
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
-  const cc = typeof cardCfg === 'function' ? cardCfg() : { secret: 'pics', names: 'full', qr: true, cls: true };
+  const cc = { ...(typeof cardCfg === 'function' ? cardCfg() : { names: 'full', qr: true, cls: true }), secret: kidSecretOf(st) };
   const e1Url = cc.qr ? einmaleinsLoginOf(st) : '';
   const pwW = cc.qr ? 43 : CARD_W - 8; // Platz fürs Passwort (links neben den QR-Codes)
   ctx.save();
@@ -901,23 +935,20 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   // Passwort: Bilder, Wörter oder beides
   const pics = picsList(st.pics);
   ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
-  if (cc.secret === 'words') {
-    ctx.fillText('Passwort: diese 3 Wörter', X(4), Y(34.6));
-    for (let k = 0; k < 3; k++) {
-      const ty = 39.6 + k * 5.4;
-      ctx.beginPath(); ctx.arc(X(5.9), Y(ty - 1.05), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
-      ctx.fillText(String(k + 1), X(5.9), Y(ty - 0.15)); ctx.textAlign = 'left';
-      ctx.fillStyle = '#1E293B';
-      ctx.fillText(fitText(ctx, pics[k] != null ? KID_PW[pics[k]].de : '', L(pwW - 6), (z) => `700 ${z}px ${disp}`, L(4)), X(9.6), Y(ty + 0.3));
-    }
+  if (cc.secret === 'password' || cc.secret === 'class') {
+    const pwTxt = cc.secret === 'class' ? klass.list.find((c) => c.id === st.class_id)?.class_pw || '' : st.pw;
+    ctx.fillText(cc.secret === 'class' ? 'Passwort (für die ganze Klasse)' : 'Passwort', X(4), Y(35.2));
+    rrect(ctx, X(4), Y(37.4), L(pwW), L(11.2), L(2.4));
+    ctx.fillStyle = wash; ctx.fill(); ctx.lineWidth = L(0.4); ctx.strokeStyle = accent; ctx.stroke();
+    ctx.fillStyle = '#1E293B';
+    ctx.fillText(fitText(ctx, pwTxt, L(pwW - 5), (z) => `700 ${z}px ui-monospace, Menlo, Consolas, monospace`, L(5)), X(6.5), Y(44.8));
     ctx.restore();
     if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
     return;
   }
-  ctx.fillText(cc.secret === 'both' ? 'Passwort: 3 Bilder antippen oder Wörter tippen' : 'Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
+  ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
   for (let k = 0; k < 3; k++) {
-    const bx = 4 + k * 13, by = cc.secret === 'both' ? 36.2 : 37;
+    const bx = 4 + k * 13, by = 37;
     rrect(ctx, X(bx), Y(by), L(11), L(11), L(2.2));
     ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.45); ctx.strokeStyle = accent; ctx.stroke();
     const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
@@ -925,11 +956,6 @@ async function drawKidCard(ctx, x, y, s, st, className) {
     ctx.beginPath(); ctx.arc(X(bx + 0.4), Y(by + 0.4), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
     ctx.fillText(String(k + 1), X(bx + 0.4), Y(by + 1.3)); ctx.textAlign = 'left';
-    if (cc.secret === 'both' && pics[k] != null) {
-      ctx.fillStyle = '#1E293B'; ctx.textAlign = 'center';
-      ctx.fillText(fitText(ctx, KID_PW[pics[k]].de, L(12.6), (z) => `700 ${z}px ${body}`, L(2.2)), X(bx + 5.5), Y(by + 14.2));
-      ctx.textAlign = 'left';
-    }
   }
   ctx.restore();
   if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
@@ -1166,15 +1192,7 @@ const classActions = {
   'stats-kid': (el) => { klass.kidDetail = klass.kidDetail === el.dataset.id ? '' : el.dataset.id; render(); if (klass.kidDetail) $('.kid-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   /* Kinder */
   'kid-login': () => openKidLogin(),
-  'kid-pw-mode': () => {
-    const w = $('.kid-pw-words'), p = $('#kid-pw-pics'), b = $('#kid-pw-mode');
-    if (!w) return;
-    const toWords = w.hidden;
-    w.hidden = !toWords; p.hidden = toWords;
-    b.textContent = toWords ? 'Lieber Bilder antippen' : 'Passwort lieber eintippen';
-    kidForm.picks = []; renderKidSlots(); $('#kid-error').textContent = '';
-    (toWords ? $('#kid-pw') : $('#kid-user'))?.focus();
-  },
+  'kid-pw-mode': (el) => setKidLoginMode(el.dataset.mode),
   'kid-pick': (el) => kidPick(+el.dataset.i),
   'kid-unpick': () => kidUnpick(),
   'kid-account': () => openKidAccount(),

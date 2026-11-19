@@ -96,9 +96,16 @@ Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) 
 
 **Anmelden als Kind:** QR-Code auf dem Kärtchen mit der Kamera scannen – oder auf **Anmelden → Kinder-Login**, Benutzernamen eintippen und die 3 Bilder der Reihe nach antippen. Nach 8 falschen Versuchen ist 5 Minuten Pause. Auf einem Gerät, auf dem eine Lehrperson angemeldet ist, geht das Kinder-Login erst nach dem Abmelden.
 
-**Kärtchen anpassen** (Menü → Klassen & Kärtchen, oder in der Klasse unter Kärtchen → „Kärtchen anpassen“): Passwort als **Bilder**, als **Passwort-Wörter** (z. B. „Erdbeere Velo Löwe“ zum Eintippen) oder **beides**; Name als Vorname + Anfangsbuchstabe oder **nur Initialen**; QR-Code und Klassenname ein/aus. Das Passwort selbst bleibt gleich – die Kinder können im Kinder-Login jederzeit „Passwort lieber eintippen“ wählen.
+**Anmelden mit Bildern oder Passwort** (Menü → Klassen & Kärtchen): Was auf dem Kärtchen steht, wählst du:
+- **Bilder** – die Kinder tippen 3 Bilder an (ideal für die Unterstufe).
+- **Passwort pro Kind** – Vokaboom erzeugt für jedes Kind ein eigenes Passwort, z. B. `blau-tiger-47`.
+- **Klassenpasswort** – du legst für jede Klasse ein Passwort fest (mind. 4 Zeichen, z. B. `Sommer2026`). Einfach zu merken, dafür könnten sich Kinder gegenseitig anmelden. Klassen ohne Klassenpasswort bekommen Kärtchen mit Bildern.
 
-**Kärtchen verloren?** Beim Kind auf das Symbol mit den gekreuzten Pfeilen tippen: Es bekommt neue Bilder, das alte Kärtchen gilt nicht mehr.
+Alle drei funktionieren immer (auch der QR-Code). Gross/klein, Leerzeichen und Bindestriche spielen beim Eintippen keine Rolle. Im Kinder-Login wählen die Kinder „Mit Bildern“ oder „Mit Passwort“; das Gerät merkt sich die Wahl. Ausserdem: Name als Vorname + Anfangsbuchstabe oder **nur Initialen**, QR-Code und Klassenname ein/aus. In Teilmal geht das Passwort auch, wenn das Kind mit Vokaboom verbunden ist (gleiches Kärtchen).
+
+Dafür `supabase/vokabelwelt.sql` nochmals ganz ausführen (bestehende Kinder bekommen dabei automatisch ein Passwort; Bilder und Kärtchen bleiben gültig) – und für Teilmal `einmaleins.sql` aus dem Teilmal-Projekt.
+
+**Kärtchen verloren?** Beim Kind auf das Symbol mit den gekreuzten Pfeilen tippen: Es bekommt neue Bilder und ein neues Passwort, das alte Kärtchen gilt nicht mehr. (Ein Klassenpasswort änderst du im Menü.)
 
 Dafür braucht es die Tabellen für Klassen: `supabase/vokabelwelt.sql` nochmals ganz im SQL Editor ausführen (bestehende Daten bleiben erhalten).
 

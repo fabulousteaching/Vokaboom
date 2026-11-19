@@ -14,7 +14,11 @@ const MENU_SECTIONS = [
   ['daten', 'shield', 'Daten & Hilfe'],
 ];
 const CARD_DEFAULTS = { secret: 'pics', names: 'full', qr: true, cls: true };
-const cardCfg = () => ({ ...CARD_DEFAULTS, ...(db.settings.cards || {}) });
+const cardCfg = () => {
+  const c = { ...CARD_DEFAULTS, ...(db.settings.cards || {}) };
+  if (!['pics', 'password', 'class'].includes(c.secret)) c.secret = 'pics'; // alte Werte („words“, „both“)
+  return c;
+};
 
 /** Knopf oben rechts: ein einziger „Menü“-Knopf mit Konto-Status */
 function menuButtonHTML() {
@@ -52,7 +56,8 @@ function menuAfterRender() {
   if (MENU.sec === 'mikro') fillMicSelect();
   if (MENU.sec === 'stimme') updatePhSettings();
   if (MENU.sec === 'avatar' && cloud.uid && !MENU.avCfg && !MENU.avLoading) menuLoadAvatarCfg();
-  if (MENU.sec === 'avatar' && cloud.uid && typeof loadClasses === 'function' && !klass.loaded) loadClasses().then(() => { if (MENU.sec === 'avatar' && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML('avatar'); });
+  const sec = MENU.sec;
+  if ((sec === 'avatar' || sec === 'klassen') && cloud.uid && typeof loadClasses === 'function' && !klass.loaded) loadClasses().then(() => { if (MENU.sec === sec && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML(sec); });
 }
 function menuBindOnce(m) {
   const s = db.settings;
@@ -64,7 +69,11 @@ function menuBindOnce(m) {
     if (t.id === 'mic-device') s.micId = t.value;
     if (t.id === 'set-rate') s.rate = parseFloat(t.value);
     if (t.id === 'ph-min') { s.phonetic = { ...(s.phonetic || {}), passMin: parseInt(t.value, 10) || 60 }; applyTeacherPrefs(); }
-    if (t.dataset.card) { s.cards = { ...cardCfg(), [t.dataset.card]: t.type === 'checkbox' ? t.checked : t.value }; MENU.cardsChanged = true; menuSaved(); }
+    if (t.dataset.card) {
+      s.cards = { ...cardCfg(), [t.dataset.card]: t.type === 'checkbox' ? t.checked : t.value }; MENU.cardsChanged = true; menuSaved();
+      if (t.dataset.card === 'secret') { saveDB(); $('#menu-body').innerHTML = menuSectionHTML('klassen'); return; }
+    }
+    if (t.dataset.classPw) { saveClassPw(t.dataset.classPw, t.value).then((ok) => { if (ok) { MENU.cardsChanged = true; menuSaved(); } }); return; }
     if (t.dataset.av) {
       const v = t.type === 'checkbox' ? t.checked : +t.value;
       MENU.avCfg = { ...(MENU.avCfg || {}), [t.dataset.av]: v };
@@ -104,13 +113,19 @@ function menuSectionHTML(sec) {
           <p class="small muted">Gilt für die Kärtchen, die du ab jetzt druckst (Klasse → Kärtchen). Das Passwort bleibt gleich – nur die Darstellung ändert sich.</p>
           <div class="field"><span class="label">Passwort auf dem Kärtchen</span>
             <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="pics" ${c.secret === 'pics' ? 'checked' : ''}><span><b>Bilder</b> – die Kinder tippen 3 Bilder an (ideal für Unterstufe)</span></label>
-            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="words" ${c.secret === 'words' ? 'checked' : ''}><span><b>Passwort-Wörter</b> – z. B. „Erdbeere Velo Löwe“, zum Eintippen</span></label>
-            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="both" ${c.secret === 'both' ? 'checked' : ''}><span><b>Beides</b> – Bilder mit dem Wort darunter</span></label>
+            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="password" ${c.secret === 'password' ? 'checked' : ''}><span><b>Passwort pro Kind</b> – Vokaboom erzeugt für jedes Kind ein eigenes Passwort, z. B. „blau-tiger-47“</span></label>
+            <label class="radio"><input type="radio" name="card-secret" data-card="secret" value="class" ${c.secret === 'class' ? 'checked' : ''}><span><b>Klassenpasswort</b> – du legst ein Passwort für die ganze Klasse fest (einfach zu merken; dafür könnten sich Kinder gegenseitig anmelden)</span></label>
           </div>
           <div class="field"><span class="label">Name auf dem Kärtchen</span>
             <label class="radio"><input type="radio" name="card-names" data-card="names" value="full" ${c.names === 'full' ? 'checked' : ''}><span>Vorname und Anfangsbuchstabe („Lena M.“)</span></label>
             <label class="radio"><input type="radio" name="card-names" data-card="names" value="initials" ${c.names === 'initials' ? 'checked' : ''}><span>Nur Initialen („L. M.“) – datensparsam, z. B. für Kärtchen, die herumliegen</span></label>
           </div>
+          ${c.secret === 'class' ? `<div class="field class-pw-list"><span class="label">Klassenpasswörter</span>
+            ${(klass.list || []).length ? klass.list.map((k) => `<label class="class-pw-row"><span>${esc(k.name)}</span>
+              <input type="text" data-class-pw="${k.id}" value="${esc(k.class_pw || '')}" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="z. B. Sommer2026"></label>`).join('')
+              : '<p class="small muted">Noch keine Klassen.</p>'}
+            <small class="muted">Klassen ohne Klassenpasswort bekommen Kärtchen mit Bildern. Die Bilder und das eigene Passwort jedes Kindes funktionieren weiterhin.</small></div>` : ''}
+          ${c.secret !== 'pics' && klass.noPw ? '<p class="banner bad small">Für Passwörter zuerst <code>supabase/vokabelwelt.sql</code> in Supabase nochmals ausführen.</p>' : ''}
           <label class="switch"><input type="checkbox" data-card="qr" ${c.qr ? 'checked' : ''}><span>QR-Code aufs Kärtchen (Anmelden ohne Tippen)</span></label>
           <label class="switch"><input type="checkbox" data-card="cls" ${c.cls ? 'checked' : ''}><span>Klassenname oben aufs Kärtchen</span></label>
         </section>`;
