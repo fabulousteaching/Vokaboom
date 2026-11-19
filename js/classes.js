@@ -232,21 +232,54 @@ async function kidLoginFromHash() {
     } catch (e) { toast(kidErrorText(e), 'bad'); }
     return true;
   }
-  const m = location.hash.match(/^#k=([a-z]+[0-9]{2,4})\.(\d{1,2})-(\d{1,2})-(\d{1,2})$/i);
+  // QR-Code eines Kärtchens: #k= meldet direkt an, #w= (Kind in beiden Tools) fragt zuerst, wo
+  const m = location.hash.match(/^#([kw])=([a-z]+[0-9]{2,4})\.(\d{1,2})-(\d{1,2})-(\d{1,2})$/i);
   if (!m) return false;
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
-  const user = m[1].toLowerCase(), pics = [m[2], m[3], m[4]].map(Number);
-  if (isKid() && kid.username === user) { render(); return true; }
+  const user = m[2].toLowerCase(), pics = [m[3], m[4], m[5]].map(Number);
   render();
-  if (cloud.uid || SSO.teacherSignedIn(AUTH_KEY)) { openTeacherBlocks(); return true; }
+  if (m[1].toLowerCase() === 'w' && !(cloud.uid || SSO.teacherSignedIn(AUTH_KEY))) { openToolChooser(user, pics.join('-')); return true; }
+  await kidLoginFromCard(user, pics);
+  return true;
+}
+
+/* ---------- Ein QR-Code für beide Tools (gleich in Vokaboom und Teilmal) ----------
+ * Kinder mit demselben Login in Vokaboom und Teilmal haben auf dem Kärtchen nur einen QR-Code (…#w=baum34.1-2-3).
+ * Er fragt „Wo willst du dich anmelden?“: „bei Vokaboom“ oder „bei Teilmal“. Kinder, die nur ein Tool haben,
+ * kommen mit ihrem QR-Code (…#k=…) direkt dorthin. */
+const TOOL_HERE = 'vokaboom';
+const TOOL_LOGOS = {
+  vokaboom: '<svg viewBox="0 -6 80 78" aria-hidden="true"><defs><linearGradient id="tool-vk-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4F46E5"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect x="6" y="22" width="36" height="42" rx="10" fill="#FFB703" transform="rotate(-12 24 43)"/><rect x="14" y="20" width="38" height="46" rx="11" fill="url(#tool-vk-g)"/><path d="M23 34l10 18 10-18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><g stroke-linecap="round"><path d="M54 13.1L52 2.3" stroke="#EC4899" stroke-width="4"/><path d="M57.8 13.2L63.3 1.9" stroke="#FFB703" stroke-width="4.4"/><path d="M60.3 16.2L70 11" stroke="#EC4899" stroke-width="4"/><path d="M61.5 19.7L68.9 20.5" stroke="#FFB703" stroke-width="3.6"/><path d="M50.2 14.7L45.7 10.6" stroke="#FFB703" stroke-width="3.6"/></g><circle cx="57.9" cy="-1.8" r="2" fill="#EC4899"/><circle cx="75.1" cy="14.7" r="1.9" fill="#FFB703"/><circle cx="71" cy="2.5" r="1.5" fill="#EC4899"/><circle cx="46.5" cy="3.1" r="1.5" fill="#EC4899"/></svg>',
+  teilmal: '<svg viewBox="3 11 69 69" aria-hidden="true"><defs><linearGradient id="tool-tm-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0F766E"/><stop offset="1" stop-color="#0E7490"/></linearGradient></defs><path d="M27 12H56a15 15 0 0 1 15 15V42a15 15 0 0 1-15 15H39L22 70l3-13H27a15 15 0 0 1-15-15V27a15 15 0 0 1 15-15z" fill="#FF6B4A" transform="translate(-5 5) rotate(-7 41 40)"/><path d="M27 12H56a15 15 0 0 1 15 15V42a15 15 0 0 1-15 15H39L22 70l3-13H27a15 15 0 0 1-15-15V27a15 15 0 0 1 15-15z" fill="url(#tool-tm-g)"/><path d="M23 27l15 15M38 27 23 42" stroke="#fff" stroke-width="6.8" stroke-linecap="round"/><g fill="#FF6B4A"><circle cx="54" cy="27.5" r="4.3"/><circle cx="54" cy="41.5" r="4.3"/></g></svg>',
+};
+/** Adresse fürs Kärtchen: ein QR-Code; bei Kindern in beiden Tools zuerst die Frage, wo sie sich anmelden */
+const cardQrUrl = (st, both) => `${siteUrl()}#${both ? 'w' : 'k'}=${st.username}.${picsList(st.pics).join('-')}`;
+function openToolChooser(user, pics) {
+  const other = String(CLOUD_CFG.einmaleinsUrl || '').trim();
+  const tile = (tool, name, sub) => {
+    const inner = `<span class="tool-logo" aria-hidden="true">${TOOL_LOGOS[tool]}</span><strong>bei ${name}</strong><small>${sub}</small>`;
+    return tool === TOOL_HERE || !other
+      ? `<button type="button" class="role-tile tool-tile ${tool}" data-action="tool-here" data-u="${esc(user)}" data-p="${esc(pics)}">${inner}</button>`
+      : `<a class="role-tile tool-tile ${tool}" href="${esc(other)}#k=${esc(user)}.${esc(pics)}">${inner}</a>`;
+  };
+  openModal(`
+    <header class="modal-head"><h2>Wo willst du dich anmelden?</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schliessen">${icon('x')}</button></header>
+    <div class="role-pick tool-pick">
+      ${tile('vokaboom', 'Vokaboom', 'ABC Vokabeln üben')}
+      ${tile('teilmal', 'Teilmal', '1×1 Rechnen üben')}
+    </div>
+    <p class="small center muted">Wechseln kannst du später jederzeit mit dem Knopf auf deiner Startseite.</p>`, { label: 'Wo willst du dich anmelden?', cls: 'auth-modal role-modal tool-modal' });
+}
+/** Login mit dem QR-Code des Kärtchens (Benutzername und Bilder) */
+async function kidLoginFromCard(user, pics) {
+  if (isKid() && kid.username === user) { render(); return; }
+  if (cloud.uid || SSO.teacherSignedIn(AUTH_KEY)) { openTeacherBlocks(); return; }
   toast('Anmelden …');
   try {
     if (await kidLogin(user, pics)) toast(`Hallo ${kid.first}! Du bist angemeldet.`);
     else toast('Dieses Kärtchen gilt nicht mehr. Frag deine Lehrperson nach einem neuen.', 'bad');
   } catch (e) { toast(kidErrorText(e), 'bad'); }
-  return true;
 }
-
 function openTeacherBlocks() {
   openModal(`
     <header class="modal-head"><h2>Kinder-Login</h2><button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
@@ -868,7 +901,7 @@ function classCardsHTML(c, kids) {
     <div class="cards-head">
       <div><h2>Login-Kärtchen</h2>
         <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen – oder mit Passwort, wenn du das im Menü so eingestellt hast.</p>
-        <p class="hint">Die Kärtchen sind neutral, ohne Logo. ${kids.some((x) => einmaleinsLoginOf(x)) ? 'Kinder, die auch in Teilmal sind, bekommen zwei QR-Codes: <strong>ABC Vokabeln</strong> öffnet Vokaboom, <strong>1×1 Rechnen</strong> öffnet Teilmal – ein Kärtchen für beide Tools.' : 'Der QR-Code <strong>ABC Vokabeln</strong> öffnet Vokaboom.'}</p></div>
+        <p class="hint">Die Kärtchen sind neutral, ohne Logo. ${kids.some((x) => einmaleinsLoginOf(x)) ? 'Kinder, die auch in Teilmal sind, haben einen QR-Code für beide Tools: Beim Scannen wählen sie <strong>bei Vokaboom</strong> oder <strong>bei Teilmal</strong>. Kinder, die nur in Vokaboom sind, kommen direkt dorthin.' : 'Der QR-Code <strong>ABC Vokabeln</strong> öffnet Vokaboom.'}</p></div>
       <span class="row"><button class="btn secondary" data-action="menu-sec" data-sec="klassen">${icon('sliders')} Kärtchen anpassen</button>
       <button class="btn primary" data-action="cards-pdf" id="cards-pdf">${icon('down')} PDF herunterladen</button></span>
     </div>
@@ -936,8 +969,8 @@ function drawQRLabel(ctx, cx, y, tag, text, accent, X, Y, L, body) {
 }
 /**
  * Zeichnet ein Login-Kärtchen (x, y in mm; s = Pixel pro mm). Ohne Logo und ohne Namen eines Tools:
- * Es gilt für alle Tools, in denen das Kind dasselbe Login hat. Ein QR-Code pro Fach: „ABC Vokabeln“ (Vokaboom)
- * und bei Kindern, die auch in Einmaleins sind, „1×1 Rechnen“. Gleiches Kärtchen wie in Einmaleins.
+ * Es gilt für alle Tools, in denen das Kind dasselbe Login hat. Ein QR-Code: bei Kindern in beiden Tools mit der Frage
+ * „bei Vokaboom“ oder „bei Teilmal“ (#w=…), sonst direkt zu Vokaboom (#k=…). Gleiches Kärtchen wie in Teilmal.
  */
 async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
@@ -945,7 +978,7 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
   const cc = { ...(typeof cardCfg === 'function' ? cardCfg() : { names: 'full', qr: true, cls: true }), secret: kidSecretOf(st) };
   const e1Url = cc.qr ? einmaleinsLoginOf(st) : '';
-  const pwW = !cc.qr ? CARD_W - 8 : e1Url ? 40 : 54; // Platz fürs Passwort (links neben den QR-Codes)
+  const pwW = !cc.qr ? CARD_W - 8 : 54; // Platz fürs Passwort (links neben dem QR-Code)
   ctx.save();
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
   ctx.fillStyle = '#fff'; ctx.fill();
@@ -998,20 +1031,27 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   ctx.restore();
   if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
 }
-/** QR-Codes: einer pro Fach */
+/** Ein QR-Code: Kinder in beiden Tools wählen beim Scannen „bei Vokaboom“ oder „bei Teilmal“ (wie in Teilmal) */
 function drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body) {
   ctx.save();
-  if (e1Url) {
-    drawQR(ctx, kidLoginUrl(st), 46.5, 30.5, 17.5, X, Y, L);
-    drawQR(ctx, e1Url, 65, 30.5, 17.5, X, Y, L);
-    drawQRLabel(ctx, 55.25, 51.2, 'ABC', 'Vokabeln', accent, X, Y, L, body);
-    drawQRLabel(ctx, 73.75, 51.2, '1×1', 'Rechnen', accent, X, Y, L, body);
-  } else {
-    drawQR(ctx, kidLoginUrl(st), 61, 29.5, 20, X, Y, L);
-    drawQRLabel(ctx, 71, 51.6, 'ABC', 'Vokabeln', accent, X, Y, L, body);
-  }
+  drawQR(ctx, cardQrUrl(st, !!e1Url), 61, 29.5, 20, X, Y, L);
+  if (e1Url) drawQRTags(ctx, 71, 51.6, ['ABC', '1×1'], accent, X, Y, L, body);
+  else drawQRLabel(ctx, 71, 51.6, 'ABC', 'Vokabeln', accent, X, Y, L, body);
   ctx.restore();
 }
+/** Unter dem QR-Code für beide Tools: „ABC“ und „1×1“ nebeneinander */
+function drawQRTags(ctx, cx, y, tags, accent, X, Y, L, body) {
+  ctx.font = `700 ${L(2.3)}px ${body}`;
+  const ws = tags.map((t) => ctx.measureText(t).width + L(2)), gap = L(1.4);
+  let x0 = X(cx) - (ws.reduce((a, b) => a + b, 0) + gap * (tags.length - 1)) / 2;
+  ctx.textAlign = 'left';
+  tags.forEach((t, i) => {
+    rrect(ctx, x0, Y(y - 2.4), ws[i], L(3.3), L(1.1)); ctx.fillStyle = accent; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillText(t, x0 + L(1), Y(y));
+    x0 += ws[i] + gap;
+  });
+}
+
 
 async function cardFontsReady() {
   try { await Promise.all(["800 20px 'Bricolage Grotesque'", '600 20px Lexend', '500 20px Lexend'].map((f) => document.fonts.load(f))); } catch { /* */ }
@@ -1240,6 +1280,7 @@ const classActions = {
   /* Kinder */
   'kid-login': () => openKidLogin(),
   'kid-pw-mode': (el) => setKidLoginMode(el.dataset.mode),
+  'tool-here': (el) => { closeModal(true); kidLoginFromCard(el.dataset.u, el.dataset.p.split('-').map(Number)); },
   'kid-pick': (el) => kidPick(+el.dataset.i),
   'kid-unpick': () => kidUnpick(),
   'kid-account': () => openKidAccount(),
