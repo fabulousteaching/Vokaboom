@@ -356,9 +356,10 @@ function avatarEarnPoints(pts, from = null) {
   avCoinUI();
   if (avPtsGet() >= AV_POINTS_PER_COIN) avFlushPoints(from);
 }
-/** Münzen direkt gutschreiben (z. B. Teilmal) */
-function avatarEarnCoins(n, from = null) {
+/** Münzen direkt gutschreiben (Teilmal: das Tool zeigt seine eigene Münz-Meldung, darum hier still) */
+function avatarEarnCoins(n, from = null, quiet = true) {
   if (!isKid() || !n) return;
+  AV.quiet = quiet;
   avatarEarnPoints(n * AV_POINTS_PER_COIN, from);
 }
 let avFlushing = false;
@@ -375,7 +376,8 @@ async function avFlushPoints(from = null) {
     avApply(st);
     if (keepAvatar && AV.state.fresh) AV.state.avatar = keepAvatar;
     again = st.granted > 0;
-    if (st.granted > 0) { try { avCoinFx(st.granted, from); } catch (e) { console.warn('Münzen-Animation', e); } }
+    if (st.granted > 0 && AV.quiet) { const p = document.querySelector('.av-coin-pill'); p?.classList.remove('bump'); void p?.offsetWidth; p?.classList.add('bump'); }
+    else if (st.granted > 0) { try { avCoinFx(st.granted, from); } catch (e) { console.warn('Münzen-Animation', e); } }
     else if (!AV.capWarned) { AV.capWarned = true; avToast('Für heute hast du alle Münzen gesammelt (40). Morgen gibt es neue!'); }
   } catch (e) {
     console.warn('Münzen gutschreiben', e); // offline: Punkte bleiben gespeichert und werden später eingelöst
