@@ -129,6 +129,7 @@ function menuSectionHTML(sec) {
               <input type="text" data-class-pw="${k.id}" value="${esc(k.class_pw || '')}" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="z. B. Sommer2026"></label>`).join('')
               : '<p class="small muted">Noch keine Klassen.</p>'}
             <small class="muted">Klassen ohne Klassenpasswort bekommen Kärtchen mit Bildern. Die Bilder und das eigene Passwort jedes Kindes funktionieren weiterhin.</small></div>` : ''}
+          ${c.secret === 'password' && klass.oldPw ? OLD_PW_NOTE : ''}
           ${c.secret !== 'pics' && klass.noPw ? '<p class="banner bad small">Für Passwörter zuerst <code>supabase/vokabelwelt.sql</code> in Supabase nochmals ausführen.</p>' : ''}
           <label class="switch"><input type="checkbox" data-card="qr" ${c.qr ? 'checked' : ''}><span>QR-Code aufs Kärtchen (Anmelden ohne Tippen)</span></label>
           <label class="switch"><input type="checkbox" data-card="cls" ${c.cls ? 'checked' : ''}><span>Klassenname oben aufs Kärtchen</span></label>

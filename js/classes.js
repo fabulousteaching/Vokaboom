@@ -409,6 +409,7 @@ async function loadClasses() {
       // Datenbank noch ohne neue Spalten (SQL-Skript nicht neu ausgeführt)?
       klass.noRules = !!cl.data?.length && !('rules' in cl.data[0]);
       klass.noPw = !!cl.data?.length && !('class_pw' in cl.data[0]);
+      klass.oldPw = (st.data || []).some((x) => /-/.test(x.pw || '')); // Datenbank erzeugt noch lange Passwörter (altes SQL)
       if (cl.error) throw cl.error;
       if (st.error) throw st.error;
       klass.list = (cl.data || []).map((x) => ({ ...x, rules: x.rules && typeof x.rules === 'object' && !Array.isArray(x.rules) ? x.rules : {} }));
@@ -827,9 +828,11 @@ async function renameClass() {
 }
 
 /* ---------- Login-Kärtchen ---------- */
+const OLD_PW_NOTE = '<p class="banner bad small">Die Passwörter haben noch das alte Format (z. B. „Rot-kuh-78“). Bitte <code>supabase/vokabelwelt.sql</code> in Supabase im SQL Editor nochmals ganz ausführen – dann bekommen alle Kinder einfache Passwörter wie „Teich23“. Danach Seite neu laden.</p>';
 function classCardsHTML(c, kids) {
   if (!kids.length) return '<div class="panel"><p class="empty">Noch keine Kinder in dieser Klasse.</p></div>';
   return `<div class="panel">
+    ${klass.oldPw && kidSecretOf(kids[0]) === 'password' ? OLD_PW_NOTE : ''}
     <div class="cards-head">
       <div><h2>Login-Kärtchen</h2>
         <p class="hint">Ausdrucken, ausschneiden und verteilen. Anmelden: QR-Code scannen – oder Benutzername eintippen und die 3 Bilder der Reihe nach antippen – oder mit Passwort, wenn du das im Menü so eingestellt hast.</p>
@@ -910,7 +913,7 @@ async function drawKidCard(ctx, x, y, s, st, className) {
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
   const cc = { ...(typeof cardCfg === 'function' ? cardCfg() : { names: 'full', qr: true, cls: true }), secret: kidSecretOf(st) };
   const e1Url = cc.qr ? einmaleinsLoginOf(st) : '';
-  const pwW = cc.qr ? 43 : CARD_W - 8; // Platz fürs Passwort (links neben den QR-Codes)
+  const pwW = !cc.qr ? CARD_W - 8 : e1Url ? 40 : 54; // Platz fürs Passwort (links neben den QR-Codes)
   ctx.save();
   rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
   ctx.fillStyle = '#fff'; ctx.fill();
