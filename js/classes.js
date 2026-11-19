@@ -954,105 +954,84 @@ function drawQR(ctx, url, qx, qy, qs, X, Y, L) {
     }
   } catch { /* */ }
 }
-/** Beschriftung unter einem QR-Code: farbiges Kästchen („ABC“ / „1×1“) und Fach */
-function drawQRLabel(ctx, cx, y, tag, text, accent, X, Y, L, body) {
-  ctx.font = `700 ${L(2.3)}px ${body}`;
-  const tw = ctx.measureText(tag).width + L(2);
-  ctx.font = `600 ${L(2.3)}px ${body}`;
-  const xw = ctx.measureText(text).width;
-  const x0 = X(cx) - (tw + L(1) + xw) / 2;
-  rrect(ctx, x0, Y(y - 2.4), tw, L(3.3), L(1.1)); ctx.fillStyle = accent; ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.3)}px ${body}`; ctx.textAlign = 'left';
-  ctx.fillText(tag, x0 + L(1), Y(y));
-  ctx.fillStyle = '#475569'; ctx.font = `600 ${L(2.3)}px ${body}`;
-  ctx.fillText(text, x0 + tw + L(1), Y(y));
-}
 /**
  * Zeichnet ein Login-Kärtchen (x, y in mm; s = Pixel pro mm). Ohne Logo und ohne Namen eines Tools:
  * Es gilt für alle Tools, in denen das Kind dasselbe Login hat. Ein QR-Code: bei Kindern in beiden Tools mit der Frage
- * „bei Vokaboom“ oder „bei Teilmal“ (#w=…), sonst direkt zu Vokaboom (#k=…). Gleiches Kärtchen wie in Teilmal.
+ * „bei Vokaboom“ oder „bei Teilmal“ (#w=…), sonst direkt ins Tool (#k=…). Gleiches Kärtchen in Vokaboom und Teilmal.
  */
 async function drawKidCard(ctx, x, y, s, st, className) {
   const [accent, wash] = cardColor(st.username);
   const X = (mm) => (x + mm) * s, Y = (mm) => (y + mm) * s, L = (mm) => mm * s;
   const disp = "'Bricolage Grotesque', Lexend, system-ui, sans-serif", body = 'Lexend, system-ui, sans-serif';
   const cc = { ...(typeof cardCfg === 'function' ? cardCfg() : { names: 'full', qr: true, cls: true }), secret: kidSecretOf(st) };
-  const e1Url = cc.qr ? einmaleinsLoginOf(st) : '';
-  const pwW = !cc.qr ? CARD_W - 8 : 54; // Platz fürs Passwort (links neben dem QR-Code)
+  const both = cc.qr && !!einmaleinsLoginOf(st);
+  const pwMax = (cc.qr ? 56 : CARD_W - 4) - 4; // so breit darf der Passwort-Kasten höchstens werden
   ctx.save();
-  rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
+  // Karte: weiss, runde Ecken, feiner Rand, zwei weiche Farbflächen
+  rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(4));
   ctx.fillStyle = '#fff'; ctx.fill();
   ctx.save(); ctx.clip();
-  ctx.fillStyle = accent; ctx.fillRect(X(0), Y(0), L(CARD_W), L(9));
+  ctx.fillStyle = wash;
+  ctx.beginPath(); ctx.arc(X(CARD_W + 3), Y(-5), L(31), 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.arc(X(-7), Y(CARD_H + 9), L(17), 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
   ctx.restore();
-  rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(3.5));
-  ctx.lineWidth = L(0.25); ctx.strokeStyle = '#CBD5E1'; ctx.stroke();
-  // Kopf: „Mein Login“ und Klasse
+  rrect(ctx, X(0), Y(0), L(CARD_W), L(CARD_H), L(4));
+  ctx.lineWidth = L(0.25); ctx.strokeStyle = '#E2E8F0'; ctx.stroke();
+  // Kopf: „Mein Login“ als Pille, Klasse rechts
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-  ctx.fillStyle = '#fff'; ctx.font = `800 ${L(3.4)}px ${disp}`;
-  ctx.fillText('Mein Login', X(4), Y(6.2));
-  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.9)';
-  if (cc.cls) ctx.fillText(fitText(ctx, className, L(44), (z) => `500 ${z}px ${body}`, L(2.8)), X(CARD_W - 4), Y(6));
-  ctx.textAlign = 'left';
+  ctx.font = `800 ${L(2.6)}px ${disp}`;
+  const pillW = ctx.measureText('Mein Login').width + L(4.4);
+  rrect(ctx, X(4), Y(4), pillW, L(5.4), L(2.7)); ctx.fillStyle = accent; ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText('Mein Login', X(4) + L(2.2), Y(7.65));
+  if (cc.cls) {
+    ctx.textAlign = 'right'; ctx.fillStyle = accent;
+    ctx.fillText(fitText(ctx, className, L(42), (z) => `700 ${z}px ${body}`, L(2.6)), X(CARD_W - 4.5), Y(7.65));
+    ctx.textAlign = 'left';
+  }
   // Bild, Name, Benutzername
-  rrect(ctx, X(4), Y(12), L(16), L(16), L(3.5)); ctx.fillStyle = wash; ctx.fill();
+  rrect(ctx, X(4), Y(13), L(15), L(15), L(4)); ctx.fillStyle = wash; ctx.fill();
   const wimg = await svgImage(KID_WORDS[kidWordOf(st.username)] || '');
-  if (wimg) ctx.drawImage(wimg, X(5.5), Y(13.5), L(13), L(13));
+  if (wimg) ctx.drawImage(wimg, X(5.6), Y(14.6), L(11.8), L(11.8));
   ctx.fillStyle = '#1E293B';
-  ctx.fillText(fitText(ctx, cc.names === 'initials' ? kidInitials(st) : kidName(st), L(56), (z) => `600 ${z}px ${body}`, L(3.4)), X(23.5), Y(16.6));
-  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`; ctx.fillText('Benutzername', X(23.5), Y(21));
+  ctx.fillText(fitText(ctx, cc.names === 'initials' ? kidInitials(st) : kidName(st), L(58), (z) => `600 ${z}px ${body}`, L(3.3)), X(22.5), Y(17));
+  ctx.fillStyle = '#94A3B8'; ctx.font = `600 ${L(2.1)}px ${body}`; ctx.fillText('Benutzername', X(22.5), Y(21));
   ctx.fillStyle = accent;
-  ctx.fillText(fitText(ctx, displayUser(st.username), L(56), (z) => `800 ${z}px ${disp}`, L(6.2)), X(23.5), Y(27.8));
-  // Passwort: Bilder, Wörter oder beides
+  ctx.fillText(fitText(ctx, displayUser(st.username), L(58.5), (z) => `800 ${z}px ${disp}`, L(6.4)), X(22.5), Y(27.6));
+  // Passwort: Kasten so gross wie das Passwort – oder die 3 Bilder
   const pics = picsList(st.pics);
-  ctx.fillStyle = '#64748B'; ctx.font = `500 ${L(2.2)}px ${body}`;
+  ctx.fillStyle = '#94A3B8'; ctx.font = `600 ${L(2.1)}px ${body}`;
   if (cc.secret === 'password' || cc.secret === 'class') {
     const pwTxt = cc.secret === 'class' ? klass.list.find((c) => c.id === st.class_id)?.class_pw || '' : showPw(st.pw);
     ctx.fillText(cc.secret === 'class' ? 'Passwort (für die ganze Klasse)' : 'Passwort', X(4), Y(35.2));
-    rrect(ctx, X(4), Y(37.4), L(pwW), L(11.2), L(2.4));
-    ctx.fillStyle = wash; ctx.fill(); ctx.lineWidth = L(0.4); ctx.strokeStyle = accent; ctx.stroke();
-    ctx.fillStyle = '#1E293B';
-    ctx.fillText(fitText(ctx, pwTxt, L(pwW - 5), (z) => `700 ${z}px ui-monospace, Menlo, Consolas, monospace`, L(5)), X(6.5), Y(44.8));
-    ctx.restore();
-    if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
-    return;
-  }
-  ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(34.6));
-  for (let k = 0; k < 3; k++) {
-    const bx = 4 + k * 13, by = 37;
-    rrect(ctx, X(bx), Y(by), L(11), L(11), L(2.2));
-    ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.45); ctx.strokeStyle = accent; ctx.stroke();
-    const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
-    if (im) ctx.drawImage(im, X(bx + 1.7), Y(by + 1.7), L(7.6), L(7.6));
-    ctx.beginPath(); ctx.arc(X(bx + 0.4), Y(by + 0.4), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.5)}px ${body}`; ctx.textAlign = 'center';
-    ctx.fillText(String(k + 1), X(bx + 0.4), Y(by + 1.3)); ctx.textAlign = 'left';
+    const t = fitText(ctx, pwTxt, L(pwMax - 6), (z) => `700 ${z}px ui-monospace, Menlo, Consolas, monospace`, L(5));
+    const tw = ctx.measureText(t).width;
+    rrect(ctx, X(4), Y(37.4), tw + L(6), L(10.4), L(3.2));
+    ctx.fillStyle = wash; ctx.fill(); ctx.lineWidth = L(0.35); ctx.strokeStyle = accent; ctx.stroke();
+    ctx.fillStyle = '#1E293B'; ctx.fillText(t, X(7), Y(44.4));
+  } else {
+    ctx.fillText('Passwort: diese 3 Bilder antippen', X(4), Y(35.2));
+    for (let k = 0; k < 3; k++) {
+      const bx = 4 + k * 13, by = 37.4;
+      rrect(ctx, X(bx), Y(by), L(11), L(11), L(3));
+      ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.4); ctx.strokeStyle = accent; ctx.stroke();
+      const im = pics[k] != null ? await svgImage(KID_PW[pics[k]].svg) : null;
+      if (im) ctx.drawImage(im, X(bx + 1.7), Y(by + 1.7), L(7.6), L(7.6));
+      ctx.beginPath(); ctx.arc(X(bx + 0.6), Y(by + 0.6), L(1.9), 0, Math.PI * 2); ctx.fillStyle = accent; ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = `700 ${L(2.4)}px ${body}`; ctx.textAlign = 'center';
+      ctx.fillText(String(k + 1), X(bx + 0.6), Y(by + 1.45)); ctx.textAlign = 'left';
+    }
   }
   ctx.restore();
-  if (cc.qr) drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body);
+  if (cc.qr) drawCardQR(ctx, st, both, X, Y, L);
 }
-/** Ein QR-Code: Kinder in beiden Tools wählen beim Scannen „bei Vokaboom“ oder „bei Teilmal“ (wie in Teilmal) */
-function drawCardQRs(ctx, st, e1Url, accent, X, Y, L, body) {
+/** Ein QR-Code in einem weissen Rahmen, ohne Text darunter */
+function drawCardQR(ctx, st, both, X, Y, L) {
   ctx.save();
-  drawQR(ctx, cardQrUrl(st, !!e1Url), 61, 29.5, 20, X, Y, L);
-  if (e1Url) drawQRTags(ctx, 71, 51.6, ['ABC', '1×1'], accent, X, Y, L, body);
-  else drawQRLabel(ctx, 71, 51.6, 'ABC', 'Vokabeln', accent, X, Y, L, body);
+  rrect(ctx, X(59.5), Y(28.5), L(21.5), L(21.5), L(3.2));
+  ctx.fillStyle = '#fff'; ctx.fill(); ctx.lineWidth = L(0.3); ctx.strokeStyle = '#E2E8F0'; ctx.stroke();
+  drawQR(ctx, cardQrUrl(st, both), 60.25, 29.25, 20, X, Y, L);
   ctx.restore();
 }
-/** Unter dem QR-Code für beide Tools: „ABC“ und „1×1“ nebeneinander */
-function drawQRTags(ctx, cx, y, tags, accent, X, Y, L, body) {
-  ctx.font = `700 ${L(2.3)}px ${body}`;
-  const ws = tags.map((t) => ctx.measureText(t).width + L(2)), gap = L(1.4);
-  let x0 = X(cx) - (ws.reduce((a, b) => a + b, 0) + gap * (tags.length - 1)) / 2;
-  ctx.textAlign = 'left';
-  tags.forEach((t, i) => {
-    rrect(ctx, x0, Y(y - 2.4), ws[i], L(3.3), L(1.1)); ctx.fillStyle = accent; ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.fillText(t, x0 + L(1), Y(y));
-    x0 += ws[i] + gap;
-  });
-}
-
-
 async function cardFontsReady() {
   try { await Promise.all(["800 20px 'Bricolage Grotesque'", '600 20px Lexend', '500 20px Lexend'].map((f) => document.fonts.load(f))); } catch { /* */ }
 }
