@@ -92,9 +92,9 @@ Jedes Lehrmittel und jede Unit gibt es nur einmal. Wer „new world“ anlegen w
 
 ## Klassen und Kinder-Logins
 
-Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) den Knopf **Meine Klassen**.
+Mit Konto gibt es auf der Startseite (und im **Menü → Klassenübersicht**) den Knopf **Meine Klassen**. In der Klassenübersicht steht jede Klasse mit Direktlinks zu Kinder, Portionen, Kärtchen und Auswertung sowie der Einstellung fürs Wiederholen.
 
-**Menü:** Oben rechts gibt es einen einzigen Knopf **Menü**. Links die Bereiche, rechts die Einstellungen: Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon.
+**Menü:** Oben rechts gibt es einen einzigen Knopf **Menü**. Links die Bereiche, rechts die Einstellungen: Konto · Klassenübersicht · Login-Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon.
 
 1. **Klasse anlegen**, z. B. „5a Englisch“.
 2. **Kinder**: Vorname und im kleinen Kästchen den ersten Buchstaben des Nachnamens eintragen – oder eine ganze Namensliste einfügen (eine Zeile pro Kind). Gespeichert wird nur der Vorname und der erste Buchstabe des Nachnamens.
@@ -105,7 +105,7 @@ Mit Konto gibt es auf der Startseite (und im **Menü → Klassen & Kärtchen**) 
 
 **Anmelden als Kind:** QR-Code auf dem Kärtchen mit der Kamera scannen – oder auf **Anmelden → Kinder-Login**, Benutzernamen eintippen und die 3 Bilder der Reihe nach antippen. Nach 8 falschen Versuchen ist 5 Minuten Pause. Auf einem Gerät, auf dem eine Lehrperson angemeldet ist, geht das Kinder-Login erst nach dem Abmelden.
 
-**Anmelden mit Bildern oder Passwort** (Menü → Klassen & Kärtchen): Was auf dem Kärtchen steht, wählst du:
+**Anmelden mit Bildern oder Passwort** (Menü → Login-Kärtchen): Was auf dem Kärtchen steht, wählst du:
 - **Bilder** – die Kinder tippen 3 Bilder an (ideal für die Unterstufe).
 - **Passwort pro Kind** – Vokaboom erzeugt für jedes Kind ein eigenes einfaches Passwort: ein Wort und eine Zahl, z. B. `Teich23` (andere Wörter als bei den Benutzernamen).
 - **Klassenpasswort** – du legst für jede Klasse ein Passwort fest (mind. 4 Zeichen, z. B. `Sommer2026`). Einfach zu merken, dafür könnten sich Kinder gegenseitig anmelden. Klassen ohne Klassenpasswort bekommen Kärtchen mit Bildern.
@@ -190,7 +190,7 @@ Richtig → ein Fach weiter. Falsch → zurück ins 1. Fach (morgen wieder). Fas
 
 - Alle Übungen zählen mit (Aussprechen, Hören & Schreiben, Test, Spiele). Bei den Lernkarten schätzen sich die Kinder selbst ein – dort kommen Wörter nur neu in den Kasten, sie rücken nicht vor.
 - Auf der Startseite erscheint **„Heute wiederholen: 12 Wörter“** mit dem Knopf **Los geht's**. Eine Runde hat höchstens 20 Wörter aus allen Portionen gemischt. Am Schluss sehen die Kinder, welche Wörter morgen nochmals kommen und wie viele schon sicher sitzen. Richtige Antworten geben Münzen für den Avatar.
-- **Eintippen oder Auswählen:** Klasse → **Portionen** → **Wiederholen**. Eintippen: Deutsch sehen, Wort in der Fremdsprache schreiben (automatisch geprüft, Tippfehler zählen als „fast“). Auswählen: das richtige Wort aus 4. Ohne Einstellung wählt Vokaboom nach dem Klassennamen: „3a“, „4b“ → Auswählen, sonst Eintippen.
+- **Eintippen oder Auswählen:** **Menü → Klassenübersicht** (bei jeder Klasse „🧠 Wiederholen“) oder Klasse → **Portionen** → **Wiederholen**. Eintippen: Deutsch sehen, Wort in der Fremdsprache schreiben (automatisch geprüft, Tippfehler zählen als „fast“). Auswählen: das richtige Wort aus 4. Ohne Einstellung wählt Vokaboom nach dem Klassennamen: „3a“, „4b“ → Auswählen, sonst Eintippen.
 - **Auswertung:** Klasse → **Auswertung** → Spalte **🧠 Wiederholen**: wie viele Wörter heute fällig sind, wie viele sicher sitzen und wann das Kind zuletzt wiederholt hat. Rot = fällige Wörter und seit mehr als 4 Tagen nicht wiederholt.
 - Erinnert werden die Kinder, wenn sie Vokaboom öffnen (keine Push-Nachrichten). Mit Login-Kärtchen ist der Stand auf jedem Gerät gleich; ohne Login nur auf diesem Gerät.
 - Für die Einstellung Eintippen/Auswählen `supabase/vokabelwelt.sql` nochmals ganz ausführen.

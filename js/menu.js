@@ -1,13 +1,14 @@
 /* Vokaboom – Menü für Lehrpersonen (und alle ohne Kinder-Login)
  * Links die Bereiche, rechts die Einstellungen des gewählten Bereichs:
- * Konto · Klassen & Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon
+ * Konto · Klassenübersicht · Login-Kärtchen · Avatar & Münzen · Stimme & Aussprache · Mikrofon
  */
 'use strict';
 
 const MENU = { sec: 'konto', avCfg: null, avLoading: false, bonus: { cls: '', kid: '', n: 10 } };
 const MENU_SECTIONS = [
   ['konto', 'user', 'Konto'],
-  ['klassen', 'users', 'Klassen & Kärtchen'],
+  ['uebersicht', 'users', 'Klassenübersicht'],
+  ['klassen', 'image', 'Login-Kärtchen'],
   ['avatar', 'sparkle', 'Avatar & Münzen'],
   ['stimme', 'speaker', 'Stimme & Aussprache'],
   ['mikro', 'mic', 'Mikrofon'],
@@ -56,7 +57,7 @@ function menuAfterRender() {
   if (MENU.sec === 'stimme') updatePhSettings();
   if (MENU.sec === 'avatar' && cloud.uid && !MENU.avCfg && !MENU.avLoading) menuLoadAvatarCfg();
   const sec = MENU.sec;
-  if ((sec === 'avatar' || sec === 'klassen') && cloud.uid && typeof loadClasses === 'function' && !klass.loaded) loadClasses().then(() => { if (MENU.sec === sec && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML(sec); });
+  if (['avatar', 'klassen', 'uebersicht'].includes(sec) && cloud.uid && typeof loadClasses === 'function' && !klass.loaded) loadClasses().then(() => { if (MENU.sec === sec && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML(sec); });
 }
 function menuBindOnce(m) {
   const s = db.settings;
@@ -105,14 +106,29 @@ function menuSectionHTML(sec) {
           </div>`;
       }
       return accountSectionHTML();
-    case 'klassen': {
+    case 'uebersicht': {
       if (!cloud.user) return needLogin('Klassen, Kinder-Logins und Auswertungen');
+      if (!klass.loaded) return '<p class="muted"><span class="spinner"></span> Klassen werden geladen …</p>';
+      const list = klass.list || [];
+      return `${list.length ? `<div class="cls-list">${list.map((c) => {
+          const nKids = studentsOf(c.id).length, nSets = (c.set_ids || []).filter((id) => getSet(id)).length, mode = reviewMode(c);
+          return `<article class="cls-card">
+            <header><h3>${esc(c.name)}</h3><small>${nKids} ${nKids === 1 ? 'Kind' : 'Kinder'} · ${nSets} ${nSets === 1 ? 'Portion' : 'Portionen'} freigegeben</small></header>
+            <div class="cls-links">${CLASS_TABS.map(([tab, ic, name]) => `<button type="button" class="cls-link" data-action="menu-class" data-id="${c.id}" data-tab="${tab}">${icon(ic)}<span>${name}</span></button>`).join('')}</div>
+            <div class="cls-review"><span class="small">🧠 Wiederholen:</span>
+              <div class="seg small" role="group" aria-label="Wiederholen in ${esc(c.name)}">
+                <button type="button" class="seg-btn" data-action="menu-class-review" data-id="${c.id}" data-mode="type" aria-pressed="${mode === 'type'}">⌨️ Eintippen</button>
+                <button type="button" class="seg-btn" data-action="menu-class-review" data-id="${c.id}" data-mode="choice" aria-pressed="${mode === 'choice'}">👆 Auswählen</button>
+              </div></div>
+          </article>`;
+        }).join('')}</div>` : '<p class="empty">Du hast noch keine Klasse.</p>'}
+        <div class="row"><button type="button" class="btn secondary" data-action="classes">${icon('plus')} ${list.length ? 'Klasse hinzufügen oder löschen' : 'Erste Klasse anlegen'}</button></div>
+        <p class="small muted">🧠 Wiederholen: Eintippen = Deutsch sehen, Wort in der Fremdsprache schreiben. Auswählen = das richtige Wort aus 4 (für die 3. und 4. Klasse).</p>`;
+    }
+    case 'klassen': {
+      if (!cloud.user) return needLogin('Login-Kärtchen für Kinder');
       const c = cardCfg();
-      const nList = (klass.list || []).length;
-      return `<div class="menu-cards">
-          <button type="button" class="menu-card" data-action="classes">${icon('users')}<strong>Meine Klassen</strong><small>${nList ? `${nList} ${nList === 1 ? 'Klasse' : 'Klassen'} · ` : ''}Kinder, Portionen freigeben, Kärtchen drucken, Auswertung.</small></button>
-        </div>
-        <section class="menu-group">
+      return `<section class="menu-group">
           <h3>Login-Kärtchen</h3>
           <p class="small muted">Gilt für die Kärtchen, die du ab jetzt druckst (Klasse → Kärtchen). Das Passwort bleibt gleich – nur die Darstellung ändert sich.</p>
           <div class="field"><span class="label">Passwort auf dem Kärtchen</span>
@@ -255,5 +271,12 @@ const menuActions = {
   },
   'bonus-n': (el) => { MENU.bonus.n = +el.dataset.n; avAllSet('[data-action="bonus-n"]', el); },
   'bonus-give': () => menuGiveBonus(),
+  'menu-class': (el) => { closeModal(true); openClass(el.dataset.id, el.dataset.tab); },
+  'menu-class-review': async (el) => {
+    const c = classById(el.dataset.id);
+    if (!c) return;
+    await saveClassReview(c, el.dataset.mode);
+    if (MENU.sec === 'uebersicht' && $('#menu-body')) $('#menu-body').innerHTML = menuSectionHTML('uebersicht');
+  },
 };
 function avAllSet(sel, el) { $$(sel).forEach((b) => b.setAttribute('aria-pressed', String(b === el))); }

@@ -78,3 +78,19 @@
 }
 .range-ends { display: flex; justify-content: space-between; font-size: .8rem; color: var(--ink-3); margin-top: -.15rem; }
 .menu .field b { color: var(--brand); }
+
+/* Klassenübersicht */
+.cls-list { display: grid; gap: .8rem; }
+.cls-card { display: grid; gap: .7rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); }
+.cls-card header { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem; }
+.cls-card h3 { margin: 0; font-size: 1.2rem; }
+.cls-card header small { color: var(--ink-2); }
+.cls-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+.cls-link {
+  display: grid; justify-items: center; gap: .25rem; padding: .6rem .3rem; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); font-weight: 600; font-size: .9rem;
+}
+.cls-link:hover { border-color: var(--brand); background: var(--brand-wash); color: var(--brand); }
+.cls-link .icon { width: 22px; height: 22px; color: var(--brand); }
+.cls-review { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+@media (max-width: 520px) { .cls-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

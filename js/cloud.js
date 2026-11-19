@@ -551,7 +551,6 @@ function accountSectionHTML() {
     </div>
     <p class="muted small">Deine Portionen werden automatisch in deinem Konto gespeichert. Beim Abmelden werden sie von diesem Gerät entfernt – sie bleiben in deinem Konto und sind beim nächsten Anmelden wieder da.</p>
     <div class="row">
-      <button type="button" class="btn primary" data-action="classes">${icon('user')} Klassen & Kinder-Logins</button>
       <button type="button" class="btn secondary" data-action="cloud-sync">${icon('flip')} Jetzt abgleichen</button>
       <button type="button" class="btn ghost" data-action="logout">Abmelden</button>
     </div>
