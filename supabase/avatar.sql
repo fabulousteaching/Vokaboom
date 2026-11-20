@@ -13,6 +13,8 @@
 -- 3D-Welt (Teilmal): avatar3d = 3D-Avatar, garage = Kart-Optik fürs Turbo-Rennen. Teile heissen „a3:<platz>:<wert>“ bzw.
 -- „car:<platz>:<wert>“, kosten Münzen aus demselben Konto und können erst ab einer Anzahl gesammelter Münzen freigeschaltet sein.
 -- Spiele bezahlen Kinder mit fab_coins_spend (mit Auftragsnummer, so wird nie doppelt abgebucht). Jede Ausgabe steht in fab_coin_log.
+-- Umtausch 2D → 3D: Seit der 3D-Avatar in beiden Tools gilt, bekommt jedes Kind beim nächsten Laden für gekaufte 2D-Teile das
+-- passende 3D-Teil geschenkt; für 2D-Teile ohne 3D-Gegenstück (oder deren Gegenstück gratis ist) gibt es die Münzen zurück.
 
 create table if not exists public.fab_avatars (
   kid_key text primary key check (kid_key ~ '^[ve]:[0-9a-f-]{36}$'),
@@ -30,6 +32,8 @@ alter table public.fab_avatars add column if not exists avatar3d jsonb not null 
   check (jsonb_typeof(avatar3d) = 'object' and octet_length(avatar3d::text) <= 3000);
 alter table public.fab_avatars add column if not exists garage jsonb not null default '{}'
   check (jsonb_typeof(garage) = 'object' and octet_length(garage::text) <= 1000);
+-- 2D-Teile, die schon in 3D umgetauscht bzw. zurückbezahlt wurden (nie doppelt)
+alter table public.fab_avatars add column if not exists m2d text[] not null default '{}';
 alter table public.fab_avatars enable row level security;
 revoke all on public.fab_avatars from anon, authenticated;
 
@@ -186,6 +190,7 @@ begin
         update public.fab_avatars set
           coins = a.coins + b.coins, earned = a.earned + b.earned, spent = a.spent + b.spent,
           owned = (select coalesce(array_agg(distinct o), '{}') from unnest(a.owned || b.owned) o),
+          m2d = (select coalesce(array_agg(distinct o), '{}') from unnest(a.m2d || b.m2d) o),
           avatar = case when b.updated_at > a.updated_at and b.avatar <> '{}'::jsonb then b.avatar else a.avatar end,
           avatar3d = case when (b.updated_at > a.updated_at or a.avatar3d = '{}'::jsonb) and b.avatar3d <> '{}'::jsonb then b.avatar3d else a.avatar3d end,
           garage = case when (b.updated_at > a.updated_at or a.garage = '{}'::jsonb) and b.garage <> '{}'::jsonb then b.garage else a.garage end,
@@ -210,6 +215,43 @@ language sql stable security definer set search_path = '' as $$
     || jsonb_build_object('cfg', cfg, 'dayMax', coalesce((cfg ->> 'dayMax')::integer, 40));
 $$;
 
+-- Umtausch 2D → 3D (einmal je gekauftem 2D-Teil): passendes 3D-Teil schenken, sonst Münzen zurück
+create or replace function public.fab_migrate_2d(k text)
+returns void
+language plpgsql security definer set search_path = '' as $$
+declare
+  a public.fab_avatars; it text; to3 text; refund integer := 0; add text[] := '{}'; done text[] := '{}'; pr integer;
+  m constant jsonb := '{
+    "hair:mohawk": "a3:hair:mohawk", "hairc:rainbow": "a3:hairC:rainbow", "eyes:star": "a3:eyes:star", "eyes:heart": "a3:eyes:heart",
+    "mouth:tongue": "a3:mouth:tongue", "face:stars": "a3:deco:stars", "top:hero": "a3:top:hero", "top:space": "a3:top:space",
+    "top:tux": "a3:top:tux", "bottom:cargo": "a3:bottom:cargo", "shoes:rocket": "a3:shoes:rocket", "shoes:roller": "a3:shoes:rollers",
+    "hat:crown": "a3:hat:crown", "hat:wizard": "a3:hat:wizard", "hat:cat": "a3:hat:catbeanie", "hat:viking": "a3:hat:viking",
+    "hat:party": "a3:hat:party", "glasses:star": "a3:glasses:star", "glasses:heart": "a3:glasses:heart", "back:cape": "a3:back:cape",
+    "back:wings": "a3:back:wings", "back:dragon": "a3:back:dragon", "back:jetpack": "a3:back:jetpack", "hand:wand": "a3:hand:wand",
+    "hand:trophy": "a3:hand:trophy", "hand:guitar": "a3:hand:guitar", "pet:cat": "a3:pet:cat", "pet:dog": "a3:pet:dog",
+    "pet:dragon": "a3:pet:dragon", "pet:bunny": "a3:pet:bunny"
+  }';
+begin
+  select * into a from public.fab_avatars where kid_key = k for update;
+  if not found then return; end if;
+  foreach it in array a.owned loop
+    if it like 'a3:%' or it like 'car:%' or it = any (a.m2d) then continue; end if;
+    to3 := m ->> it;
+    if to3 is not null and exists (select 1 from public.fab_avatar_items i where i.id = to3) then
+      if not (to3 = any (a.owned) or to3 = any (add)) then add := add || to3; end if;
+    else
+      select price into pr from public.fab_avatar_items where id = it;
+      refund := refund + coalesce(pr, 0);
+    end if;
+    done := done || it;
+  end loop;
+  if cardinality(done) = 0 then return; end if;
+  update public.fab_avatars set owned = owned || add, m2d = m2d || done, coins = coins + refund,
+    spent = greatest(0, spent - refund), updated_at = now() where kid_key = k;
+  if refund > 0 then insert into public.fab_coin_log (kid_key, delta, reason) values (k, refund, 'umtausch 2d-teile'); end if;
+end;
+$$;
+
 -- Kind: Avatar, gekaufte Teile und Münzen holen
 create or replace function public.fab_avatar_get(p_app text, p_token uuid)
 returns jsonb
@@ -218,6 +260,7 @@ declare k text;
 begin
   k := public.fab_kid_key(p_app, p_token);
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  perform public.fab_migrate_2d(k);
   return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
 end;
 $$;
@@ -380,7 +423,7 @@ begin
 end;
 $$;
 
-revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid) from public, anon, authenticated;
+revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid), public.fab_migrate_2d(text) from public, anon, authenticated;
 grant execute on function public.fab_teacher_bonus(uuid, integer) to authenticated;
 grant execute on function public.fab_avatar_get(text, uuid), public.fab_avatar_save(text, uuid, jsonb),
   public.fab_avatar_buy(text, uuid, text), public.fab_coins_earn(text, uuid, integer),

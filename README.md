@@ -18,7 +18,7 @@ Ist eine Antwort richtig, geht es in allen Übungen nach einem kurzen Moment aut
 
 ## Mein Avatar (Kinder mit Login)
 
-Kinder mit Login-Kärtchen gestalten eine eigene Ganzkörper-Figur und kaufen mit Münzen, die sie beim Üben verdienen, besondere Teile (Krone, Flügel, Mini-Drache …). Gemeinsam mit Teilmal. Siehe `supabase/AVATAR.md`.
+Kinder mit Login-Kärtchen gestalten eine eigene **3D-Figur** (runde Voxel-Figur wie in Teilmal: Frisuren, Oberteile, Outfits, Hosen, Schuhe, Hüte & Brillen, Accessoires, Gadgets, Rücken, Tiere & Effekte, Animationen – über 170 Teile) und kaufen mit Münzen, die sie beim Üben verdienen, besondere Teile. Grosse drehbare Figur, Anprobieren gratis, Speichern automatisch. Avatar und Münzen gelten in Vokaboom und Teilmal gleich (gleiche Oberfläche, gleiche Dateien). In Live-Spielen erscheinen die Kinder mit ihrem 3D-Kopf. Früher im 2D-Shop gekaufte Teile werden in passende 3D-Teile umgetauscht oder zurückbezahlt. Ohne 3D-Grafik gibt es den bisherigen 2D-Avatar. Siehe `supabase/AVATAR.md`.
 
 ## Portion in die andere Sprache verschieben
 

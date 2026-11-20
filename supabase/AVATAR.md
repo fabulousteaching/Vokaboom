@@ -4,7 +4,7 @@ Kinder mit Login-Kärtchen gestalten im Bereich **Mein Avatar** eine eigene Ganz
 
 ## Einrichten (einmal)
 
-Im Supabase **SQL Editor** den Inhalt von `supabase/avatar.sql` einfügen und **Run** drücken. Das genügt für beide Tools (gleiches Supabase-Projekt). Mehrmals ausführen schadet nicht.
+Im Supabase **SQL Editor** den Inhalt von `supabase/avatar.sql` einfügen und **Run** drücken. Das genügt für beide Tools (gleiches Supabase-Projekt). Mehrmals ausführen schadet nicht. **Nach jedem Update dieser Datei nochmals ausführen** (zuletzt: 3D-Avatar in beiden Tools und Umtausch der 2D-Teile).
 
 **Neu (3D-Welt in Teilmal):** Die Datei nochmals ganz ausführen. Sie ergänzt – ohne bestehende Daten zu ändern –
 die Spalten `avatar3d` und `garage` (3D-Avatar und Kart), die Preise der 3D-Teile mit Freischaltung (`min_earned`),
@@ -59,10 +59,23 @@ Die Dateien `js/avatar.js`, `css/avatar.css` und `supabase/avatar.sql` sind in b
 
 Ohne diese Schritte läuft Teilmal wie bisher; die Datenbank ist schon für beide vorbereitet (inkl. Zusammenführen, wenn ein Kind später verbunden wird).
 
-## 3D-Welt in Teilmal (Avatar und Garage)
+## 3D-Avatar in Vokaboom und Teilmal
 
-Teilmal hat zusätzlich eine 3D-Welt mit eigenem 3D-Avatar und einer Garage fürs Turbo-Rennen (siehe README von Teilmal).
-Sie nutzt dasselbe Münzkonto: Teile heissen `a3:<platz>:<wert>` (Avatar) bzw. `car:<platz>:<wert>` (Kart, z. B. `car:body:rocket` für die Rakete) und stehen mit Preis
-und Freischaltung in `fab_avatar_items`. Gekauft wird mit `fab_avatar_buy` (wie beim 2D-Avatar), gespeichert mit
-`fab_avatar3d_save` bzw. `fab_garage_save`. Der 2D-Avatar von Vokaboom bleibt unverändert.
-In Vokaboom ändert sich dadurch nichts; `js/avatar.js` fragt nur nach einem 3D-Kopfbild für die Münz-Anzeige, falls es eines gibt.
+Seit November 2026 ist der **3D-Avatar** (runde Voxel-Figur, über 170 Teile, Animationen) der Avatar in **beiden** Tools –
+mit derselben Oberfläche: grosse drehbare Figur, Kategorien, Vorschaubilder, Anprobieren, Kaufen, automatisch speichern.
+Die Dateien `js/avatar3d.js`, `js/shop3d.js`, `js/world3d.js`, `css/world3d.css` und `js/vendor/three.module.min.js` sind
+in beiden Repositories **gleich** (wie `avatar.js`, `avatar.css` und `avatar.sql`). Nur Teilmal hat zusätzlich die **Garage**
+fürs Turbo-Rennen (sie erscheint nur, wo das Rennen geladen ist).
+
+- Teile heissen `a3:<platz>:<wert>` (Avatar) bzw. `car:<platz>:<wert>` (Kart, z. B. `car:body:rocket`) und stehen mit Preis und
+  Freischaltung in `fab_avatar_items`. Gekauft wird mit `fab_avatar_buy`, gespeichert mit `fab_avatar3d_save` bzw. `fab_garage_save`.
+- **Umtausch der 2D-Teile:** Wer im bisherigen 2D-Shop eingekauft hat, bekommt beim nächsten Laden (`fab_avatar_get` →
+  `fab_migrate_2d`) das passende 3D-Teil geschenkt (z. B. Irokese, Krone, Katzenohren, Flügel, Katze); für 2D-Teile ohne 3D-Gegenstück
+  oder mit einem Gegenstück, das in 3D gratis ist (z. B. Hintergründe, Eule, Haarfarben), gibt es die Münzen zurück. Jedes 2D-Teil wird
+  nur einmal umgetauscht (Spalte `m2d`); im Münz-Protokoll steht «umtausch 2d-teile».
+- **Live-Spiele (Vokaboom):** Kinder mit 3D-Avatar erscheinen im Warteraum und auf dem Siegerpodest mit ihrem 3D-Kopf
+  (der Bildschirm der Lehrperson zeichnet ihn); sonst wie bisher mit der 2D-Figur.
+- **Ohne 3D-Grafik** (sehr alte Geräte) gibt es weiterhin den 2D-Avatar.
+- three.js und der Baukasten werden erst geladen, wenn man den 3D-Avatar öffnet bzw. sein Bild zeichnet.
+
+**Dafür `supabase/avatar.sql` nochmals ganz ausführen** (ergänzt `m2d` und `fab_migrate_2d`; bestehende Daten bleiben).

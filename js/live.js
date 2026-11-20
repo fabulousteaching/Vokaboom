@@ -179,7 +179,7 @@ function hostMsg(m) {
   if (!m || LV.role !== 'host') return;
   if (m.t === 'join' && m.id) {
     if (!m.kid && liveNameProblem(m.name)) { LV.ch.send({ t: 'denied', id: m.id, reason: liveNameProblem(m.name) }); return; }
-    if (!LV.players.has(m.id)) LV.players.set(m.id, { name: String(m.name || 'Kind').slice(0, 24), score: 0, av: m.av && typeof m.av === 'object' && typeof avFill === 'function' ? avFill(m.av) : null });
+    if (!LV.players.has(m.id)) LV.players.set(m.id, { name: String(m.name || 'Kind').slice(0, 24), score: 0, a3: m.a3 && typeof m.a3 === 'object' && !Array.isArray(m.a3) && JSON.stringify(m.a3).length < 4000 ? m.a3 : null, av: m.av && typeof m.av === 'object' && typeof avFill === 'function' ? avFill(m.av) : null });
     hostBroadcastState();
     if (LV.st.phase === 'lobby') { const pl = $('#live-players'); if (pl) pl.outerHTML = livePlayersHTML(); else renderLive(); liveRefreshLobby(); }
     else if (LV.kind === 'bingo') renderLive();
@@ -199,12 +199,17 @@ function renderLive() {
   if (LV.role === 'player') { v.innerHTML = playerHTML(); bindPlayer(); return; }
   v.innerHTML = joinFormHTML(); bindJoinForm();
 }
+/** Gesicht eines Kindes: 3D-Kopf (wenn es einen 3D-Avatar hat und das Gerät 3D kann), sonst die 2D-Figur */
+function lvFace(p, opts) {
+  const flat = p.av && typeof avatarSVG === 'function' ? avatarSVG(p.av, opts) : '';
+  return p.a3 && typeof w3HeadHTML === 'function' ? w3HeadHTML(p.a3, flat) : flat;
+}
 function livePlayersHTML() {
   const names = [...LV.players.values()].map((p) => p.name);
   return `<div class="live-players" id="live-players">
       <h2>${esc(LV.kind === 'quiz' ? `Quiz: ${LV.set.name}` : `Hör-Bingo: ${LV.set.name}`)}</h2>
       <p class="lead">${names.length} ${names.length === 1 ? 'Kind ist' : 'Kinder sind'} dabei</p>
-      <div class="live-chips">${[...LV.players.values()].map((p) => `<span class="live-chip">${p.av ? `<span class="av-mini">${avatarSVG(p.av, { crop: 'head', bg: false })}</span>` : ''}${esc(p.name)}</span>`).join('') || '<span class="muted">Warte auf die ersten Kinder …</span>'}</div>
+      <div class="live-chips">${[...LV.players.values()].map((p) => `<span class="live-chip">${p.a3 || p.av ? `<span class="av-mini">${lvFace(p, { crop: 'head', bg: false })}</span>` : ''}${esc(p.name)}</span>`).join('') || '<span class="muted">Warte auf die ersten Kinder …</span>'}</div>
     </div>`;
 }
 function lobbyHTML() {
@@ -383,7 +388,7 @@ function podiumHTML() {
     const cls = ['p1', 'p2', 'p3'][k];
     const right = x ? (LV.players.get(x.id)?.right || 0) : 0;
     return `<div class="pd-col ${cls}">
-      <div class="pd-person">${x ? `<span class="pd-medal">${['🥇', '🥈', '🥉'][k]}</span><span class="pd-avatar ${LV.players.get(x.id)?.av ? 'has-av' : ''}">${LV.players.get(x.id)?.av ? avatarSVG(LV.players.get(x.id).av, { crop: 'head' }) : esc(x.name.charAt(0).toUpperCase())}</span><strong class="pd-name">${esc(x.name)}</strong><small>${x.score} Punkte · ${right} richtig</small>` : ''}</div>
+      <div class="pd-person">${x ? `<span class="pd-medal">${['🥇', '🥈', '🥉'][k]}</span><span class="pd-avatar ${LV.players.get(x.id)?.av || LV.players.get(x.id)?.a3 ? 'has-av' : ''}">${LV.players.get(x.id)?.av || LV.players.get(x.id)?.a3 ? lvFace(LV.players.get(x.id), { crop: 'head' }) : esc(x.name.charAt(0).toUpperCase())}</span><strong class="pd-name">${esc(x.name)}</strong><small>${x.score} Punkte · ${right} richtig</small>` : ''}</div>
       <div class="pd-block"><span>${k + 1}</span></div>
     </div>`;
   };
@@ -532,7 +537,8 @@ async function liveJoin(code, name) {
     return;
   }
   const av = typeof avMine === 'function' ? avMine() : null;
-  const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid(), av });
+  const a3 = typeof w3LiveLook === 'function' ? w3LiveLook() : null; // 3D-Look (gleich wie in Teilmal), falls schon gestaltet
+  const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid(), av, a3 });
   hello();
   lvEvery(() => { if (!LV.st.kind) hello(); }, 2000); // bis die Lehrperson antwortet
   renderLive();

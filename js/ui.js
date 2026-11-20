@@ -124,7 +124,8 @@ function render() {
   const v = $('#view');
   const set = currentSet();
   if (!['home', 'classes', 'class', 'live', 'avatar', 'library', 'review'].includes(ui.view) && !set) ui.view = 'home';
-  if (ui.view === 'avatar' && !isKid()) ui.view = 'home';
+  const w3 = typeof renderWorld3D === 'function' && w3WebGL(); // 3D-Avatar (js/world3d.js, gleich wie in Teilmal), sonst der 2D-Avatar
+  if (ui.view === 'avatar' && !isKid() && !w3) ui.view = 'home';
   if (isKid() && ['classes', 'class', 'pics', 'library'].includes(ui.view)) ui.view = 'home';
   renderCrumbs();
   switch (ui.view) {
@@ -140,7 +141,7 @@ function render() {
     case 'pics': v.innerHTML = viewPics(set); loadReview(set); break;
     case 'classes': renderClasses(); break;
     case 'class': renderClass(); break;
-    case 'avatar': renderAvatar(); break;
+    case 'avatar': if (w3 && !(isKid() && !avatarOn())) renderWorld3D('avatar'); else renderAvatar(); break;
     case 'library': renderLibrary(); break;
     case 'review': renderReview(); break;
     default: v.innerHTML = viewHome(); bindHome();
@@ -149,6 +150,7 @@ function render() {
 
 function go(view, extra = {}) {
   if (ui.view === 'live' && view !== 'live' && typeof liveStop === 'function') liveStop(); // Live-Spiel verlassen
+  if (typeof stopWorld3D === 'function') stopWorld3D(); // 3D-Avatar aufräumen (und offene Änderungen speichern)
   stopModes();
   Object.assign(ui, extra);
   ui.view = view;
