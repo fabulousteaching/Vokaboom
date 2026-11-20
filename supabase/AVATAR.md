@@ -62,7 +62,7 @@ Ohne diese Schritte läuft Teilmal wie bisher; die Datenbank ist schon für beid
 ## 3D-Welt in Teilmal (Avatar und Garage)
 
 Teilmal hat zusätzlich eine 3D-Welt mit eigenem 3D-Avatar und einer Garage fürs Turbo-Rennen (siehe README von Teilmal).
-Sie nutzt dasselbe Münzkonto: Teile heissen `a3:<platz>:<wert>` (Avatar) bzw. `car:<platz>:<wert>` (Kart) und stehen mit Preis
+Sie nutzt dasselbe Münzkonto: Teile heissen `a3:<platz>:<wert>` (Avatar) bzw. `car:<platz>:<wert>` (Kart, z. B. `car:body:rocket` für die Rakete) und stehen mit Preis
 und Freischaltung in `fab_avatar_items`. Gekauft wird mit `fab_avatar_buy` (wie beim 2D-Avatar), gespeichert mit
 `fab_avatar3d_save` bzw. `fab_garage_save`. Der 2D-Avatar von Vokaboom bleibt unverändert.
 In Vokaboom ändert sich dadurch nichts; `js/avatar.js` fragt nur nach einem 3D-Kopfbild für die Münz-Anzeige, falls es eines gibt.

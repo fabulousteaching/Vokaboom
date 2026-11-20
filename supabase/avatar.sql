@@ -78,15 +78,16 @@ insert into public.fab_avatar_items (id, price, min_earned) values
   ('a3:pet:robot', 45, 80), ('a3:pet:dragon', 50, 100), ('a3:effect:bubbles', 20, 0), ('a3:effect:notes', 20, 0), ('a3:effect:sparkles', 25, 0),
   ('a3:effect:hearts', 25, 0), ('a3:effect:aura', 35, 60), ('a3:emote:clap', 6, 0), ('a3:emote:jump', 8, 0), ('a3:emote:think', 8, 0),
   ('a3:emote:bow', 8, 0), ('a3:emote:shy', 8, 0), ('a3:emote:sit', 10, 0), ('a3:emote:flex', 10, 0), ('a3:emote:laugh', 10, 0),
-  ('a3:emote:dance', 15, 0), ('a3:emote:spin', 15, 0), ('car:finish:matte', 10, 0), ('car:finish:metal', 12, 0), ('car:finish:pearl', 18, 0),
-  ('car:finish:glow', 20, 0), ('car:finish:chrome', 25, 40), ('car:pattern:center', 8, 0), ('car:pattern:racing', 10, 0), ('car:pattern:duo', 12, 0),
-  ('car:pattern:dots', 12, 0), ('car:pattern:stars', 15, 0), ('car:pattern:checker', 15, 0), ('car:pattern:lightning', 18, 0),
-  ('car:pattern:flames', 20, 0), ('car:rims:black', 8, 0), ('car:rims:star', 12, 0), ('car:rims:spoke', 12, 0), ('car:rims:turbine', 15, 0),
-  ('car:rims:gold', 20, 0), ('car:rims:neon', 22, 0), ('car:wing:duck', 10, 0), ('car:wing:big', 15, 0), ('car:wing:fin', 18, 0),
-  ('car:wing:double', 20, 0), ('car:exhaust:black', 8, 0), ('car:exhaust:gold', 12, 0), ('car:exhaust:quad', 15, 0), ('car:flames:blue', 12, 0),
-  ('car:flames:green', 12, 0), ('car:flames:violet', 12, 0), ('car:flames:plasma', 18, 0), ('car:flames:rainbow', 25, 0), ('car:glow:cyan', 18, 0),
-  ('car:glow:pink', 18, 0), ('car:glow:green', 18, 0), ('car:glow:violet', 18, 0), ('car:glow:gold', 20, 0), ('car:glow:rainbow', 30, 50),
-  ('car:visor:gold', 10, 0), ('car:visor:mirror', 10, 0), ('car:visor:rainbow', 15, 0)
+  ('a3:emote:dance', 15, 0), ('a3:emote:spin', 15, 0), ('car:body:bathtub', 20, 0), ('car:body:hotdog', 25, 0), ('car:body:duck', 25, 0),
+  ('car:body:shark', 30, 0), ('car:body:rocket', 30, 0), ('car:body:monster', 30, 0), ('car:body:carriage', 35, 0), ('car:body:ufo', 40, 50),
+  ('car:finish:matte', 10, 0), ('car:finish:metal', 12, 0), ('car:finish:pearl', 18, 0), ('car:finish:glow', 20, 0), ('car:finish:chrome', 25, 40),
+  ('car:pattern:center', 8, 0), ('car:pattern:racing', 10, 0), ('car:pattern:duo', 12, 0), ('car:pattern:dots', 12, 0), ('car:pattern:stars', 15, 0),
+  ('car:pattern:checker', 15, 0), ('car:pattern:lightning', 18, 0), ('car:pattern:flames', 20, 0), ('car:rims:black', 8, 0),
+  ('car:rims:star', 12, 0), ('car:rims:spoke', 12, 0), ('car:rims:turbine', 15, 0), ('car:rims:gold', 20, 0), ('car:rims:neon', 22, 0),
+  ('car:wing:duck', 10, 0), ('car:wing:big', 15, 0), ('car:wing:fin', 18, 0), ('car:wing:double', 20, 0), ('car:exhaust:black', 8, 0),
+  ('car:exhaust:gold', 12, 0), ('car:exhaust:quad', 15, 0), ('car:flames:blue', 12, 0), ('car:flames:green', 12, 0), ('car:flames:violet', 12, 0),
+  ('car:flames:plasma', 18, 0), ('car:flames:rainbow', 25, 0), ('car:glow:cyan', 18, 0), ('car:glow:pink', 18, 0), ('car:glow:green', 18, 0),
+  ('car:glow:violet', 18, 0), ('car:glow:gold', 20, 0), ('car:glow:rainbow', 30, 50)
 on conflict (id) do update set price = excluded.price, min_earned = excluded.min_earned;
 
 -- Münz-Protokoll: jede Ausgabe (Kauf, Spiel) mit Zeit; request verhindert doppeltes Abbuchen
