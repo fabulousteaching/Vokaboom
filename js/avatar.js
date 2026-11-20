@@ -401,7 +401,7 @@ function avCoinPillHTML() {
   const c = AV.state?.coins ?? '…';
   const p = Math.min(100, (avPtsGet() / avPPC()) * 100);
   return `<button class="av-coin-pill" data-action="avatar-open" title="Mein Avatar und meine Münzen" aria-label="${c} Münzen – Mein Avatar">
-    <span class="av-pill-face">${AV.state ? avatarSVG(AV.state.avatar, { crop: 'head', bg: false }) : ''}</span>${AV_COIN_SVG}<b class="av-coin-n">${c}</b><i class="av-coin-prog" aria-hidden="true"><i style="width:${p}%"></i></i></button>`;
+    <span class="av-pill-face">${(typeof window.avPillFace === 'function' && window.avPillFace()) || (AV.state ? avatarSVG(AV.state.avatar, { crop: 'head', bg: false }) : '')}</span>${AV_COIN_SVG}<b class="av-coin-n">${c}</b><i class="av-coin-prog" aria-hidden="true"><i style="width:${p}%"></i></i></button>`;
 }
 function avCoinUI() {
   const slot = document.getElementById('av-coin-slot');

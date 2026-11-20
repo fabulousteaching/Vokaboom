@@ -9,6 +9,10 @@
 --
 -- Schutz: Preise stehen in der Datenbank (fab_avatar_items). Kaufen, Anziehen und Münzen gutschreiben
 -- geht nur über die Funktionen unten; pro Aufruf höchstens 5 Münzen, pro Tag höchstens 40.
+--
+-- 3D-Welt (Teilmal): avatar3d = 3D-Avatar, garage = Kart-Optik fürs Turbo-Rennen. Teile heissen „a3:<platz>:<wert>“ bzw.
+-- „car:<platz>:<wert>“, kosten Münzen aus demselben Konto und können erst ab einer Anzahl gesammelter Münzen freigeschaltet sein.
+-- Spiele bezahlen Kinder mit fab_coins_spend (mit Auftragsnummer, so wird nie doppelt abgebucht). Jede Ausgabe steht in fab_coin_log.
 
 create table if not exists public.fab_avatars (
   kid_key text primary key check (kid_key ~ '^[ve]:[0-9a-f-]{36}$'),
@@ -21,6 +25,11 @@ create table if not exists public.fab_avatars (
   day_coins integer not null default 0,
   updated_at timestamptz not null default now()
 );
+-- 3D-Avatar und Kart (seit der 3D-Welt; bestehende Daten bleiben unverändert)
+alter table public.fab_avatars add column if not exists avatar3d jsonb not null default '{}'
+  check (jsonb_typeof(avatar3d) = 'object' and octet_length(avatar3d::text) <= 3000);
+alter table public.fab_avatars add column if not exists garage jsonb not null default '{}'
+  check (jsonb_typeof(garage) = 'object' and octet_length(garage::text) <= 1000);
 alter table public.fab_avatars enable row level security;
 revoke all on public.fab_avatars from anon, authenticated;
 
@@ -43,6 +52,55 @@ insert into public.fab_avatar_items (id, price) values
   ('pet:cat', 35), ('pet:dog', 35), ('pet:dragon', 50), ('pet:owl', 40), ('pet:bunny', 35),
   ('bg:space', 20), ('bg:beach', 15), ('bg:jungle', 15), ('bg:rainbow', 18), ('bg:castle', 25)
 on conflict (id) do update set price = excluded.price;
+-- Freischaltung: manche Teile gibt es erst ab so vielen insgesamt gesammelten Münzen (0 = sofort)
+alter table public.fab_avatar_items add column if not exists min_earned integer not null default 0 check (min_earned >= 0);
+-- 3D-Avatar (a3:…) und Kart (car:…) – Grundausstattung ist gratis und steht darum nicht in der Liste
+insert into public.fab_avatar_items (id, price, min_earned) values
+  ('a3:eyes:star', 10, 0), ('a3:eyes:heart', 10, 0), ('a3:eyes:cat', 10, 0), ('a3:eyes:sparkle', 12, 0), ('a3:mouth:tongue', 6, 0),
+  ('a3:mouth:wavy', 6, 0), ('a3:mouth:cat', 8, 0), ('a3:mouth:fang', 8, 0), ('a3:mouth:kiss', 8, 0), ('a3:deco:bandaid', 5, 0),
+  ('a3:deco:whiskers', 8, 0), ('a3:deco:stars', 10, 0), ('a3:deco:hearts', 10, 0), ('a3:deco:paint', 12, 0), ('a3:hair:mohawk', 15, 0),
+  ('a3:hairC:rainbow', 20, 0), ('a3:top:jersey', 12, 0), ('a3:top:denim', 12, 0), ('a3:top:sport', 15, 0), ('a3:top:puffer', 15, 0),
+  ('a3:top:pastel', 18, 0), ('a3:top:overalls', 12, 0), ('a3:top:tux', 22, 0), ('a3:top:robe', 25, 0), ('a3:top:hero', 28, 0),
+  ('a3:top:space', 30, 40), ('a3:bottom:cargo', 10, 0), ('a3:bottom:tutu', 15, 0), ('a3:shoes:slippers', 8, 0), ('a3:shoes:boots', 10, 0),
+  ('a3:shoes:rollers', 18, 0), ('a3:shoes:rocket', 25, 30), ('a3:hat:cap', 8, 0), ('a3:hat:capback', 8, 0), ('a3:hat:beanie', 8, 0),
+  ('a3:hat:bucket', 10, 0), ('a3:hat:helmet', 10, 0), ('a3:hat:party', 10, 0), ('a3:hat:flower', 12, 0), ('a3:hat:catbeanie', 15, 0),
+  ('a3:hat:bunny', 15, 0), ('a3:hat:headset', 15, 0), ('a3:hat:tiara', 18, 0), ('a3:hat:viking', 22, 0), ('a3:hat:wizard', 25, 0),
+  ('a3:hat:crown', 35, 60), ('a3:glasses:sun', 10, 0), ('a3:glasses:star', 12, 0), ('a3:glasses:heart', 12, 0), ('a3:glasses:goggles', 15, 0),
+  ('a3:glasses:visor', 18, 0), ('a3:neck:scarf', 8, 0), ('a3:neck:bandana', 8, 0), ('a3:neck:bowtie', 10, 0), ('a3:neck:medal', 15, 0),
+  ('a3:neck:pearls', 15, 0), ('a3:neck:headphones', 18, 0), ('a3:neck:goldchain', 20, 0), ('a3:wrist:band', 6, 0), ('a3:wrist:bracelet', 10, 0),
+  ('a3:wrist:watch', 12, 0), ('a3:wrist:smartwatch', 15, 0), ('a3:bag:fanny', 10, 0), ('a3:bag:messenger', 12, 0), ('a3:bag:paw', 15, 0),
+  ('a3:hand:pencil', 6, 0), ('a3:hand:calculator', 8, 0), ('a3:hand:book', 8, 0), ('a3:hand:flag', 8, 0), ('a3:hand:lollipop', 8, 0),
+  ('a3:hand:balloon', 10, 0), ('a3:hand:icecream', 10, 0), ('a3:hand:magnifier', 10, 0), ('a3:hand:glowstick', 10, 0), ('a3:hand:basketball', 12, 0),
+  ('a3:hand:flowers', 12, 0), ('a3:hand:umbrella', 12, 0), ('a3:hand:teddy', 15, 0), ('a3:hand:gamepad', 15, 0), ('a3:hand:microphone', 15, 0),
+  ('a3:hand:camera', 15, 0), ('a3:hand:wand', 18, 0), ('a3:hand:trophy', 20, 0), ('a3:hand:skateboard', 20, 0), ('a3:hand:guitar', 25, 0),
+  ('a3:back:backpack', 12, 0), ('a3:back:guitar', 22, 0), ('a3:back:cape', 25, 0), ('a3:back:butterfly', 30, 0), ('a3:back:wings', 35, 0),
+  ('a3:back:jetpack', 40, 50), ('a3:back:dragon', 40, 50), ('a3:pet:cat', 35, 0), ('a3:pet:dog', 35, 0), ('a3:pet:bunny', 35, 0),
+  ('a3:pet:robot', 45, 80), ('a3:pet:dragon', 50, 100), ('a3:effect:bubbles', 20, 0), ('a3:effect:notes', 20, 0), ('a3:effect:sparkles', 25, 0),
+  ('a3:effect:hearts', 25, 0), ('a3:effect:aura', 35, 60), ('a3:emote:clap', 6, 0), ('a3:emote:jump', 8, 0), ('a3:emote:think', 8, 0),
+  ('a3:emote:bow', 8, 0), ('a3:emote:shy', 8, 0), ('a3:emote:sit', 10, 0), ('a3:emote:flex', 10, 0), ('a3:emote:laugh', 10, 0),
+  ('a3:emote:dance', 15, 0), ('a3:emote:spin', 15, 0), ('car:finish:matte', 10, 0), ('car:finish:metal', 12, 0), ('car:finish:pearl', 18, 0),
+  ('car:finish:glow', 20, 0), ('car:finish:chrome', 25, 40), ('car:pattern:center', 8, 0), ('car:pattern:racing', 10, 0), ('car:pattern:duo', 12, 0),
+  ('car:pattern:dots', 12, 0), ('car:pattern:stars', 15, 0), ('car:pattern:checker', 15, 0), ('car:pattern:lightning', 18, 0),
+  ('car:pattern:flames', 20, 0), ('car:rims:black', 8, 0), ('car:rims:star', 12, 0), ('car:rims:spoke', 12, 0), ('car:rims:turbine', 15, 0),
+  ('car:rims:gold', 20, 0), ('car:rims:neon', 22, 0), ('car:wing:duck', 10, 0), ('car:wing:big', 15, 0), ('car:wing:fin', 18, 0),
+  ('car:wing:double', 20, 0), ('car:exhaust:black', 8, 0), ('car:exhaust:gold', 12, 0), ('car:exhaust:quad', 15, 0), ('car:flames:blue', 12, 0),
+  ('car:flames:green', 12, 0), ('car:flames:violet', 12, 0), ('car:flames:plasma', 18, 0), ('car:flames:rainbow', 25, 0), ('car:glow:cyan', 18, 0),
+  ('car:glow:pink', 18, 0), ('car:glow:green', 18, 0), ('car:glow:violet', 18, 0), ('car:glow:gold', 20, 0), ('car:glow:rainbow', 30, 50),
+  ('car:visor:gold', 10, 0), ('car:visor:mirror', 10, 0), ('car:visor:rainbow', 15, 0)
+on conflict (id) do update set price = excluded.price, min_earned = excluded.min_earned;
+
+-- Münz-Protokoll: jede Ausgabe (Kauf, Spiel) mit Zeit; request verhindert doppeltes Abbuchen
+create table if not exists public.fab_coin_log (
+  id bigint generated always as identity primary key,
+  kid_key text not null,
+  delta integer not null,
+  reason text not null check (char_length(reason) <= 40),
+  request uuid unique,
+  at timestamptz not null default now()
+);
+create index if not exists fab_coin_log_kid on public.fab_coin_log (kid_key, at desc);
+alter table public.fab_coin_log enable row level security;
+revoke all on public.fab_coin_log from anon, authenticated;
 
 -- Einstellungen der Lehrperson (gelten für alle ihre Klassen, in beiden Tools):
 -- {"on": true, "coins": true, "shop": true, "games": true, "perCoin": 10, "dayMax": 40}
@@ -128,6 +186,8 @@ begin
           coins = a.coins + b.coins, earned = a.earned + b.earned, spent = a.spent + b.spent,
           owned = (select coalesce(array_agg(distinct o), '{}') from unnest(a.owned || b.owned) o),
           avatar = case when b.updated_at > a.updated_at and b.avatar <> '{}'::jsonb then b.avatar else a.avatar end,
+          avatar3d = case when (b.updated_at > a.updated_at or a.avatar3d = '{}'::jsonb) and b.avatar3d <> '{}'::jsonb then b.avatar3d else a.avatar3d end,
+          garage = case when (b.updated_at > a.updated_at or a.garage = '{}'::jsonb) and b.garage <> '{}'::jsonb then b.garage else a.garage end,
           updated_at = now()
         where kid_key = vk;
         delete from public.fab_avatars where kid_key = ek;
@@ -142,10 +202,10 @@ drop function if exists public.fab_avatar_state(text);
 create or replace function public.fab_avatar_state(k text, cfg jsonb default '{}'::jsonb)
 returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce((select jsonb_build_object('avatar', a.avatar, 'owned', to_jsonb(a.owned), 'coins', a.coins, 'earned', a.earned, 'spent', a.spent,
-    'today', case when a.day = current_date then a.day_coins else 0 end)
+  select coalesce((select jsonb_build_object('avatar', a.avatar, 'avatar3d', a.avatar3d, 'garage', a.garage, 'owned', to_jsonb(a.owned), 'coins', a.coins,
+    'earned', a.earned, 'spent', a.spent, 'today', case when a.day = current_date then a.day_coins else 0 end)
     from public.fab_avatars a where a.kid_key = k),
-    jsonb_build_object('avatar', '{}'::jsonb, 'owned', '[]'::jsonb, 'coins', 0, 'earned', 0, 'spent', 0, 'today', 0))
+    jsonb_build_object('avatar', '{}'::jsonb, 'avatar3d', '{}'::jsonb, 'garage', '{}'::jsonb, 'owned', '[]'::jsonb, 'coins', 0, 'earned', 0, 'spent', 0, 'today', 0))
     || jsonb_build_object('cfg', cfg, 'dayMax', coalesce((cfg ->> 'dayMax')::integer, 40));
 $$;
 
@@ -184,18 +244,20 @@ $$;
 create or replace function public.fab_avatar_buy(p_app text, p_token uuid, p_item text)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare k text; pr integer; a public.fab_avatars;
+declare k text; pr integer; me integer; a public.fab_avatars;
 begin
   k := public.fab_kid_key(p_app, p_token);
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
   if not coalesce((public.fab_kid_cfg(p_app, p_token) ->> 'shop')::boolean, true) then raise exception 'shop_off' using errcode = 'P0001'; end if;
-  select price into pr from public.fab_avatar_items where id = p_item;
+  select price, min_earned into pr, me from public.fab_avatar_items where id = p_item;
   if pr is null then raise exception 'no_item' using errcode = 'P0001'; end if;
   insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
   select * into a from public.fab_avatars where kid_key = k for update;
   if p_item = any (a.owned) then return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token)); end if;
+  if a.earned < coalesce(me, 0) then raise exception 'locked' using errcode = 'P0001'; end if;
   if a.coins < pr then raise exception 'not_enough' using errcode = 'P0001'; end if;
   update public.fab_avatars set coins = coins - pr, spent = spent + pr, owned = array_append(owned, p_item), updated_at = now() where kid_key = k;
+  insert into public.fab_coin_log (kid_key, delta, reason) values (k, -pr, left('kauf ' || p_item, 40));
   return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
 end;
 $$;
@@ -216,6 +278,69 @@ begin
   n := greatest(0, least(coalesce(p_n, 0), 5, dmax - today));
   update public.fab_avatars set coins = coins + n, earned = earned + n, day = current_date, day_coins = today + n, updated_at = now() where kid_key = k;
   return public.fab_avatar_state(k, cfg) || jsonb_build_object('granted', n);
+end;
+$$;
+
+-- Kind: 3D-Avatar speichern (nur Gratis-Teile oder gekaufte „a3:…“-Teile)
+create or replace function public.fab_avatar3d_save(p_app text, p_token uuid, p_look jsonb)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k text; own text[]; bad text;
+begin
+  k := public.fab_kid_key(p_app, p_token);
+  if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  if jsonb_typeof(p_look) <> 'object' or octet_length(p_look::text) > 3000 then raise exception 'bad_avatar' using errcode = '22023'; end if;
+  insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
+  select owned into own from public.fab_avatars where kid_key = k for update;
+  select i.id into bad from jsonb_each_text(p_look) v join public.fab_avatar_items i on i.id = 'a3:' || v.key || ':' || v.value
+    where not (i.id = any (own)) limit 1;
+  if bad is not null then raise exception 'not_owned' using errcode = 'P0001', detail = bad; end if;
+  update public.fab_avatars set avatar3d = p_look, updated_at = now() where kid_key = k;
+  return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
+end;
+$$;
+
+-- Kind: Kart-Optik aus der Garage speichern (nur Gratis-Teile oder gekaufte „car:…“-Teile; fährt immer gleich schnell)
+create or replace function public.fab_garage_save(p_app text, p_token uuid, p_car jsonb)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k text; own text[]; bad text;
+begin
+  k := public.fab_kid_key(p_app, p_token);
+  if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  if jsonb_typeof(p_car) <> 'object' or octet_length(p_car::text) > 1000 then raise exception 'bad_car' using errcode = '22023'; end if;
+  insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
+  select owned into own from public.fab_avatars where kid_key = k for update;
+  select i.id into bad from jsonb_each_text(p_car) v join public.fab_avatar_items i on i.id = 'car:' || v.key || ':' || v.value
+    where not (i.id = any (own)) limit 1;
+  if bad is not null then raise exception 'not_owned' using errcode = 'P0001', detail = bad; end if;
+  update public.fab_avatars set garage = p_car, updated_at = now() where kid_key = k;
+  return public.fab_avatar_state(k, public.fab_kid_cfg(p_app, p_token));
+end;
+$$;
+
+-- Kind: Münzen ausgeben (z. B. 1 Münze pro Spiel in Teilmal). Höchstens 5 auf einmal; nie unter 0.
+-- p_request: Auftragsnummer vom Gerät. Kommt dieselbe Nummer nochmals (z. B. Netz kurz weg), wird nicht nochmals abgebucht.
+create or replace function public.fab_coins_spend(p_app text, p_token uuid, p_n integer, p_reason text, p_request uuid)
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare k text; a public.fab_avatars; n integer; cfg jsonb;
+begin
+  k := public.fab_kid_key(p_app, p_token);
+  if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
+  n := coalesce(p_n, 0);
+  if n < 1 or n > 5 then raise exception 'bad_amount' using errcode = '22023'; end if;
+  if p_request is null then raise exception 'bad_request' using errcode = '22023'; end if;
+  cfg := public.fab_kid_cfg(p_app, p_token);
+  insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
+  select * into a from public.fab_avatars where kid_key = k for update;
+  if exists (select 1 from public.fab_coin_log l where l.request = p_request) then
+    return public.fab_avatar_state(k, cfg) || jsonb_build_object('charged', 0, 'repeat', true);
+  end if;
+  if a.coins < n then raise exception 'not_enough' using errcode = 'P0001'; end if;
+  update public.fab_avatars set coins = coins - n, spent = spent + n, updated_at = now() where kid_key = k;
+  insert into public.fab_coin_log (kid_key, delta, reason, request) values (k, -n, left(coalesce(nullif(p_reason, ''), 'spiel'), 40), p_request);
+  return public.fab_avatar_state(k, cfg) || jsonb_build_object('charged', n);
 end;
 $$;
 
@@ -257,5 +382,7 @@ $$;
 revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid) from public, anon, authenticated;
 grant execute on function public.fab_teacher_bonus(uuid, integer) to authenticated;
 grant execute on function public.fab_avatar_get(text, uuid), public.fab_avatar_save(text, uuid, jsonb),
-  public.fab_avatar_buy(text, uuid, text), public.fab_coins_earn(text, uuid, integer) to anon, authenticated;
+  public.fab_avatar_buy(text, uuid, text), public.fab_coins_earn(text, uuid, integer),
+  public.fab_avatar3d_save(text, uuid, jsonb), public.fab_garage_save(text, uuid, jsonb),
+  public.fab_coins_spend(text, uuid, integer, text, uuid) to anon, authenticated;
 grant execute on function public.fab_class_avatars(uuid) to authenticated;

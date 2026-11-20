@@ -22,7 +22,7 @@
 .av-coin-pill b { font-weight: 800; font-variant-numeric: tabular-nums; }
 .av-coin-pill .av-coin-prog { position: absolute; left: 10px; right: 10px; bottom: 3px; height: 3px; }
 .av-pill-face { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: var(--brand-wash, #EEF0FF); display: grid; place-items: center; }
-.av-pill-face .av-svg { width: 100%; height: 100%; }
+.av-pill-face .av-svg, .av-pill-face img { width: 100%; height: 100%; object-fit: cover; }
 .av-coin-pill.bump, .av-wallet.bump { animation: av-bump .45s; }
 @keyframes av-bump { 40% { transform: scale(1.15); } }
 .av-coin-fly { position: fixed; left: 0; top: 0; width: 40px; height: 40px; z-index: 2000; pointer-events: none; }
