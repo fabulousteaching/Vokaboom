@@ -24,7 +24,16 @@ const avCfg = () => ({ on: true, coins: true, shop: true, games: true, perCoin: 
 const avPPC = () => Math.max(1, +avCfg().perCoin || AV_POINTS_PER_COIN);
 /** Avatar für dieses Kind sichtbar? (solange nichts geladen ist: ja) */
 const avatarOn = () => avCfg().on !== false;
-const AV = { state: null, loading: null, draft: null, cat: 'body', tried: null, busy: false, pts: 0, capWarned: false };
+/** Münzensperre der Lehrperson (gilt, solange „until“ nicht vorbei ist; until = null: bis sie aufgehoben wird) */
+const avLock = () => { const l = isKid() ? avCfg().lock : null; return l && typeof l === 'object' && (l.until == null || Date.parse(l.until) > Date.now()) ? l : null; };
+function avLockText(l = avLock()) {
+  if (!l) return '';
+  const d = l.until ? new Date(l.until) : null;
+  const end = !d ? '' : d.toDateString() === new Date().toDateString() ? ' für heute'
+    : ` bis ${d.toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'numeric' })}`;
+  return `Deine Lehrperson hat deine Münzen${end} gesperrt. Du kannst weiter üben und spielen, bekommst aber keine neuen Münzen.`;
+}
+const AV = { state: null, loading: null, draft: null, cat: 'body', tried: null, busy: false, pts: 0, capWarned: false, lockWarned: false };
 
 /* ---------------- Katalog ---------------- */
 // price: Münzen (0 = Basic-Set). Die Preise der Datenbank (fab_avatar_items) sind massgebend.
@@ -335,7 +344,13 @@ async function avRpc(fn, args = {}) {
 function avApply(st) {
   if (!st) return;
   AV.state = { ...st, avatar: Object.keys(st.avatar || {}).length ? avFill(st.avatar) : avStarter(kid.username), fresh: !Object.keys(st.avatar || {}).length };
+  AV.at = Date.now();
+  if (!avLock()) AV.lockWarned = false;
   avCoinUI();
+}
+/** Zustand auffrischen, wenn er älter als ms ist (z. B. damit eine neue Münzensperre der Lehrperson bald ankommt) */
+function avatarFresh(ms = 3 * 60e3) {
+  if (isKid() && AV.state && !AV.loading && Date.now() - (AV.at || 0) > ms) avatarLoad(true);
 }
 /** Beim Anmelden und Auffrischen: Avatar und Münzen holen (still, ohne Fehlermeldung) */
 function avatarLoad(force = false) {
@@ -359,6 +374,10 @@ function avatarEarnPoints(pts, from = null, kind = '') {
   if (!isKid() || !pts) return;
   const c = avCfg();
   if (!c.on || !c.coins || (kind === 'game' && !c.games)) return;
+  if (avLock()) {   // Münzensperre: Punkte verfallen, einmal Bescheid geben
+    if (!AV.lockWarned && !AV.quiet) { AV.lockWarned = true; avToast(`🔒 ${avLockText()}`); }
+    return;
+  }
   avPtsSet(avPtsGet() + pts);
   avCoinUI();
   if (avPtsGet() >= avPPC()) avFlushPoints(from);
@@ -385,6 +404,7 @@ async function avFlushPoints(from = null) {
     again = st.granted > 0;
     if (st.granted > 0 && AV.quiet) { const p = document.querySelector('.av-coin-pill'); p?.classList.remove('bump'); void p?.offsetWidth; p?.classList.add('bump'); }
     else if (st.granted > 0) { try { avCoinFx(st.granted, from); } catch (e) { console.warn('Münzen-Animation', e); } }
+    else if (st.locked) { avPtsSet(0); avCoinUI(); if (!AV.lockWarned && !AV.quiet) { AV.lockWarned = true; avToast(`🔒 ${avLockText()}`); } }
     else if (!AV.capWarned) { AV.capWarned = true; avToast(`Für heute hast du alle Münzen gesammelt (${st.dayMax ?? 40}). Morgen gibt es neue!`); }
   } catch (e) {
     console.warn('Münzen gutschreiben', e); // offline: Punkte bleiben gespeichert und werden später eingelöst
@@ -401,7 +421,7 @@ function avCoinPillHTML() {
   const c = AV.state?.coins ?? '…';
   const p = Math.min(100, (avPtsGet() / avPPC()) * 100);
   return `<button class="av-coin-pill" data-action="avatar-open" title="Mein Avatar und meine Münzen" aria-label="${c} Münzen – Mein Avatar">
-    <span class="av-pill-face">${(typeof window.avPillFace === 'function' && window.avPillFace()) || (AV.state ? avatarSVG(AV.state.avatar, { crop: 'head', bg: false }) : '')}</span>${AV_COIN_SVG}<b class="av-coin-n">${c}</b><i class="av-coin-prog" aria-hidden="true"><i style="width:${p}%"></i></i></button>`;
+    <span class="av-pill-face">${(typeof window.avPillFace === 'function' && window.avPillFace()) || (AV.state ? avatarSVG(AV.state.avatar, { crop: 'head', bg: false }) : '')}</span>${AV_COIN_SVG}<b class="av-coin-n">${c}</b>${avLock() ? '<span class="av-lock" title="Münzen gesperrt">🔒</span>' : ''}<i class="av-coin-prog" aria-hidden="true"><i style="width:${p}%"></i></i></button>`;
 }
 function avCoinUI() {
   const slot = document.getElementById('av-coin-slot');
@@ -520,6 +540,7 @@ function avCoinsInfo() {
   const html = `<div class="av-modal" role="dialog" aria-modal="true" aria-label="Meine Münzen"><div class="av-modal-card">
     <button class="av-modal-x" data-action="avatar-modal-close" aria-label="Schliessen">✕</button>
     <div class="av-coins-hero">${AV_COIN_SVG}<b>${st.coins}</b><span>${st.coins === 1 ? 'Münze' : 'Münzen'}</span></div>
+    ${avLock() ? `<p class="av-lock-note">🔒 ${avEsc(avLockText())}</p>` : ''}
     <div class="av-next"><span>Nächste Münze</span><i class="av-coin-prog big"><i style="width:${Math.min(100, (avPtsGet() / avPPC()) * 100)}%"></i></i><small>noch ${String(left).replace('.', ',')} Punkte</small></div>
     <ul class="av-rules">
       ${AV_APP === 'vokaboom' ? `<li><b>Richtige Antwort = 1 Punkt</b> (beim Aussprechen, Hören & Schreiben, im Test und in den Übungen; Lernkarten „gewusst“ ½ Punkt).</li>

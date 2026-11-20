@@ -13,6 +13,8 @@
 -- 3D-Welt (Teilmal): avatar3d = 3D-Avatar, garage = Kart-Optik fürs Turbo-Rennen. Teile heissen „a3:<platz>:<wert>“ bzw.
 -- „car:<platz>:<wert>“, kosten Münzen aus demselben Konto und können erst ab einer Anzahl gesammelter Münzen freigeschaltet sein.
 -- Spiele bezahlen Kinder mit fab_coins_spend (mit Auftragsnummer, so wird nie doppelt abgebucht). Jede Ausgabe steht in fab_coin_log.
+-- Münzensperre: Die Lehrperson kann einem Kind das Münzen-Verdienen sperren (heute, ein paar Tage oder bis sie es aufhebt);
+-- üben und spielen geht weiter. Siehe fab_coin_locks / fab_teacher_coin_lock.
 -- Umtausch 2D → 3D: Seit der 3D-Avatar in beiden Tools gilt, bekommt jedes Kind beim nächsten Laden für gekaufte 2D-Teile das
 -- passende 3D-Teil geschenkt; für 2D-Teile ohne 3D-Gegenstück (oder deren Gegenstück gratis ist) gibt es die Münzen zurück.
 
@@ -124,19 +126,34 @@ drop policy if exists "eigene einstellungen" on public.fab_teacher_settings;
 create policy "eigene einstellungen" on public.fab_teacher_settings for all to authenticated
   using ((select auth.uid()) = teacher_id) with check ((select auth.uid()) = teacher_id);
 
+-- Münzensperre durch die Lehrperson: pro Kind und Tool (Schlüssel = Vokaboom- bzw. Teilmal-ID des Kindes).
+-- Das Kind kann weiter üben und spielen, verdient aber keine Münzen. until = null: bis die Lehrperson sie aufhebt.
+create table if not exists public.fab_coin_locks (
+  student_id uuid primary key,
+  teacher_id uuid not null default auth.uid(),
+  until timestamptz,
+  note text not null default '' check (char_length(note) <= 80),
+  created_at timestamptz not null default now()
+);
+alter table public.fab_coin_locks enable row level security;
+revoke all on public.fab_coin_locks from anon, authenticated;
+
 -- Hilfe: Einstellungen der Lehrperson des Kindes (mit Standardwerten)
 create or replace function public.fab_kid_cfg(p_app text, p_token uuid)
 returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
-declare tid uuid; cfg jsonb;
+declare tid uuid; sid uuid; cfg jsonb; lk jsonb;
 begin
   if p_app = 'vokaboom' and to_regclass('public.vokaboom_sessions') is not null then
-    select c.teacher_id into tid from public.vokaboom_sessions x join public.vokaboom_students s on s.id = x.student_id
+    select c.teacher_id, s.id into tid, sid from public.vokaboom_sessions x join public.vokaboom_students s on s.id = x.student_id
       join public.vokaboom_classes c on c.id = s.class_id where x.token = p_token;
   elsif p_app in ('einmaleins', 'teilmal') and to_regclass('public.einmaleins_sessions') is not null then
-    select c.teacher_id into tid from public.einmaleins_sessions x join public.einmaleins_students s on s.id = x.student_id
+    select c.teacher_id, s.id into tid, sid from public.einmaleins_sessions x join public.einmaleins_students s on s.id = x.student_id
       join public.einmaleins_classes c on c.id = s.class_id where x.token = p_token;
   end if;
+  -- Münzensperre der Lehrperson (nur solange sie gilt)
+  select jsonb_build_object('until', l.until, 'at', l.created_at) into lk from public.fab_coin_locks l
+    where l.student_id = sid and (l.until is null or l.until > now());
   select t.avatar into cfg from public.fab_teacher_settings t where t.teacher_id = tid;
   cfg := coalesce(cfg, '{}'::jsonb);
   return jsonb_build_object(
@@ -145,7 +162,8 @@ begin
     'shop', coalesce((cfg ->> 'shop')::boolean, true),
     'games', coalesce((cfg ->> 'games')::boolean, true),
     'perCoin', least(30, greatest(3, coalesce((cfg ->> 'perCoin')::integer, 10))),
-    'dayMax', least(100, greatest(0, coalesce((cfg ->> 'dayMax')::integer, 40))));
+    'dayMax', least(100, greatest(0, coalesce((cfg ->> 'dayMax')::integer, 40))),
+    'lock', lk);
 end;
 $$;
 
@@ -306,7 +324,8 @@ begin
 end;
 $$;
 
--- Kind: verdiente Münzen gutschreiben (höchstens 5 pro Aufruf, pro Tag so viele, wie die Lehrperson erlaubt – Standard 40)
+-- Kind: verdiente Münzen gutschreiben (höchstens 5 pro Aufruf, pro Tag so viele, wie die Lehrperson erlaubt – Standard 40;
+-- bei einer Münzensperre der Lehrperson keine)
 create or replace function public.fab_coins_earn(p_app text, p_token uuid, p_n integer)
 returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -316,12 +335,13 @@ begin
   if k is null then raise exception 'session_invalid' using errcode = 'P0001'; end if;
   cfg := public.fab_kid_cfg(p_app, p_token);
   dmax := case when (cfg ->> 'coins')::boolean then (cfg ->> 'dayMax')::integer else 0 end;
+  if jsonb_typeof(cfg -> 'lock') = 'object' then dmax := 0; end if;   -- Münzensperre der Lehrperson
   insert into public.fab_avatars (kid_key) values (k) on conflict do nothing;
   select * into a from public.fab_avatars where kid_key = k for update;
   today := case when a.day = current_date then a.day_coins else 0 end;
   n := greatest(0, least(coalesce(p_n, 0), 5, dmax - today));
   update public.fab_avatars set coins = coins + n, earned = earned + n, day = current_date, day_coins = today + n, updated_at = now() where kid_key = k;
-  return public.fab_avatar_state(k, cfg) || jsonb_build_object('granted', n);
+  return public.fab_avatar_state(k, cfg) || jsonb_build_object('granted', n, 'locked', jsonb_typeof(cfg -> 'lock') = 'object');
 end;
 $$;
 
@@ -423,8 +443,57 @@ begin
 end;
 $$;
 
-revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid), public.fab_migrate_2d(text) from public, anon, authenticated;
-grant execute on function public.fab_teacher_bonus(uuid, integer) to authenticated;
+-- Hilfe: Gehört dieses Kind (Vokaboom- oder Teilmal-ID) der angemeldeten Lehrperson?
+create or replace function public.fab_teacher_owns(p_student uuid)
+returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare ok boolean := false;
+begin
+  if auth.uid() is null or p_student is null then return false; end if;
+  if to_regclass('public.vokaboom_students') is not null then
+    execute 'select exists (select 1 from public.vokaboom_students s join public.vokaboom_classes c on c.id = s.class_id
+      where s.id = $1 and c.teacher_id = auth.uid())' into ok using p_student;
+  end if;
+  if not coalesce(ok, false) and to_regclass('public.einmaleins_students') is not null then
+    execute 'select exists (select 1 from public.einmaleins_students e join public.einmaleins_classes c on c.id = e.class_id
+      where e.id = $1 and c.teacher_id = auth.uid())' into ok using p_student;
+  end if;
+  return coalesce(ok, false);
+end;
+$$;
+
+-- Lehrperson: Münzen eines Kindes sperren (p_on = true) oder die Sperre aufheben (p_on = false).
+-- p_until: bis wann (null = bis die Lehrperson sie aufhebt). Gilt im Tool, zu dem die ID gehört (Teilmal-Kind → Teilmal).
+create or replace function public.fab_teacher_coin_lock(p_student uuid, p_on boolean, p_until timestamptz default null, p_note text default '')
+returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.fab_teacher_owns(p_student) then raise exception 'not_allowed' using errcode = '42501'; end if;
+  if not coalesce(p_on, false) or p_until <= now() then
+    delete from public.fab_coin_locks where student_id = p_student;
+    return null;
+  end if;
+  insert into public.fab_coin_locks (student_id, teacher_id, until, note, created_at)
+    values (p_student, auth.uid(), p_until, left(coalesce(p_note, ''), 80), now())
+    on conflict (student_id) do update set teacher_id = excluded.teacher_id, until = excluded.until, note = excluded.note, created_at = now();
+  return jsonb_build_object('until', p_until, 'at', now(), 'note', left(coalesce(p_note, ''), 80));
+end;
+$$;
+
+-- Lehrperson: geltende Münzensperren der eigenen Kinder (für die Übersicht)
+create or replace function public.fab_teacher_coin_locks(p_students uuid[])
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_object_agg(l.student_id, jsonb_build_object('until', l.until, 'at', l.created_at, 'note', l.note)), '{}'::jsonb)
+  from public.fab_coin_locks l
+  where l.student_id = any (p_students[1:300]) and (l.until is null or l.until > now()) and public.fab_teacher_owns(l.student_id);
+$$;
+
+revoke all on function public.fab_kid_key(text, uuid), public.fab_avatar_state(text, jsonb), public.fab_kid_cfg(text, uuid), public.fab_migrate_2d(text),
+  public.fab_teacher_owns(uuid) from public, anon, authenticated;
+revoke all on function public.fab_teacher_coin_lock(uuid, boolean, timestamptz, text), public.fab_teacher_coin_locks(uuid[]) from public, anon;
+grant execute on function public.fab_teacher_bonus(uuid, integer), public.fab_teacher_coin_lock(uuid, boolean, timestamptz, text),
+  public.fab_teacher_coin_locks(uuid[]) to authenticated;
 grant execute on function public.fab_avatar_get(text, uuid), public.fab_avatar_save(text, uuid, jsonb),
   public.fab_avatar_buy(text, uuid, text), public.fab_coins_earn(text, uuid, integer),
   public.fab_avatar3d_save(text, uuid, jsonb), public.fab_garage_save(text, uuid, jsonb),

@@ -21,6 +21,8 @@
   background: var(--paper, #fff); box-shadow: var(--shadow-soft, 0 4px 14px -8px rgba(40, 40, 90, .3)); cursor: pointer; font: inherit; color: var(--ink, #161A33); overflow: hidden; }
 .av-coin-pill b { font-weight: 800; font-variant-numeric: tabular-nums; }
 .av-coin-pill .av-coin-prog { position: absolute; left: 10px; right: 10px; bottom: 3px; height: 3px; }
+.av-coin-pill .av-lock { font-size: .8rem; margin-left: -.1rem; }
+.av-lock-note { margin: .2rem 0 .8rem; padding: .55rem .75rem; border-radius: 12px; background: #FFF4E0; color: #7A4A00; font-size: .92rem; line-height: 1.35; }
 .av-pill-face { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: var(--brand-wash, #EEF0FF); display: grid; place-items: center; }
 .av-pill-face .av-svg, .av-pill-face img { width: 100%; height: 100%; object-fit: cover; }
 .av-coin-pill.bump, .av-wallet.bump { animation: av-bump .45s; }

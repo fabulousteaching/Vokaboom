@@ -42,6 +42,7 @@ Im **Menü → Avatar & Münzen** (Vokaboom, mit Konto) legt die Lehrperson fest
 - **Spiele geben Punkte** ein/aus
 - **Shop** ein/aus (aus: nur das Basic-Set und schon gekaufte Teile; die Datenbank lehnt Käufe ab)
 - **Bonus-Münzen** an ein Kind oder die ganze Klasse verteilen (höchstens 50 auf einmal, `fab_teacher_bonus`)
+- **Münzensperre** für ein Kind (in Teilmal: Klasse → Übersicht → «Münzensperren» oder beim Kind): für heute, 3 Tage, 1 Woche oder bis die Lehrperson sie aufhebt. Das Kind übt und spielt weiter, verdient aber keine neuen Münzen; schon gesammelte Münzen bleiben. Die Datenbank schreibt dann nichts gut (`fab_coin_locks`, `fab_teacher_coin_lock`, `fab_teacher_coin_locks`). Die Sperre gilt im Tool, in dem sie gesetzt wurde (Teilmal-Sperre → Münzen aus Teilmal), und kommt spätestens nach ein paar Minuten beim Kind an. Das Kind sieht oben beim Münzstand ein 🔒 und beim Antippen, bis wann.
 
 ## In Teilmal einbauen
 
