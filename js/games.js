@@ -1139,14 +1139,18 @@ document.addEventListener('change', (e) => {
    Oben steht das deutsche Wort (oder das Bild). Drei Bögen mit Wörtern: durch den richtigen laufen.
    3 Leben: ein falsches Wort, ein Hindernis oder ein Sturz in eine Lücke kostet eines. Alle 5 richtigen wird es schneller.
    ========================================================= */
+const runnerLives = () => (db.settings.runLives === 1 ? 1 : 3);
 const runnerWorld = () => ((typeof RUN_WORLD_INFO === 'object' && RUN_WORLD_INFO.some((w) => w.id === db.settings.runWorld)) ? db.settings.runWorld : 'jungle');
 function startRunnerGame(set) {
   const gl = typeof w3WebGL === 'function' && w3WebGL();
   $('#view').innerHTML = gameShell('Welten-Lauf', gl ? `<div class="test-card setup choose-card rn-setup">
     <h2>Wo willst du rennen?</h2>
     ${w3RunWorldsHTML(runnerWorld(), 'rn-world')}
-    <p class="muted">Oben steht ein deutsches Wort${set.noPics ? '' : ' oder ein Bild'}. Lauf durch den Bogen mit dem richtigen Wort!<br>
-      Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen, <b>↓</b> rutschen.</p>
+    <h2>Wie viele Leben?</h2>
+    <div class="seg rn-lives" role="group" aria-label="Leben">${[[3, '❤❤❤ 3 Leben'], [1, '❤ Ein Leben']].map(([n, t]) => `<button class="seg-btn" data-action="rn-lives" data-n="${n}" aria-pressed="${runnerLives() === n}">${t}</button>`).join('')}</div>
+    <p class="muted">Oben steht ein deutsches Wort${set.noPics ? '' : ' oder ein Bild'}. Lauf durch den Bogen mit dem richtigen Wort! Jedes richtige Wort macht dich ein bisschen schneller.
+      ${runnerLives() === 1 ? 'Mit einem Leben ist beim ersten Fehler, Hindernis oder Absturz Schluss.' : 'Ein falsches Wort, ein Hindernis oder ein Absturz kostet ein Leben.'}<br>
+      Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen.</p>
     <div class="row center"><button class="btn primary big" data-action="rn-go">🏃 Los!</button>
       ${isKid() && typeof renderWorld3D === 'function' ? '<button class="btn ghost" data-action="avatar-open">🧍 Avatar gestalten</button>' : ''}</div>
   </div>` : `<div class="test-card"><p class="lead">Dieses Spiel braucht 3D-Grafik. Auf diesem Gerät geht das leider nicht – probier ein anderes Spiel!</p>
@@ -1154,11 +1158,12 @@ function startRunnerGame(set) {
 }
 async function runnerBegin(set) {
   const words = gameWords(set);
-  Object.assign(G.s, { pk: makePicker(words), score: 0, lives: 3, level: 1, words, done: false, wrong: [] });
+  const lives = runnerLives();
+  Object.assign(G.s, { pk: makePicker(words), score: 0, lives, maxLives: lives, level: 1, words, done: false, wrong: [] });
   $('#view').innerHTML = gameShell('Welten-Lauf', '<div id="rnwrap"><div class="rn-load"><span class="spinner big"></span><p>Die Welt wird geladen …</p></div></div>');
   try { await w3LoadRunner(); } catch (e) { console.warn(e); toast('Das Spiel konnte nicht geladen werden. Bist du online?', 'bad'); renderGame(); return; }
   if (ui.view !== 'game' || ui.game !== 'runner') return;
-  const hud = () => `<span class="rn-hud-box"><span class="hearts" id="rnlives">${[0, 1, 2].map((i) => `<i class="${i < G.s.lives ? '' : 'off'}">❤</i>`).join('')}</span><span>✓ <b id="rnscore">${G.s.score}</b></span><span>Level <b id="rnlevel">${G.s.level}</b></span></span>`;
+  const hud = () => `<span class="rn-hud-box"><span class="hearts" id="rnlives">${Array.from({ length: G.s.maxLives }, (_, i) => `<i class="${i < G.s.lives ? '' : 'off'}">❤</i>`).join('')}</span><span>✓ <b id="rnscore">${G.s.score}</b></span><span>Level <b id="rnlevel">${G.s.level}</b></span></span>`;
   const upd = () => { const h = $('.rn-host'); if (h) h.innerHTML = hud(); };
   const lose = () => { G.s.lives = Math.max(0, G.s.lives - 1); upd(); return G.s.lives <= 0; };
   const pics = !set.noPics;
@@ -1169,8 +1174,7 @@ async function runnerBegin(set) {
     hint: 'Lauf durch das richtige Wort',
     sound: db.settings.sound !== false,
     gateEvery: 84,
-    speed: (lv) => Math.min(13.5, 8.2 + (lv - 1) * 0.5),
-    level: () => G.s.level,
+    speed: (n) => Math.min(13, 8.2 + n * 0.15), // jedes richtige Wort ein bisschen schneller
     ask: () => {
       const w = pickNext(G.s.pk);
       const others = shuffle(G.s.words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, 2);
@@ -1198,15 +1202,16 @@ async function runnerBegin(set) {
 function runnerFinish(set) {
   if (ui.view !== 'game' || ui.game !== 'runner') return;
   const score = G.s.score;
-  const rec = gameRecord(set, 'runner', score);
+  const rec = gameRecord(set, G.s.maxLives === 1 ? 'runner1' : 'runner', score);
   stopGame();
   const wrong = G.s.wrong.slice(0, 6);
-  $('#view').innerHTML = gameShell('Welten-Lauf', `${gameEndHTML(rec && score > 0 ? 'Neuer Rekord!' : 'Geschafft!', `<b>${score}</b> ${score === 1 ? 'Wort' : 'Wörter'} richtig · Level ${G.s.level}`)}
+  $('#view').innerHTML = gameShell('Welten-Lauf', `${gameEndHTML(rec && score > 0 ? 'Neuer Rekord!' : 'Geschafft!', `<b>${score}</b> ${score === 1 ? 'Wort' : 'Wörter'} richtig · ${G.s.maxLives === 1 ? 'mit einem Leben' : 'mit 3 Leben'}`)}
     ${wrong.length ? `<div class="test-card"><p class="label">Merk dir</p><ul class="rn-wrong">${wrong.map((w) => `<li><span lang="de">${esc(w.german || '')}</span> = <b lang="${set.lang}">${esc(gameForm(w))}</b></li>`).join('')}</ul></div>` : ''}`);
 }
 
 const gameActions = {
   'rn-world': (el) => { db.settings.runWorld = el.dataset.v; saveDB(); renderGame(); },
+  'rn-lives': (el) => { db.settings.runLives = +el.dataset.n; saveDB(); renderGame(); },
   'rn-go': () => runnerBegin(currentSet()),
   games: () => { stopGame(); openGames(); },
   'game-open': (el) => openGame(el.dataset.game),

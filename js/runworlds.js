@@ -283,15 +283,15 @@ const RW_JUNGLE = (() => {
       // alter Steinblock (ausweichen oder über die Rampe)
       block: { u: 0.15, iter: 2, field: 1.1, yt: RN.BLOCK, top: RN.BLOCK, depth: 0, len: 8, cap: 16, build(B) {
         const st = mossy(0x8c8f84);
-        B.rbox(-6, 0, -53, 6, 14, 0, st, { p: 8 });
+        B.rbox(-6, 0, -53, 6, 8, 0, st, { p: 8 });
         // eingemeisselte Zeichen an den Seiten
-        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y > 3 && v.y < 11 && ((v.y % 4 === 0 && (v.z % 5 !== 0)) || (v.z % 5 === 0 && v.y % 4 !== 2)) ? 0x5b5f55 : null));
-        B.paint((v) => (v.y === 14 ? rnShade(0x9a9d90, (rnHash(v.x, v.z, 2) - 0.5) * 0.15) : null));
+        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y >= 2 && v.y <= 6 && ((v.y % 4 === 0 && (v.z % 5 !== 0)) || (v.z % 5 === 0 && v.y % 4 !== 2)) ? 0x5b5f55 : null));
+        B.paint((v) => (v.y === 8 ? rnShade(0x9a9d90, (rnHash(v.x, v.z, 2) - 0.5) * 0.15) : null));
         return B;
       } },
       ramp: { u: 0.15, iter: 2, field: 1.0, project: false, yt: RN.BLOCK, ramp: true, depth: 0, len: 4, cap: 12, build(B) {
         const st = mossy(0x8c8f84);
-        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 15) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, st(x, y, z)); }
+        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 9) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, st(x, y, z)); }
         return B;
       } },
     },
@@ -530,14 +530,14 @@ const RW_ROOFS = (() => {
         return B;
       } },
       block: { u: 0.15, iter: 2, field: 1.0, yt: RN.BLOCK, top: RN.BLOCK, depth: 0, len: 8, cap: 16, build(B) {
-        B.box(-6, 0, -53, 6, 14, 0, (x, y, z) => ((y % 3 === 0 && y < 13) ? 0xd8c9b8 : rwPatch(0xb5614a, 0.07, 3)(x, y, z)));
-        B.box(-6, 14, -53, 6, 14, 0, rwPatch(0x8e8a84, 0.06, 3));
-        B.box(-3, 0, 0, 3, 10, 1, 0x4a5563); B.put(2, 5, 1, 0xd4af37, 3); // Tür
-        B.box(-7, 13, -54, 7, 13, 1, 0xe5ddd0);
+        B.box(-6, 0, -53, 6, 8, 0, (x, y, z) => ((y % 3 === 0 && y < 7) ? 0xd8c9b8 : rwPatch(0xb5614a, 0.07, 3)(x, y, z)));
+        B.box(-6, 8, -53, 6, 8, 0, rwPatch(0x8e8a84, 0.06, 3));
+        B.box(-3, 0, 0, 3, 6, 1, 0x4a5563); B.put(2, 3, 1, 0xd4af37, 3); // Klappe
+        B.box(-7, 7, -54, 7, 7, 1, 0xe5ddd0);
         return B;
       } },
       ramp: { u: 0.15, iter: 1, field: 0.9, project: false, yt: RN.BLOCK, ramp: true, depth: 0, len: 4, cap: 12, build(B) {
-        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 15) - 1; for (let x = -6; x <= 6; x++) { B.put(x, h, z, (z % 3 === 0) ? 0x7a5230 : rwPatch(0xb07a4a, 0.08, 2)(x, h, z)); if (Math.abs(x) === 6) for (let y = 0; y < h; y++) B.put(x, y, z, 0x6b4a2c); } }
+        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 9) - 1; for (let x = -6; x <= 6; x++) { B.put(x, h, z, (z % 3 === 0) ? 0x7a5230 : rwPatch(0xb07a4a, 0.08, 2)(x, h, z)); if (Math.abs(x) === 6) for (let y = 0; y < h; y++) B.put(x, y, z, 0x6b4a2c); } }
         return B;
       } },
     },
@@ -692,13 +692,13 @@ const RW_DESERT = (() => {
         return B;
       } },
       block: { u: 0.15, iter: 2, field: 1.0, yt: RN.BLOCK, top: RN.BLOCK, depth: 0, len: 8, cap: 16, build(B) {
-        B.box(-6, 0, -53, 6, 14, 0, stone(0xd2a06a));
-        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y > 3 && v.y < 11 && (v.z % 6 === 0 || v.y === 7) ? 0x9a6a3a : null));
-        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y === 12 ? 0x2a9d8f : null));
+        B.box(-6, 0, -53, 6, 8, 0, stone(0xd2a06a));
+        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y >= 2 && v.y <= 5 && (v.z % 6 === 0 || v.y === 4) ? 0x9a6a3a : null));
+        B.paint((v) => ((Math.abs(v.x) === 6 || v.z === 0) && v.y === 7 ? 0x2a9d8f : null));
         return B;
       } },
       ramp: { u: 0.15, iter: 3, field: 1.4, project: false, yt: RN.BLOCK, ramp: true, depth: 0, len: 4, cap: 12, build(B) {
-        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 15) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, sand(x, y, z)); }
+        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 9) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, sand(x, y, z)); }
         return B;
       } },
     },
@@ -871,14 +871,14 @@ const RW_CASTLE = (() => {
       } },
       block: { u: 0.15, iter: 2, field: 1.0, yt: RN.BLOCK, top: RN.BLOCK, depth: 0, len: 8, cap: 16, build(B) {
         // Wagen mit Kisten (oben kann man laufen)
-        B.box(-6, 3, -53, 6, 5, 0, wood(0x8b5a2b));
-        for (const z of [-8, -45]) for (const sx of [-1, 1]) B.tube('x', sx * 6, sx * 6 + sx, z, 3, 3, 0x5b3a1e);
-        for (let z = -52; z <= -1; z += 9) B.box(-6, 6, z, 6, 14, z + 7, (x, y, zz) => ((x === -6 || x === 6 || y === 14 || y === 6) ? 0x7a4f2a : wood(0xb07a4a)(x, y, zz)));
-        B.box(-6, 6, -53, 6, 14, -53, 0x7a4f2a); B.box(-6, 6, 0, 6, 14, 0, 0x7a4f2a);
+        B.box(-6, 2, -53, 6, 3, 0, wood(0x8b5a2b));
+        for (const z of [-8, -45]) for (const sx of [-1, 1]) B.tube('x', sx * 6, sx * 6 + sx, z, 2, 2, 0x5b3a1e);
+        for (let z = -52; z <= -1; z += 9) B.box(-6, 4, z, 6, 8, z + 7, (x, y, zz) => ((x === -6 || x === 6 || y === 8 || y === 4) ? 0x7a4f2a : wood(0xb07a4a)(x, y, zz)));
+        B.box(-6, 4, -53, 6, 8, -53, 0x7a4f2a); B.box(-6, 4, 0, 6, 8, 0, 0x7a4f2a);
         return B;
       } },
       ramp: { u: 0.15, iter: 1, field: 0.9, project: false, yt: RN.BLOCK, ramp: true, depth: 0, len: 4, cap: 12, build(B) {
-        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 15) - 1; for (let x = -6; x <= 6; x++) { B.put(x, h, z, z % 3 === 0 ? 0x6b4a2c : wood(0x9a6a3a)(x, h, z)); if (Math.abs(x) === 5 && z % 6 === 0) for (let y = 0; y < h; y++) B.put(x, y, z, 0x5b3a1e); } }
+        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 9) - 1; for (let x = -6; x <= 6; x++) { B.put(x, h, z, z % 3 === 0 ? 0x6b4a2c : wood(0x9a6a3a)(x, h, z)); if (Math.abs(x) === 5 && z % 6 === 0) for (let y = 0; y < h; y++) B.put(x, y, z, 0x5b3a1e); } }
         return B;
       } },
     },
@@ -997,13 +997,13 @@ const RW_SEA = (() => {
         return B;
       } },
       block: { u: 0.15, iter: 3, field: 1.2, yt: RN.BLOCK, top: RN.BLOCK, depth: 0, len: 8, cap: 16, build(B) {
-        B.box(-6, 0, -53, 6, 14, 0, algae(0x5d6f7a));
-        for (let k = 0; k < 14; k++) { const z = -2 - k * 3.6, x = (k % 2 ? 6 : -6); B.ell(x, 4 + (k % 4) * 2, z, 1.6, 1.6, 1.6, CORAL[k % CORAL.length]); }
-        B.paint((v) => (v.y === 14 && vxRand(Math.floor(v.x / 2), 0, Math.floor(v.z / 2)) < 0.25 ? CORAL[Math.floor(vxRand(v.x, v.z, 1) * 6)] : null));
+        B.box(-6, 0, -53, 6, 8, 0, algae(0x5d6f7a));
+        for (let k = 0; k < 14; k++) { const z = -2 - k * 3.6, x = (k % 2 ? 6 : -6); B.ell(x, 2 + (k % 3) * 2, z, 1.6, 1.6, 1.6, CORAL[k % CORAL.length]); }
+        B.paint((v) => (v.y === 8 && vxRand(Math.floor(v.x / 2), 0, Math.floor(v.z / 2)) < 0.25 ? CORAL[Math.floor(vxRand(v.x, v.z, 1) * 6)] : null));
         return B;
       } },
       ramp: { u: 0.15, iter: 3, field: 1.3, project: false, yt: RN.BLOCK, ramp: true, depth: 0, len: 4, cap: 12, build(B) {
-        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 15) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, y === h ? rnShade(0xd9c79a, (vxRand(x, z, 3) - 0.5) * 0.1) : 0x8a7a5a); }
+        for (let z = 0; z >= -26; z--) { const h = Math.round(((-z + 1) / 27) * 9) - 1; for (let x = -6; x <= 6; x++) for (let y = 0; y <= h; y++) B.put(x, y, z, y === h ? rnShade(0xd9c79a, (vxRand(x, z, 3) - 0.5) * 0.1) : 0x8a7a5a); }
         return B;
       } },
     },

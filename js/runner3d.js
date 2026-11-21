@@ -22,11 +22,11 @@ const RN = {
   LW: 2.0,          // Spurbreite (m)
   FS: 0.72,         // Grösse der Figur (Avatar ≈ 1,6 m)
   G: 26,            // Schwerkraft
-  JUMP: 8.6,        // Absprung: ≈ 1,4 m hoch, 0,66 s in der Luft
+  JUMP: 9.2,        // Absprung: ≈ 1,6 m hoch, 0,7 s in der Luft (höchste Hürde 1,05 m, Blöcke 1,35 m)
   DIVE: -16,        // ↓ in der Luft
   SLIDE: 0.78,      // Rutschen (s)
   H_STAND: 1.3, H_SLIDE: 0.62,
-  LOW: 0.62, HIGH: 1.05, OVER: 1.02, BLOCK: 2.3, PLAT: 2.6,
+  LOW: 0.62, HIGH: 1.05, OVER: 1.02, BLOCK: 1.35, PLAT: 2.6,
   AHEAD: 170,       // so weit voraus wird die Strecke geplant (m)
   BEHIND: 24,
 };
@@ -249,7 +249,7 @@ async function runnerStart(host, opts) {
   const T = await w3Three();
   if (typeof w3LoadEngine === 'function') await w3LoadEngine();
   const W = RUN_WORLDS[opts.world] || RUN_WORLDS[Object.keys(RUN_WORLDS)[0]];
-  const o = { gateEvery: 78, speed: (lv) => Math.min(15, 9 + (lv - 1) * 0.55), level: () => 1, sound: true, ...opts };
+  const o = { gateEvery: 78, speed: (n) => Math.min(14.5, 8.8 + n * 0.18), sound: true, ...opts };
   const sound = (f, ...a) => { if (o.sound && typeof window[f] === 'function') try { window[f](...a); } catch { /* */ } };
   const reduce = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -257,14 +257,14 @@ async function runnerStart(host, opts) {
   host.classList.add('rn', `rn-w-${W.id}`);
   host.innerHTML = `
     <div class="rn-top"><div class="rn-host">${o.hudHTML || ''}</div>
-      <div class="rn-stats"><span class="rn-gems" title="Gesammelte Kristalle"><i>💎</i><b id="rngems">0</b></span><span class="rn-dist"><b id="rndist">0</b> m</span></div></div>
+      <div class="rn-stats"><span class="rn-gems" title="Gesammelte Kristalle"><i>💎</i><b id="rngems">0</b></span><span class="rn-speed" title="Tempo – jede richtige Antwort macht dich ein bisschen schneller">⚡ <b id="rnspeed">0</b> km/h</span><span class="rn-dist"><b id="rndist">0</b> m</span></div></div>
     <div class="rn-ask" id="rnask" hidden><small id="rnhint">${esc2(o.hint || 'Lauf durch das richtige Ergebnis')}</small><div class="rn-q" id="rnq"></div><div class="rn-ans" id="rnans"></div></div>
     <div class="rn-count" id="rncount"></div>
-    <div class="rn-help" id="rnhelp"><span><b>← →</b> Spur</span><span><b>↑</b> springen</span><span><b>↓</b> rutschen</span><small>Wischen oder Pfeiltasten</small></div>
+    <div class="rn-help" id="rnhelp"><span><b>← →</b> Spur</span><span><b>↑</b> springen</span><span><b>↓</b> schnell landen</span><small>Wischen oder Pfeiltasten</small></div>
     <div class="rn-flash" id="rnflash"></div>
     <div class="rn-load" id="rnload"><span class="spinner big"></span><p>${esc2(W.name)} wird gebaut …</p></div>`;
   const $h = (id) => host.querySelector('#' + id);
-  const elAsk = $h('rnask'), elQ = $h('rnq'), elAns = $h('rnans'), elHint = $h('rnhint'), elGems = $h('rngems'), elDist = $h('rndist'), elCount = $h('rncount'), elFlash = $h('rnflash');
+  const elSpeed = $h('rnspeed'), elAsk = $h('rnask'), elQ = $h('rnq'), elAns = $h('rnans'), elHint = $h('rnhint'), elGems = $h('rngems'), elDist = $h('rndist'), elCount = $h('rncount'), elFlash = $h('rnflash');
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30))); // Ladeanzeige zeigen, bevor gebaut wird
 
   /* Renderer */
@@ -409,7 +409,7 @@ async function runnerStart(host, opts) {
   // obs:    [{ d0, d1, lane, kind, yb, yt, top (begehbar), pool, i, hit }]
   // gates:  [{ d, q, passed, labels: [mesh] }]
   const S = {
-    d: 0, x: 0, lane: 0, y: 0, vy: 0, ground: true, slide: 0, speed: 0, base: 0, slow: 0, inv: 0, gems: 0,
+    d: 0, x: 0, lane: 0, y: 0, vy: 0, ground: true, ok: 0, lastGh: 0, endWhy: '', slide: 0, speed: 0, base: 0, slow: 0, inv: 0, gems: 0,
     over: false, finishing: false, started: false, crashT: 0, respawn: null, lastGate: -1, cam: new T.Vector3(), camY: 2.5, shake: 0,
   };
   const segs = [], obs = [], gates = [], gems = [], built = [];
@@ -420,7 +420,7 @@ async function runnerStart(host, opts) {
   const R = (a, b) => a + Math.random() * (b - a);
   const laneX = (l) => l * RN.LW;
   const TRACK_W = RN.LW * 3 + 0.6 + (W.edge || 0) * 2, X0 = -TRACK_W / 2, X1 = TRACK_W / 2;
-  const level = () => Math.max(1, o.level() || 1);
+  const level = () => 1 + Math.floor(S.ok / 5); // Schwierigkeit der Strecke (alle 5 richtigen etwas mehr)
 
   function addSeg(d0, d1, h0, h1 = h0, plat = false) {
     const s = { d0, d1, h0, h1, plat };
@@ -473,7 +473,7 @@ async function runnerStart(host, opts) {
   function plan() {
     while (genD < S.d + RN.AHEAD) {
       const lv = level();
-      const v = o.speed(lv);
+      const v = o.speed(S.ok);
       const gap = v * R(1.25, 1.75) * (lv > 3 ? 0.9 : 1);
       const d = genD;
       // Tor fällig?
@@ -488,7 +488,7 @@ async function runnerStart(host, opts) {
       if (d < clearUntil) { flat(d, clearUntil); genD = clearUntil; continue; }
       const room = nextGate - 14 - d;
       const pick = weighted([
-        ['low', 3], ['high', 2.2], ['over', W.obstacles.over ? 2 : 0], ['blocks', 2.4], ['mix', lv > 1 ? 2 : 0.6],
+        ['low', 3], ['high', 2.4], ['blocks', 2.4], ['mix', lv > 1 ? 2 : 0.6],
         ['plat', room > 44 && !W.noPlat ? 2.2 : 0], ['ditch', room > 24 ? (W.gapsOften ? 3 : 1.4) : 0], ['gems', 1.2],
       ]);
       let end;
@@ -541,7 +541,7 @@ async function runnerStart(host, opts) {
   }
   function mix(at) {
     // zwei Reihen kurz hintereinander, immer schaffbar
-    const a = shuffle2(['low', 'high', W.obstacles.over ? 'over' : 'low'])[0];
+    const a = shuffle2(['low', 'high', 'low'])[0];
     const l1 = Math.floor(R(-1, 2));
     addObs(a, l1, at - 5);
     const l2 = [-1, 0, 1].filter((l) => l !== l1)[Math.floor(Math.random() * 2)];
@@ -622,6 +622,7 @@ async function runnerStart(host, opts) {
     elAsk.classList.add(ok ? 'ok' : 'bad');
     if (g.q.solved) elQ.innerHTML = g.q.solved;
     if (ok) {
+      S.ok++;
       sound('tone', [880, 1175, 1568], 0.08, 'triangle', 0.08);
       burst(laneX(lane), S.y + 1.6, -g.d, 0x86efac, 26);
       S.boost = 1.2; fig.setMood('win'); setTimeout(() => fig.setMood(''), 900);
@@ -769,7 +770,7 @@ async function runnerStart(host, opts) {
   plan();
   scenery();
   for (const s of segs) if (s.d1 < 40) { /* Anlauf ist schon gebaut */ }
-  S.base = o.speed(level());
+  S.base = o.speed(0);
   fig.setAnim('idle');
   $h('rnload')?.remove();
   // Countdown
@@ -813,7 +814,7 @@ async function runnerStart(host, opts) {
 
   function step(dt) {
     // Tempo: Grundtempo aus dem Level, kurz langsamer nach einem Treffer, kurz schneller nach richtiger Antwort
-    const target = S.started && !S.over ? o.speed(level()) : 0;
+    const target = S.started && !S.over ? o.speed(S.ok) : 0;
     S.base += (target - S.base) * (1 - Math.exp(-dt * (S.started ? 1.5 : 6)));
     S.slow = Math.max(0, S.slow - dt);
     S.boost = Math.max(0, (S.boost || 0) - dt);
@@ -822,11 +823,12 @@ async function runnerStart(host, opts) {
     S.inv = Math.max(0, S.inv - dt);
     fig.setRate(S.speed / 9.5);
 
+    if (S.over && S.endWhy === 'fall') { S.vy -= RN.G * dt; S.y = Math.max(S.lastGh - 12, S.y + S.vy * dt); }
     if (S.respawn) {
       S.respawn.t -= dt;
       S.vy -= RN.G * dt; S.y += S.vy * dt; S.d += S.speed * 0.25 * dt;
       if (S.respawn.t <= 0) {
-        S.d = S.respawn.d; S.y = (groundBase(S.d) ?? 0) + 2.5; S.vy = 0; S.ground = false; S.respawn = null; S.inv = 2.2;
+        S.d = S.respawn.d; S.y = (groundBase(S.d) ?? 0) + 2.5; S.lastGh = groundBase(S.d) ?? 0; S.vy = 0; S.ground = false; S.respawn = null; S.inv = 2.2;
         fig.setAnim('leap');
       }
     } else if (S.started && !S.over) {
@@ -837,6 +839,7 @@ async function runnerStart(host, opts) {
       // senkrecht
       S.slide = Math.max(0, S.slide - dt);
       const gh = groundAt(S.d, S.x, S.y);
+      if (S.ground) S.lastGh = S.y;
       if (S.ground) {
         if (gh == null) { S.ground = false; S.vy = 0; }
         else if (gh < S.y - 0.25) { S.ground = false; S.vy = 0; } // Kante: runterfallen
@@ -849,8 +852,10 @@ async function runnerStart(host, opts) {
       }
       if (S.ground && fig.anim === 'slide' && S.slide <= 0) fig.setAnim('run');
       if (S.ground && fig.anim === 'leap') fig.setAnim('run');
-      // runtergefallen?
-      if (!S.ground && S.y < (W.fallY ?? -1.4) && groundBase(S.d) == null) fall();
+      // runtergefallen? Über einer Lücke unter die Kante gesunken oder unter die nächste Platte geraten → weg
+      // (nur beim Fallen und nur gegenüber der Grundbahn – Blöcke zählen nicht, sonst gäbe es Fehlalarm beim Hochspringen)
+      const gb0 = groundBase(S.d);
+      if (!S.ground && S.vy <= 0 && ((gb0 == null && S.y < S.lastGh - 0.45) || (gb0 != null && S.y < gb0 - 0.3))) fall();
       // Hindernisse
       const h = S.slide > 0 ? RN.H_SLIDE : RN.H_STAND;
       for (const ob of obs) {
@@ -880,6 +885,8 @@ async function runnerStart(host, opts) {
         g.gone = true; g.idx.forEach((k) => gatePool.hide(k)); g.labels.forEach((m) => { m.visible = false; });
       }
       elDist.textContent = Math.floor(S.d);
+      const kmh = Math.round(S.base * 3.6);
+      if (elSpeed.textContent !== String(kmh)) { elSpeed.textContent = kmh; }
     }
     // aufräumen und weiterbauen
     while (segs.length && segs[0].d1 < S.d - RN.BEHIND) { const s = segs.shift(); scene.remove(s.mesh); s.mesh.geometry.dispose(); }
@@ -911,17 +918,19 @@ async function runnerStart(host, opts) {
     // Figur
     figWrap.position.set(S.x, S.y, -S.d);
     figWrap.rotation.z = (laneX(S.lane) - S.x) * 0.08;
-    figWrap.visible = !(S.inv > 0 && Math.floor(S.inv * 10) % 2 === 0 && !S.respawn);
+    const sunk = (S.respawn || S.endWhy === 'fall') && S.y < S.lastGh - 1.6; // im Abgrund verschwunden
+    figWrap.visible = !sunk && !(S.inv > 0 && Math.floor(S.inv * 10) % 2 === 0 && !S.respawn);
     fig.update(dt);
     const gb = groundAt(S.d, S.x, S.y);
-    blob.visible = gb != null && S.y - gb < 4;
+    blob.visible = gb != null && S.y - gb < 4 && !sunk && !((S.respawn || S.endWhy === 'fall') && S.y < S.lastGh - 0.3);
     if (gb != null) { blob.position.set(S.x, gb + 0.02, -S.d); const k = rnClamp(1 - (S.y - gb) / 4, 0.3, 1); blob.scale.setScalar(k); blob.material.opacity = 0.28 * k; }
     // Kamera: hinter der Figur, folgt weich in der Höhe
-    const camYT = (S.respawn ? S.y + 3 : Math.max(S.y, gb ?? S.y)) + (camera.aspect < 0.8 ? 3.3 : 2.9);
+    const falling = S.respawn || S.endWhy === 'fall';
+    const camYT = (falling ? S.lastGh : Math.max(S.y, gb ?? S.y)) + (camera.aspect < 0.8 ? 3.3 : 2.9);
     S.camY += (camYT - S.camY) * (1 - Math.exp(-dt * 4));
     if (Math.abs(camYT - S.camY) > 2.2) S.camY = camYT - Math.sign(camYT - S.camY) * 2.2; // nie unter den Weg
     const back = camera.aspect < 0.8 ? 7.4 : 6.2;
-    if (S.finishing) {
+    if (S.finishing && S.endWhy !== 'fall') {
       S.finT = (S.finT || 0) + dt;
       const a = Math.min(1, S.finT / 1.6), ang = a * Math.PI * 0.85;
       camera.position.set(S.x + Math.sin(ang) * 4.6, S.y + 2.2 - a * 0.6, -S.d + Math.cos(ang) * 4.6);
@@ -945,7 +954,7 @@ async function runnerStart(host, opts) {
 
   function end(why = '') {
     if (S.over) return;
-    S.over = true;
+    S.over = true; S.endWhy = why;
     elAsk.hidden = true;
     const sad = ['crash', 'fall', 'wrong'].includes(why);
     fig.setAnim(sad ? 'oops' : 'cheer');
