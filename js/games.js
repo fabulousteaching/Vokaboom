@@ -1150,7 +1150,8 @@ function startRunnerGame(set) {
     <div class="seg rn-lives" role="group" aria-label="Leben">${[[3, '❤❤❤ 3 Leben'], [1, '❤ Ein Leben']].map(([n, t]) => `<button class="seg-btn" data-action="rn-lives" data-n="${n}" aria-pressed="${runnerLives() === n}">${t}</button>`).join('')}</div>
     <p class="muted">Oben steht ein deutsches Wort${set.noPics ? '' : ' oder ein Bild'}. Lauf durch den Bogen mit dem richtigen Wort! Jedes richtige Wort macht dich ein bisschen schneller.
       ${runnerLives() === 1 ? 'Mit einem Leben ist beim ersten Fehler, Hindernis oder Absturz Schluss.' : 'Ein falsches Wort, ein Hindernis oder ein Absturz kostet ein Leben.'}<br>
-      Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen.</p>
+      Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen, <b>↓</b> rutschen.<br>
+      Mit der Zeit kommt Neues: hohe Wände (<b>↑↑</b> Doppelsprung), Löcher, rollende Fässer, nur noch eine Spur mit Kurven (<b>← →</b> rechtzeitig abbiegen). Auf einer Spur stehen die Wörter übereinander: oben = springen, Mitte = weiterlaufen, unten = rutschen.</p>
     <div class="row center"><button class="btn primary big" data-action="rn-go">🏃 Los!</button>
       ${isKid() && typeof renderWorld3D === 'function' ? '<button class="btn ghost" data-action="avatar-open">🧍 Avatar gestalten</button>' : ''}</div>
   </div>` : `<div class="test-card"><p class="lead">Dieses Spiel braucht 3D-Grafik. Auf diesem Gerät geht das leider nicht – probier ein anderes Spiel!</p>

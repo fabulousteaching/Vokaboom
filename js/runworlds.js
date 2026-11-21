@@ -112,6 +112,30 @@ function rwRayTex(T, rgb, top = 0) {
   }, { repeat: false });
 }
 
+/* ---------------- Hindernisse, die später dazukommen ---------------- */
+/** hohe Wand (nur mit Doppelsprung): gestreift, mit leuchtenden Doppelpfeilen ⏫ */
+function rwTall({ post, panel, panel2, accent = 0x22d3ee }) {
+  return { u: 0.08, iter: 2, field: 1.0, yt: RN.TALL, cap: 16, build(B) {
+    const H = Math.round(RN.TALL / 0.08);
+    for (const sx of [-11, 11]) { B.box(sx - 1, 0, -1, sx + 1, H + 1, 1, post); B.ell(sx, H + 2.5, 0, 1.6, 1.6, 1.6, accent, { mat: 2 }); }
+    B.box(-10, 3, 0, 10, H, 0, (x, y) => (Math.floor((x + 40 + y) / 4) % 2 ? panel : panel2));
+    for (const oy of [H - 11, H - 5]) for (let k = 0; k <= 5; k++) for (const dy of [0, 1]) { B.put(-k, oy + 5 - k - dy, 1, accent, 2); B.put(k, oy + 5 - k - dy, 1, accent, 2); }
+    return B;
+  } };
+}
+/** Rollendes Hindernis (wandert quer über die Spuren). kind: barrel | ball | spool | crab */
+function rwRoller(kind, c1, c2 = 0x3b2a1a) {
+  return { u: 0.06, iter: 3, field: 1.1, yt: RN.LOW, cap: 12, noRoll: kind === 'crab', r: 0.31, build(B) {
+    if (kind === 'barrel') { B.tube('z', -6, 6, 0, 5, (z) => 5 + Math.sin(((z + 6) / 12) * Math.PI) * 0.6, (x, y, z) => (Math.abs(z) === 4 ? c2 : rnShade(c1, (vxRand(x, y, Math.floor(z / 3)) - 0.5) * 0.15))); B.tube('z', -6, -6, 0, 5, 4.5, rnShade(c1, -0.2)); }
+    else if (kind === 'ball') { for (let k = 0; k < 40; k++) { const a = k * 2.4, e = Math.asin(1 - (2 * (k + 0.5)) / 40); B.bar([0, 5, 0], [Math.cos(a) * Math.cos(e) * 5.5, 5 + Math.sin(e) * 5.5, Math.sin(a) * Math.cos(e) * 5.5], 0.5, k % 2 ? c1 : c2); } B.ell(0, 5, 0, 3.5, 3.5, 3.5, rnShade(c1, -0.25)); }
+    else if (kind === 'spool') { B.tube('z', -6, 6, 0, 5, (z) => (Math.abs(z) >= 5 ? 5.4 : 3.6), (x, y, z) => (Math.abs(z) >= 5 ? c2 : ((x + y) % 3 === 0 ? rnShade(c1, -0.2) : c1))); }
+    else { // Krabbe
+      B.ell(0, 4, 0, 6, 3, 4.5, c1); for (const sx of [-1, 1]) { B.ell(sx * 8, 6, 2, 2.4, 2, 2, c1); B.put(sx * 9, 7, 4, 0xffffff, 1); B.bar([sx * 4, 3, 0], [sx * 9, 0, -1], 0.6, c2); B.bar([sx * 4, 3, -2], [sx * 9, 0, -4], 0.6, c2); B.bar([sx * 2, 6, 3], [sx * 2, 9, 4], 0.5, c2); B.ell(sx * 2, 9.5, 4, 1, 1, 1, 0x111111, { mat: 1 }); }
+    }
+    return B;
+  } };
+}
+
 /* ---------------- gemeinsame Teile ---------------- */
 /** Ring aus Kugeln um einen Pfosten (Blumen, Ranken) */
 function rwFlowers(B, pts, cols, r = 1.3) { pts.forEach(([x, y, z], i) => { const c = cols[i % cols.length]; B.ell(x, y, z, r, r, r, c); B.put(x, y, z + (z >= 0 ? 1 : -1), 0xffe066); }); }
@@ -156,7 +180,7 @@ const RW_JUNGLE = (() => {
         for (const [x, y, z, r] of [[0, 36, 0, 6], [4, 33, 2, 4.5], [-4, 34, -2, 4.5]]) B.ell(x, y, z, r, r * 0.55, r, leafC);
         return B;
       } },
-      arch: { u: 0.3, iter: 3, field: 1.2, build(B) {
+      arch: { u: 0.3, iter: 3, field: 1.2, span: true, build(B) {
         // riesiger Ast, der sich über den Weg spannt
         const pts = []; for (let i = 0; i <= 16; i++) { const t = i / 16, a = Math.PI * t; pts.push([-28 * Math.cos(a), Math.sin(a) * 30 + (t < 0.5 ? 0 : 0), Math.sin(a * 2) * 2]); }
         B.curve(pts, (t) => 2.3 - Math.sin(t * Math.PI) * 0.9, bark);
@@ -165,7 +189,7 @@ const RW_JUNGLE = (() => {
         for (const i of [3, 4, 12, 13]) { const [x, y, z] = pts[i]; B.curve([[x, y - 1, z], [x + 0.5, y - 6, z + 0.5], [x, y - 11, z]], 0.5, 0x4a7a2a); }
         return B;
       } },
-      canopy: { u: 0.5, iter: 2, field: 1.0, build(B) {
+      canopy: { u: 0.5, iter: 2, field: 1.0, span: true, build(B) {
         for (const [x, y, z, r] of [[0, 0, 0, 7], [6, 1, 3, 5], [-6, 0, -2, 5.5], [2, 1, -6, 4.5], [-3, 1, 6, 4.5]]) B.ell(x, y, z, r, r * 0.42, r, leafC);
         return B;
       } },
@@ -257,6 +281,7 @@ const RW_JUNGLE = (() => {
       } },
     },
     obstacles: {
+      tall: rwTall({ post: 0x6b4f35, panel: 0xb7c95a, panel2: 0x7d8a34, accent: 0x22d3ee }), roller: rwRoller('barrel', 0x8b5a2b, 0x4f7a2a),
       // umgestürzter Baumstamm (springen)
       low: { u: 0.1, iter: 3, field: 1.1, yt: RN.LOW, cap: 24, build(B) {
         B.tube('x', -8, 8, 0, 3, (a) => 3 - Math.abs(a) * 0.02, bark);
@@ -330,9 +355,9 @@ const RW_JUNGLE = (() => {
         if (ctx.ground(d + 4) != null) ctx.put('rope', sg * 3.45, H + 1.05, d, 0, 1);
       }
     },
-    onGap(ctx, d0, d1) { ctx.put('lily', RT.rnd(-2, 2), -1.36, (d0 + d1) / 2, RT.rnd(0, 6.3), 1); },
+    onGap(ctx, d0, d1) { ctx.put('lily', RT.rnd(-2, 2), SY + 0.07, (d0 + d1) / 2, RT.rnd(0, 6.3), 1); },
     extras(ctx) {
-      const { T, scene } = ctx;
+      const { T } = ctx; const scene = ctx.fx;
       // Lichtstrahlen durchs Blätterdach
       const rayTex = rwRayTex(T, '255,250,210', 1);
       const rayMat = new T.MeshBasicMaterial({ map: rayTex, transparent: true, opacity: 0.38, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, fog: false });
@@ -502,7 +527,7 @@ const RW_ROOFS = (() => {
       solar: { u: 0.08, iter: 1, field: 0.8, build(B) { for (let z = -12; z <= 12; z++) for (let x = -10; x <= 10; x++) B.put(x, 6 + Math.round(z * 0.35), z, (x % 5 === 0 || z % 6 === 0) ? 0xc9ced6 : 0x1e3a6e, 1); B.box(-9, 0, 10, -8, 10, 11, 0x9aa0a8); B.box(8, 0, 10, 9, 10, 11, 0x9aa0a8); return B; } },
       pigeon: { u: 0.03, iter: 3, field: 1.2, build(B) { B.ell(0, 5, 0, 4, 3.5, 6, 0x8e96a3); B.ell(0, 9, -5, 2.6, 2.6, 2.6, 0x6f7887); B.put(0, 9, -8, 0xf2a33a); B.ell(0, 5, 6, 2, 1.2, 3, 0x5c6470); B.put(-1, 10, -7, 0x111111); B.put(1, 10, -7, 0x111111); B.box(-1, 0, 0, -1, 2, 0, 0xe58a6a); B.box(1, 0, 0, 1, 2, 0, 0xe58a6a); return B; } },
       lamp: { u: 0.07, iter: 2, field: 0.9, cap: 12, build(B) { B.cyl(0, 0, 0, 72, 1.1, 0x2f3440, { mat: 3 }); B.ell(0, 74, 0, 2.5, 2.5, 2.5, 0xfff1b8, { mat: 2 }); return B; } },
-      lights: { u: 0.06, iter: 1, field: 0.7, project: false, lod: false, cap: 8, build(B) {
+      lights: { u: 0.06, iter: 1, field: 0.7, project: false, lod: false, cap: 8, span: true, build(B) {
         const pts = []; for (let i = 0; i <= 16; i++) { const t = i / 16; pts.push([-75 + t * 150, -Math.sin(t * Math.PI) * 9, 0]); }
         B.curve(pts, 0.4, 0x222222);
         for (let i = 1; i < 16; i++) { const [x, y] = pts[i]; B.ell(x + 4, y - 2, 0, 1.4, 1.8, 1.4, [0xffd36b, 0xff6b9a, 0x6bd8ff, 0x9bff6b][i % 4], { mat: 2 }); }
@@ -510,6 +535,7 @@ const RW_ROOFS = (() => {
       } },
     },
     obstacles: {
+      tall: rwTall({ post: 0x2f3440, panel: 0xfacc15, panel2: 0x1f2430, accent: 0xff3da8 }), roller: rwRoller('spool', 0xf97316, 0x7c4a1c),
       low: { u: 0.1, iter: 2, field: 1.0, yt: RN.LOW, cap: 24, build(B) {
         B.tube('x', -8, 8, 0, 3, 2.9, metal(0xb7bcc4), { mat: 3 });
         for (const x of [-8, -3, 3, 8]) B.tube('x', x, x, 0, 3, 3.4, 0x8c939c, { mat: 3 });
@@ -549,7 +575,7 @@ const RW_ROOFS = (() => {
     } },
     scatter(ctx, d0, d1) {
       const R = RT.rnd, P = ctx.put;
-      const g = (d) => ctx.ground(d);
+      const g = (d, lat = 3) => ctx.ground(d, lat);
       for (const sg of [-1, 1]) {
         // Nachbarhäuser (Dächer tiefer oder höher), dahinter die Skyline
         const kinds = ['bldA', 'bldB', 'bldC', 'bldD'];
@@ -557,21 +583,21 @@ const RW_ROOFS = (() => {
         { const k = kinds[Math.floor(Math.random() * 4)]; P(k, sg * R(26, 44), R(-4, 16) - BLD[k].h, R(d0, d1), 0, 1); }
         { const k = kinds[Math.floor(Math.random() * 4)]; P(k, sg * R(55, 120), R(8, 40) - BLD[k].h, R(d0, d1), 0, R(1, 1.6)); }
         // auf dem eigenen Dach: Brüstung und Dinge am Rand
-        for (let d = Math.ceil(d0 / 4) * 4; d < d1; d += 4) if (g(d) === 0 && g(d + 2) === 0 && g(d - 2) === 0) P('parapet', sg * 4.75, 0, d, 0, 1);
+        for (let d = Math.ceil(d0 / 4) * 4; d < d1; d += 4) if (g(d, sg * 3) === 0 && g(d + 2, sg * 3) === 0 && g(d - 2, sg * 3) === 0) P('parapet', sg * 4.75, 0, d, 0, 1);
         const dd = R(d0, d1);
-        if (g(dd) === 0 && Math.random() < 0.55) {
+        if (g(dd, sg * 3) === 0 && Math.random() < 0.55) {
           const k = ['ac', 'ac', 'antenna', 'chimney', 'plant', 'solar', 'tank'][Math.floor(Math.random() * 7)];
           P(k, sg * R(3.9, 4.3), 0, dd, k === 'solar' ? (sg > 0 ? -Math.PI / 2 : Math.PI / 2) : R(0, 6.3), k === 'tank' ? 0.55 : 1);
         }
-        if (Math.random() < 0.25 && g(dd + 2) === 0) P('pigeon', sg * 4.75, 0.55, dd + 2, R(0, 6.3), 1);
+        if (Math.random() < 0.25 && g(dd + 2, sg * 3) === 0) P('pigeon', sg * 4.75, 0.55, dd + 2, R(0, 6.3), 1);
       }
       const ds = R(d0, d1);
-      if (Math.random() < 0.18 && g(ds) === 0) P(['signA', 'signB', 'signC'][Math.floor(Math.random() * 3)], (Math.random() < 0.5 ? -1 : 1) * 4.1, 0, ds, 0, 1);
-      if (Math.floor(d0 / 10) % 3 === 0 && g(d0 + 5) === 0) { P('lamp', -4.4, 0, d0 + 5, 0, 1); P('lamp', 4.4, 0, d0 + 5, 0, 1); P('lights', 0, 5.3, d0 + 5, 0, 1); }
+      if (Math.random() < 0.18 && g(ds, 3) === 0 && g(ds, -3) === 0) P(['signA', 'signB', 'signC'][Math.floor(Math.random() * 3)], (Math.random() < 0.5 ? -1 : 1) * 4.1, 0, ds, 0, 1);
+      if (Math.floor(d0 / 10) % 3 === 0 && g(d0 + 5, 3) === 0 && g(d0 + 5, -3) === 0) { P('lamp', -4.4, 0, d0 + 5, 0, 1); P('lamp', 4.4, 0, d0 + 5, 0, 1); P('lights', 0, 5.3, d0 + 5, 0, 1); }
     },
     onPlatform(ctx, d0, d1, H) { for (let d = d0 + 8; d < d1 - 2; d += 4) if (ctx.ground(d) === H && ctx.ground(d + 2) === H && ctx.ground(d - 2) === H) for (const sg of [-1, 1]) ctx.put('parapet', sg * 4.75, H, d, 0, 1); },
     extras(ctx) {
-      const { T, scene } = ctx;
+      const { T } = ctx; const scene = ctx.fx;
       // tiefe Sonne mit Schein
       const sunTex = rnGlowTex(T, 'rgba(255,240,200,1)', 'rgba(255,170,100,0)');
       const sunS = new T.Sprite(new T.SpriteMaterial({ map: sunTex, transparent: true, depthWrite: false, fog: false }));
@@ -641,7 +667,7 @@ const RW_DESERT = (() => {
         for (const [x, z] of [[1, 1], [-1, 1], [0, -1]]) B.ell(tx + x, ty - 2, z, 1.3, 1.3, 1.3, 0x8a4a1f);
         return B;
       } },
-      arch: { u: 0.4, iter: 3, field: 1.3, cap: 4, build(B) {
+      arch: { u: 0.4, iter: 3, field: 1.3, cap: 4, span: true, build(B) {
         const st = cliffC;
         for (let a = 0; a <= 180; a += 3) { const r = a * Math.PI / 180, cx = -Math.cos(r) * 22, cy = Math.sin(r) * 21; const k = a > 50 && a < 130 ? 5 : 6.5 + Math.abs(90 - a) * 0.02; B.ell(cx, cy, 0, k, k, 6, st, { keep: (x, y) => y >= 0 }); }
         B.ell(-22, 0, 0, 8.5, 9, 7.5, st, { keep: (x, y) => y >= 0 }); B.ell(22, 0, 0, 8.5, 9, 7.5, st, { keep: (x, y) => y >= 0 });
@@ -677,6 +703,7 @@ const RW_DESERT = (() => {
       bush: { u: 0.06, iter: 2, field: 0.8, project: false, build(B) { for (let k = 0; k < 14; k++) { const a = k * 2.4, e = 0.3 + (k % 3) * 0.3; B.bar([0, 0, 0], [Math.cos(a) * 9 * Math.cos(e), 3 + Math.sin(e) * 8, Math.sin(a) * 9 * Math.cos(e)], 0.6, k % 2 ? 0x9a8a5a : 0x7d8a4a); } return B; } },
     },
     obstacles: {
+      tall: rwTall({ post: 0x8a6238, panel: 0xe6c28c, panel2: 0xc8764a, accent: 0x2dd4bf }), roller: rwRoller('ball', 0xb08a52, 0x7a5a32),
       low: { u: 0.1, iter: 3, field: 1.1, yt: RN.LOW, cap: 24, build(B) { B.tube('x', -8, 8, 0, 3, 3, (x, y, z) => (x % 5 === 0 ? 0xc49a62 : stone(0xdcb27a)(x, y, z))); B.ell(-8, 1, 0, 2, 1.5, 2.5, 0xe8c07a); return B; } },
       high: { u: 0.07, iter: 2, field: 1.0, yt: RN.HIGH, cap: 24, build(B) {
         B.box(-12, 0, -3, 12, 14, 3, stone(0xd6a66c));
@@ -730,7 +757,7 @@ const RW_DESERT = (() => {
       if (Math.floor(d0 / 10) % 9 === 4) P('arch', 0, SY, (d0 + d1) / 2, 0, 1);
     },
     extras(ctx) {
-      const { T, scene } = ctx;
+      const { T } = ctx; const scene = ctx.fx;
       const sunTex = rnGlowTex(T, 'rgba(255,255,240,1)', 'rgba(255,240,200,0)');
       const sunS = new T.Sprite(new T.SpriteMaterial({ map: sunTex, transparent: true, depthWrite: false, fog: false })); sunS.scale.set(60, 60, 1); scene.add(sunS); ctx.own.push(sunTex, sunS.material);
       const n = 200, pos = new Float32Array(n * 3);
@@ -836,13 +863,13 @@ const RW_CASTLE = (() => {
         return B;
       } },
       tree: { u: 0.2, iter: 3, field: 1.2, build(B) { B.cyl(0, 0, 0, 16, 1.6, wood(0x6b4f35)); B.ell(0, 22, 0, 9, 8, 9, (x, y, z) => rnShade(0x4c8a35, (vxRand(Math.floor(x / 3), Math.floor(y / 3), Math.floor(z / 3), 1) - 0.5) * 0.25)); return B; } },
-      bunting: { u: 0.06, iter: 1, field: 0.7, project: false, lod: false, cap: 8, build(B) {
+      bunting: { u: 0.06, iter: 1, field: 0.7, project: false, lod: false, cap: 8, span: true, build(B) {
         const pts = []; for (let i = 0; i <= 16; i++) { const t = i / 16; pts.push([-125 + t * 250, -Math.sin(t * Math.PI) * 14, 0]); }
         B.curve(pts, 0.35, 0x5b4636);
         for (let i = 0; i < 40; i++) { const t = (i + 0.5) / 40, x = -125 + t * 250, y = -Math.sin(t * Math.PI) * 14; for (let k = 0; k < 6; k++) for (let j = -3 + Math.ceil(k / 2); j <= 3 - Math.ceil(k / 2); j++) B.put(x + j, y - 1 - k, 0, [0xd62f4b, 0xffd23f, 0x2f5bd6, 0x1f8a4c][i % 4]); }
         return B;
       } },
-      gatehouse: { u: 0.3, iter: 2, field: 1.0, cap: 4, build(B) {
+      gatehouse: { u: 0.3, iter: 2, field: 1.0, cap: 4, span: true, build(B) {
         for (const sx of [-1, 1]) B.box(sx * 14 - 4, 0, -5, sx * 14 + 4, 28, 5, wallC);
         for (let x = -18; x <= 18; x++) for (let y = 18; y <= 28; y++) { if (Math.abs(x) < 10 && y < 18 + Math.sqrt(Math.max(0, 100 - x * x)) * 0.6) continue; B.box(x, y, -5, x, y, 5, wallC(x, y, 0)); }
         for (let x = -18; x <= 18; x += 3) B.box(x, 29, -5, x + 1, 31, 5, wallC);
@@ -854,6 +881,7 @@ const RW_CASTLE = (() => {
       merlon: { u: 0.1, iter: 2, field: 0.9, lod: false, cap: 40, build(B) { B.box(-2, 0, -6, 2, 5, 6, wallC); B.box(-2, 5, -6, 2, 9, -2, wallC); B.box(-2, 5, 2, 2, 9, 6, wallC); return B; } },
     },
     obstacles: {
+      tall: rwTall({ post: 0x5b3a1e, panel: 0xd62f4b, panel2: 0xffd23f, accent: 0x7dd3fc }), roller: rwRoller('barrel', 0x9a6a3a, 0x3a3a3a),
       low: { u: 0.08, iter: 3, field: 1.2, yt: RN.LOW, cap: 24, build(B) { B.rbox(-10, 0, -4, 10, 7, 4, rwPatch(0xe0c060, 0.1, 2), { p: 5 }); for (const x of [-5, 5]) B.box(x, 0, -4, x, 7, 4, 0x9a7a3a); return B; } },
       high: { u: 0.07, iter: 2, field: 0.9, yt: RN.HIGH, cap: 24, build(B) {
         for (const sx of [-11, 11]) B.box(sx - 1, 0, -1, sx + 1, 15, 1, wood(0x6b4a2c));
@@ -908,7 +936,7 @@ const RW_CASTLE = (() => {
     },
     onPlatform(ctx, d0, d1, H) { for (let d = d0 + 7; d < d1 - 1; d += 1.6) if (ctx.ground(d) === H) for (const sg of [-1, 1]) ctx.put('merlon', sg * 3.5, H, d, 0, 1); },
     extras(ctx) {
-      const { T, scene } = ctx;
+      const { T } = ctx; const scene = ctx.fx;
       const cTex = rnCanvasTex(T, 256, 128, (g, w) => { for (let i = 0; i < 12; i++) { const x = 40 + Math.random() * (w - 80), y = 50 + Math.random() * 40, r = 22 + Math.random() * 30; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); } }, { repeat: false });
       const cMat = new T.SpriteMaterial({ map: cTex, transparent: true, depthWrite: false, fog: false, opacity: 0.9 }); ctx.own.push(cTex, cMat);
       const clouds = []; for (let i = 0; i < 9; i++) { const s = new T.Sprite(cMat); s.scale.set(RT.rnd(50, 90), RT.rnd(20, 34), 1); scene.add(s); clouds.push({ s, x: RT.rnd(-150, 150), y: RT.rnd(45, 85), d: RT.rnd(80, 240) }); }
@@ -978,11 +1006,12 @@ const RW_SEA = (() => {
         B.cut((x, y, z) => z > 12 && y > 4 && x > 0);
         return B;
       } },
-      arch: { u: 0.35, iter: 3, field: 1.3, cap: 4, build(B) { for (let a = 0; a <= 180; a += 3) { const r = a * Math.PI / 180; B.ell(-Math.cos(r) * 20, Math.sin(r) * 19, 0, 3.6, 3.6, 4, algae(0x5d6f7a)); } for (let k = 0; k < 18; k++) { const r = (k / 17) * Math.PI; B.ell(-Math.cos(r) * 20, Math.sin(r) * 19 + 3.5, 0, 1.6, 1.6, 1.6, CORAL[k % CORAL.length]); } return B; } },
+      arch: { u: 0.35, iter: 3, field: 1.3, cap: 4, span: true, build(B) { for (let a = 0; a <= 180; a += 3) { const r = a * Math.PI / 180; B.ell(-Math.cos(r) * 20, Math.sin(r) * 19, 0, 3.6, 3.6, 4, algae(0x5d6f7a)); } for (let k = 0; k < 18; k++) { const r = (k / 17) * Math.PI; B.ell(-Math.cos(r) * 20, Math.sin(r) * 19 + 3.5, 0, 1.6, 1.6, 1.6, CORAL[k % CORAL.length]); } return B; } },
       seaweed: { u: 0.05, iter: 2, field: 0.8, project: false, build(B) { for (let k = 0; k < 9; k++) { const a = k * 0.7, r = 2 + (k % 3); const pts = []; for (let i = 0; i <= 6; i++) pts.push([Math.cos(a) * r + Math.sin(i + k) * 1.5, i * 4, Math.sin(a) * r]); B.curve(pts, 0.8, k % 2 ? 0x3f9a5a : 0x7dbf4a); } return B; } },
       tube: { u: 0.05, iter: 2, field: 1.0, build(B) { for (const [x, z, h, c] of [[0, 0, 18, 0xffb02e], [5, 2, 12, 0xff6f91], [-4, 3, 14, 0xb06bff], [2, -5, 9, 0xffd166]]) { B.cyl(x, z, 0, h, 2.2, c); B.cyl(x, z, h - 3, h, 1.2, 0x2a1a33); } return B; } },
     },
     obstacles: {
+      tall: rwTall({ post: 0x5d6f7a, panel: 0xff7eb6, panel2: 0xb06bff, accent: 0xfff07a }), roller: rwRoller('crab', 0xef4444, 0xb91c1c),
       low: { u: 0.08, iter: 3, field: 1.0, yt: RN.LOW, cap: 24, build(B) { B.rbox(-10, 0, -3, 10, 3, 3, algae(0x6b7d86), { p: 4 }); for (let x = -9; x <= 9; x += 3) B.ell(x, 5, 0, 1.8, 2.6, 1.8, CORAL[(x + 9) % CORAL.length]); return B; } },
       high: { u: 0.07, iter: 2, field: 1.1, yt: RN.HIGH, cap: 24, build(B) {
         B.rbox(-12, 0, -4, 12, 12, 4, algae(0x5d6f7a), { p: 4 });
@@ -1039,7 +1068,7 @@ const RW_SEA = (() => {
       wrap.add(h); ctx.own.push(m, h.geometry);
     },
     extras(ctx) {
-      const { T, scene } = ctx;
+      const { T } = ctx; const scene = ctx.fx;
       // Lichtflecken von oben
       const rayTex = rwRayTex(T, '200,245,255', 0);
       const rayMat = new T.MeshBasicMaterial({ map: rayTex, transparent: true, opacity: 0.3, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide, fog: false });

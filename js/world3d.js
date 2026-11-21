@@ -433,7 +433,7 @@ async function w3StageStart(page, pre) {
     if (st.dead) return;
     st.raf = requestAnimationFrame(loop);
     if (document.hidden) { st.last = now; return; }
-    const dt = Math.min(0.05, (now - st.last) / 1000); st.last = now; st.t += dt;
+    const dt = Math.max(0, Math.min(0.05, (now - st.last) / 1000)); st.last = now; st.t += dt;
     const v = st.view;
     if (st.animUntil && now > st.animUntil) w3PlayAnim('idle');
     if (gar) {
