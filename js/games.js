@@ -1136,22 +1136,49 @@ document.addEventListener('change', (e) => {
 
 /* =========================================================
    Welten-Lauf (3D, mit dem eigenen Avatar; Spiel in js/runner3d.js, Welten in js/runworlds.js – gleich wie in Teilmal)
-   Oben steht das deutsche Wort (oder das Bild). Drei Bögen mit Wörtern: durch den richtigen laufen.
-   3 Leben: ein falsches Wort, ein Hindernis oder ein Sturz in eine Lücke kostet eines. Alle 5 richtigen wird es schneller.
+   Oben steht das deutsche Wort (oder das Bild). Drei schwebende Wort-Blasen: durch die richtige laufen.
+   3 Leben (oder eines): ein falsches Wort, ein Hindernis oder ein Absturz kostet eines. Jedes richtige Wort macht schneller.
+   Die Start-Stufe (wie früh die schwierigeren Hindernisse kommen) richtet sich danach, wie gut das Kind die Wörter kann.
    ========================================================= */
 const runnerLives = () => (db.settings.runLives === 1 ? 1 : 3);
 const runnerWorld = () => ((typeof RUN_WORLD_INFO === 'object' && RUN_WORLD_INFO.some((w) => w.id === db.settings.runWorld)) ? db.settings.runWorld : 'jungle');
+/**
+ * Start-Stufe aus dem Übungsstand der Wörter: Quote aller bisherigen Antworten und Anteil sicherer Wörter
+ * (im Wiederholen-Kasten ab Fach 3 oder zuletzt richtig und selten falsch). Nie leichter als Stufe 1.
+ */
+const RUN_SKILL_MIN = 20;
+function runnerSkill(set) {
+  const words = gameWords(set), P = set.progress?.words || {};
+  let n = 0, bad = 0, sure = 0;
+  for (const w of words) {
+    const s = P[w.id];
+    if (!s?.n) continue;
+    n += s.n; bad += s.bad || 0;
+    if ((s.box || 0) >= 3 || (s.n >= 2 && s.last === 'correct' && (s.bad || 0) / s.n < 0.34)) sure++;
+  }
+  const quote = n ? 1 - bad / n : 0, sureF = words.length ? sure / words.length : 0;
+  let stage = 1;
+  if (n >= RUN_SKILL_MIN) {
+    if (quote >= 0.95 && sureF >= 0.85) stage = 5;
+    else if (quote >= 0.9 && sureF >= 0.65) stage = 4;
+    else if (quote >= 0.85 && sureF >= 0.45) stage = 3;
+    else if (quote >= 0.75 && sureF >= 0.25) stage = 2;
+  }
+  return { stage, quote, sure: sureF, n, start: (typeof W3_RUN_START === 'object' ? W3_RUN_START : [0, 4, 8, 12, 16])[stage - 1] };
+}
 function startRunnerGame(set) {
   const gl = typeof w3WebGL === 'function' && w3WebGL();
+  const sk = runnerSkill(set), pct = (x) => `${Math.round(x * 100)} %`;
+  const why = sk.n < RUN_SKILL_MIN ? 'Je besser du die Wörter kannst, desto anspruchsvoller startet der Lauf.'
+    : `Beim Üben sind ${pct(sk.quote)} deiner Antworten richtig, ${pct(sk.sure)} der Wörter sitzen sicher. ${sk.stage > 1 ? 'Darum kommen schon früh schwierigere Hindernisse.' : 'Der Lauf startet gemütlich – so kannst du dich auf die Wörter konzentrieren.'}`;
   $('#view').innerHTML = gameShell('Welten-Lauf', gl ? `<div class="test-card setup choose-card rn-setup">
     <h2>Wo willst du rennen?</h2>
     ${w3RunWorldsHTML(runnerWorld(), 'rn-world')}
     <h2>Wie viele Leben?</h2>
     <div class="seg rn-lives" role="group" aria-label="Leben">${[[3, '❤❤❤ 3 Leben'], [1, '❤ Ein Leben']].map(([n, t]) => `<button class="seg-btn" data-action="rn-lives" data-n="${n}" aria-pressed="${runnerLives() === n}">${t}</button>`).join('')}</div>
-    <p class="muted">Oben steht ein deutsches Wort${set.noPics ? '' : ' oder ein Bild'}. Lauf durch den Bogen mit dem richtigen Wort! Jedes richtige Wort macht dich ein bisschen schneller.
-      ${runnerLives() === 1 ? 'Mit einem Leben ist beim ersten Fehler, Hindernis oder Absturz Schluss.' : 'Ein falsches Wort, ein Hindernis oder ein Absturz kostet ein Leben.'}<br>
-      Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen, <b>↓</b> rutschen.<br>
-      Mit der Zeit kommt Neues: hohe Wände (<b>↑↑</b> Doppelsprung), Löcher, rollende Fässer, nur noch eine Spur mit Kurven (<b>← →</b> rechtzeitig abbiegen). Auf einer Spur stehen die Wörter übereinander: oben = springen, Mitte = weiterlaufen, unten = rutschen.</p>
+    <p class="muted">Oben steht ein deutsches Wort${set.noPics ? '' : ' oder ein Bild'}. Lauf durch die Blase mit dem richtigen Wort! Jedes richtige Wort macht dich ein bisschen schneller.
+      ${runnerLives() === 1 ? 'Mit einem Leben ist beim ersten Fehler, Hindernis oder Absturz Schluss.' : 'Ein falsches Wort, ein Hindernis oder ein Absturz kostet ein Leben.'}</p>
+    ${typeof w3RunStartHTML === 'function' ? w3RunStartHTML(sk.stage, why) + w3RunRulesHTML('Wort') : ''}
     <div class="row center"><button class="btn primary big" data-action="rn-go">🏃 Los!</button>
       ${isKid() && typeof renderWorld3D === 'function' ? '<button class="btn ghost" data-action="avatar-open">🧍 Avatar gestalten</button>' : ''}</div>
   </div>` : `<div class="test-card"><p class="lead">Dieses Spiel braucht 3D-Grafik. Auf diesem Gerät geht das leider nicht – probier ein anderes Spiel!</p>
@@ -1175,6 +1202,7 @@ async function runnerBegin(set) {
     hint: 'Lauf durch das richtige Wort',
     sound: db.settings.sound !== false,
     gateEvery: 84,
+    startLevel: runnerSkill(set).start, // wer die Wörter schon gut kann, bekommt früher schwierigere Hindernisse
     speed: (n) => Math.min(13, 8.2 + n * 0.15), // jedes richtige Wort ein bisschen schneller
     ask: () => {
       const w = pickNext(G.s.pk);
@@ -1188,7 +1216,6 @@ async function runnerBegin(set) {
       if (ok) {
         G.s.score++;
         if (G.s.score % 5 === 0) G.s.level++;
-        try { speak(gameForm(q.w), set.lang); } catch { /* */ }
         upd();
         return {};
       }

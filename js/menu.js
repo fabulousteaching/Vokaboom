@@ -131,14 +131,14 @@ const menuCoinHint = (pc) => `1 richtige Antwort = 1 Punkt (Lernkarten ½). Eine
 function menuSectionHTML(sec) {
   const s = db.settings;
   const needLogin = (what) => `<div class="menu-empty">${icon('user')}<p>${what} gibt es mit einem Konto für Lehrpersonen.</p>
-    <button type="button" class="btn primary" data-action="login-choose">Anmelden oder Konto erstellen</button></div>`;
+    <button type="button" class="btn primary" data-action="login" data-mode="login">Als Lehrperson anmelden</button></div>`;
   const seg = (action, attr, val, items) => `<div class="seg" role="group">${items.map(([v, t]) => `<button type="button" class="seg-btn" data-action="${action}" data-${attr}="${v}" aria-pressed="${String(val) === String(v)}">${t}</button>`).join('')}</div>`;
   switch (sec) {
     case 'konto':
       if (!cloud.user) {
         return `<p class="muted">Du bist nicht angemeldet. Alle Vokabeln und Ergebnisse werden nur in diesem Browser gespeichert.</p>
           <div class="menu-cards">
-            <button type="button" class="menu-card" data-action="login-choose">${icon('user')}<strong>Anmelden</strong><small>Lehrperson: Portionen im Konto speichern, Klassen und Kinder-Logins, Live-Spiele mit Namen.</small></button>
+            <button type="button" class="menu-card" data-action="login" data-mode="login">${icon('user')}<strong>Als Lehrperson anmelden</strong><small>Portionen im Konto speichern, Klassen und Kinder-Logins, Live-Spiele mit Namen. Noch kein Konto? Im nächsten Fenster registrieren.</small></button>
             <button type="button" class="menu-card" data-action="kid-login">${icon('image')}<strong>Kinder-Login</strong><small>Mit Benutzername und Bilder-Passwort vom Kärtchen.</small></button>
           </div>`;
       }

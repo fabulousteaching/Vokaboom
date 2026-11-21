@@ -388,6 +388,29 @@ function w3LoadRunner() {
 function w3RunWorldsHTML(cur, action = 'run-world') {
   return `<div class="rn-worlds" role="radiogroup" aria-label="Welt">${RUN_WORLD_INFO.map((w) => `<button type="button" class="rn-world w-${w.id}" data-action="${action}" data-v="${w.id}" role="radio" aria-checked="${w.id === cur}"><span class="e" aria-hidden="true">${w.emoji}</span><b>${w.name}</b><small>${w.desc}</small></button>`).join('')}</div>`;
 }
+/** Start-Stufe des Welten-Laufs (1–5 Sterne) mit Begründung. Die Stufe rechnet jedes Tool aus seinem Trainingsstand aus. */
+const W3_RUN_START = [0, 4, 8, 12, 16]; // Stufe 1–5 → so viele «richtige Antworten» hat die Strecke schon beim Start
+function w3RunStartHTML(stage, text) {
+  const st = Math.max(1, Math.min(5, stage || 1));
+  return `<div class="rn-start"><span class="rn-stars" aria-hidden="true">${'★'.repeat(st)}<i>${'★'.repeat(5 - st)}</i></span><div><b>Start-Stufe ${st} von 5</b><small>${text}</small></div></div>`;
+}
+/** Regeln und Hindernisse (aufklappbar auf der Startkarte). what: «Ergebnis» bzw. «Wort» */
+function w3RunRulesHTML(what = 'Ergebnis') {
+  const R = [
+    ['🕹️', 'Steuern', 'Wischen oder Pfeiltasten: <b>← →</b> Spur wechseln, <b>↑</b> springen, in der Luft nochmals <b>↑</b> = Doppelsprung, <b>↓</b> rutschen (in der Luft: schnell landen).'],
+    ['🫧', 'Antwort-Blasen', `Über jeder Spur schwebt eine Blase: Lauf unter der mit dem richtigen ${what} durch. Jede richtige Antwort macht dich ein bisschen schneller.`],
+    ['↕️', 'Blasen auf nur einer Spur', 'Die Antworten schweben übereinander: <b>oben</b> = springen, <b>Mitte</b> = weiterlaufen, <b>unten</b> = rutschen.'],
+    ['🚧', 'Hürden und Absperrungen', 'drüber springen'],
+    ['🧱', 'Blöcke', 'ausweichen, hinaufspringen oder über die Rampe hinauf und oben weiterrennen'],
+    ['🕳️', 'Abgründe und Löcher', 'drüber springen – wer hineinfällt, verliert ein Leben'],
+    ['⏫', 'Hohe Wände', 'zu hoch für einen Sprung: Doppelsprung!'],
+    ['🛢️', 'Rollende Fässer', 'rollen quer über die Spuren: drüber springen oder ausweichen'],
+    ['🛣️', 'Schmale Strasse', 'manchmal gibt es nur zwei Spuren oder nur eine'],
+    ['↪️', 'Kurven', 'rechtzeitig nach links oder rechts wischen – sonst prallst du in die Leitwand (ein Leben weg)'],
+    ['💎', 'Kristalle', 'unterwegs einsammeln'],
+  ];
+  return `<details class="rn-rules"><summary>📖 Regeln und Hindernisse</summary><ul>${R.map(([e, t, d]) => `<li><span aria-hidden="true">${e}</span><div><b>${t}</b> ${d}</div></li>`).join('')}</ul><p class="muted small">Neue Hindernisse kommen nach und nach dazu – ohne Ankündigung. Probier aus, was sie können!</p></details>`;
+}
 /** Avatar-Baukasten (js/avatar3d.js) und – wo es das Rennen gibt – Karts im Avatar-Stil (js/kartvox.js) erst bei Bedarf laden */
 function w3LoadEngine() {
   if (typeof vxFigure === 'function' && (typeof kartVoxModel === 'function' || !w3Garage())) return Promise.resolve();

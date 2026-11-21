@@ -4,10 +4,12 @@
  * Drei Spuren. Wischen oder Pfeiltasten: ← → Spur wechseln, ↑ springen (in der Luft nochmals ↑: Doppelsprung),
  * ↓ rutschen (in der Luft: schnell runter). Hindernisse: Hürde und Absperrung (drüber springen), lange Blöcke
  * (ausweichen oder über die Rampe hinauf), erhöhte Wege mit Lücken und Gräben (drüber springen). Mit der Zeit kommt
- * Neues dazu (je nach Anzahl richtiger Antworten): Löcher in einzelnen Spuren, hohe Wände (Doppelsprung), nur noch
- * zwei Spuren, rollende Hindernisse und einspurige Strecken mit Kurven (← → zum Abbiegen). Regelmässig kommt ein Tor
- * mit drei Bögen: durch den Bogen mit der richtigen Antwort laufen. Auf einspurigen Strecken stehen die Antworten
- * übereinander: oben (springen), Mitte (weiterlaufen), unten (rutschen).
+ * ohne Ankündigung Neues dazu (je nach richtigen Antworten, plus Start-Stufe opts.startLevel aus dem Trainingsstand):
+ * Löcher in einzelnen Spuren, hohe Wände (Doppelsprung), nur noch zwei Spuren, rollende Hindernisse und einspurige
+ * Strassen durchs Land mit Kurven (← → zum Abbiegen; verpasst = in die Kurven-Leitwand). Wer auf einer Spur läuft,
+ * die endet, wird auf die Strasse geschoben. Regelmässig kommt ein Tor mit drei Bögen: durch den Bogen mit der
+ * richtigen Antwort laufen. Auf einspurigen Strecken stehen die Antworten übereinander: oben (springen), Mitte
+ * (weiterlaufen), unten (rutschen).
  *
  * Das Tool (Teilmal/Vokaboom) gibt die Fragen und entscheidet über Leben, Punkte und das Ende:
  *   const run = await runnerStart(host, {
@@ -15,7 +17,7 @@
  *     ask: () => ({ html, answers: ['42', '48', '36'], correct: 0, data }),   // nächste Frage
  *     onAnswer: (ok, q, lane) => ({ over }),         // Antwort am Tor
  *     onHit: (kind) => ({ over }),                   // Hindernis getroffen ('crash') oder hinuntergefallen ('fall')
- *     gateEvery: 70, speed: (lv) => …, level: () => 1, hudHTML: '…', sound: true,
+ *     gateEvery: 70, speed: (n) => …, startLevel: 0..16, hudHTML: '…', sound: true,
  *   });
  *   run.finish() – Lauf beenden (Jubel), run.dispose()
  */
@@ -184,6 +186,28 @@ function rnLabelTex(T, text, { bg = '#ffffff', fg = '#14213d', border = '#f5b301
     g.fillText(t, w / 2, h / 2 + fs * 0.06);
   }, { repeat: false });
 }
+/** Antwort-Blase im Stil der Fragekarte: dunkles Glas, weisse Schrift, farbiger Schimmer (accent) */
+function rnBubbleTex(T, text, { accent = '#a78bfa', dim = false, w = 640, h = 256 } = {}) {
+  return rnCanvasTex(T, w, h, (g) => {
+    const r = h / 2 - 18;
+    g.save(); g.shadowColor = accent; g.shadowBlur = 28; g.fillStyle = 'rgba(15, 23, 42, .9)'; rnRound(g, 18, 18, w - 36, h - 36, r); g.fill(); g.restore();
+    const gr = g.createLinearGradient(0, 18, 0, h - 18);
+    gr.addColorStop(0, 'rgba(76, 64, 196, .97)'); gr.addColorStop(1, 'rgba(15, 23, 42, .95)');
+    g.fillStyle = gr; rnRound(g, 18, 18, w - 36, h - 36, r); g.fill();
+    const hl = g.createLinearGradient(0, 22, 0, h * 0.55); hl.addColorStop(0, 'rgba(255, 255, 255, .3)'); hl.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    g.fillStyle = hl; rnRound(g, 34, 24, w - 68, h * 0.4, r - 16); g.fill();
+    g.lineWidth = 7; g.strokeStyle = accent; rnRound(g, 21, 21, w - 42, h - 42, r - 3); g.stroke();
+    g.lineWidth = 2.5; g.strokeStyle = 'rgba(255, 255, 255, .5)'; rnRound(g, 30, 30, w - 60, h - 60, r - 12); g.stroke();
+    g.fillStyle = dim ? 'rgba(255, 255, 255, .5)' : '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.shadowColor = 'rgba(0, 0, 0, .5)'; g.shadowBlur = 10; g.shadowOffsetY = 3;
+    const t = String(text);
+    let fs = 146;
+    const font = (sz) => `900 ${sz}px "Baloo 2", "Nunito", system-ui, sans-serif`;
+    g.font = font(fs);
+    while (fs > 34 && g.measureText(t).width > w - 120) { fs -= 6; g.font = font(fs); }
+    g.fillText(t, w / 2, h / 2 + fs * 0.05);
+  }, { repeat: false });
+}
 function rnRound(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
 /* ---------------- Platten (Boden, Rampen, erhöhte Wege) mit Texturen in Weltgrösse ---------------- */
@@ -271,13 +295,12 @@ async function runnerStart(host, opts) {
     <div class="rn-top"><div class="rn-host">${o.hudHTML || ''}</div>
       <div class="rn-stats"><span class="rn-gems" title="Gesammelte Kristalle"><i>💎</i><b id="rngems">0</b></span><span class="rn-speed" title="Tempo – jede richtige Antwort macht dich ein bisschen schneller">⚡ <b id="rnspeed">0</b> km/h</span><span class="rn-dist"><b id="rndist">0</b> m</span></div></div>
     <div class="rn-ask" id="rnask" hidden><small id="rnhint">${esc2(o.hint || 'Lauf durch das richtige Ergebnis')}</small><div class="rn-q" id="rnq"></div><i class="rn-bar"><b id="rnbar"></b></i></div>
-    <div class="rn-new" id="rnnew" hidden><b>Neu!</b><span></span></div>
     <div class="rn-count" id="rncount"></div>
     <div class="rn-help" id="rnhelp"><span><b>← →</b> Spur</span><span><b>↑</b> springen</span><span><b>↓</b> rutschen</span><small>Wischen oder Pfeiltasten</small></div>
     <div class="rn-flash" id="rnflash"></div>
     <div class="rn-load" id="rnload"><span class="spinner big"></span><p>${esc2(W.name)} wird gebaut …</p></div>`;
   const $h = (id) => host.querySelector('#' + id);
-  const elSpeed = $h('rnspeed'), elAsk = $h('rnask'), elQ = $h('rnq'), elBar = $h('rnbar'), elNew = $h('rnnew'), elHint = $h('rnhint'), elGems = $h('rngems'), elDist = $h('rndist'), elCount = $h('rncount'), elFlash = $h('rnflash');
+  const elSpeed = $h('rnspeed'), elAsk = $h('rnask'), elQ = $h('rnq'), elBar = $h('rnbar'), elHint = $h('rnhint'), elGems = $h('rngems'), elDist = $h('rndist'), elCount = $h('rncount'), elFlash = $h('rnflash');
   await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30))); // Ladeanzeige zeigen, bevor gebaut wird
 
   /* Renderer */
@@ -350,7 +373,6 @@ async function runnerStart(host, opts) {
       obsGeo[k] = g;
     } catch (e) { console.warn('Hindernis', k, e); }
   }
-  const gateGeo = ownGeo(rnGeo(T, W.gate.build(rnBuilder(), ctx), W.gate));
   console.info(`Welten-Lauf: ${W.id} in ${Math.round(performance.now() - t0)} ms gebaut`);
   // Wie viele Teile pro Art gleichzeitig sichtbar sind: Probelauf der Verteilung über 400 m
   const SCN_AHEAD = (W.fogFar ?? 120) + 12, NEAR = 40, BACK = 10;
@@ -372,7 +394,6 @@ async function runnerStart(host, opts) {
   }
   const obsPools = {};
   for (const [k, g] of Object.entries(obsGeo)) obsPools[k] = rnPool(T, scene, g, mats, W.obstacles[k].cap || 24, { shadow: true });
-  const gatePool = rnPool(T, scene, gateGeo, mats, 12, { shadow: true });
 
   /* Boden: Texturen */
   const groundTop = rnCanvasTex(T, 512, 512, W.ground.top);
@@ -447,7 +468,7 @@ async function runnerStart(host, opts) {
     d: 0, x: 0, lane: 0, y: 0, vy: 0, ground: true, ok: 0, lastGh: 0, endWhy: '', slide: 0, speed: 0, base: 0, slow: 0, inv: 0, gems: 0,
     over: false, finishing: false, started: false, respawn: null, camY: 2.5, shake: 0, dbl: false, flip: 0, miss: null, head: 0,
   };
-  const segs = [], obs = [], gates = [], gems = [], pits = [], signs = [], intros = [];
+  const segs = [], obs = [], gates = [], gems = [], pits = [], signs = [], shoulders = [];
   let genD = 0;             // so weit ist geplant
   let nextGate = 55;        // erstes Tor
   let clearUntil = 30;      // Anlauf ohne Hindernisse
@@ -456,31 +477,35 @@ async function runnerStart(host, opts) {
   const R = (a, b) => a + Math.random() * (b - a);
   const laneX = (l) => l * RN.LW;
   const HW1 = RN.LW / 2 + 0.3; // halbe Breite eines einspurigen Wegs
-  const level = () => 1 + Math.floor(S.ok / 5);
-  // Neues kommt nach und nach dazu (Anzahl richtige Antworten)
+  // Schwierigkeit der Strecke: richtige Antworten + Start-Stufe (wer im Training schon sicher rechnet, startet weiter vorne)
+  const SK = rnClamp(Math.round(o.startLevel || 0), 0, 30);
+  const okL = () => S.ok + SK;
+  const level = () => 1 + Math.floor(okL() / 5);
+  // Neues kommt nach und nach dazu (ohne Ankündigung – die Kinder merken selbst, was es kann)
   const UNLOCK = { holes: 3, tall: 6, narrow: 9, roller: 12, single: 15, ...(o.unlock || {}) };
-  const unlocked = (k) => S.ok >= UNLOCK[k];
-  const INTRO = {
-    holes: 'Löcher im Weg! Spring drüber oder weich aus.',
-    tall: 'Hohe Wand ⏫ – zweimal nach oben wischen: Doppelsprung!',
-    narrow: 'Nur noch zwei Spuren – bleib auf dem Weg!',
-    roller: 'Rollende Hindernisse! Spring drüber oder weich aus.',
-    single: 'Nur noch eine Spur! In Kurven ← → wischen. Antworten: ▲ springen · ● laufen · ▼ rutschen',
-  };
-  const introSeen = new Set();
-  const intro = (key, d) => { if (!introSeen.has(key)) { introSeen.add(key); intros.push({ d, text: INTRO[key], shown: false }); } };
+  const unlocked = (k) => okL() >= UNLOCK[k];
   const xRange = (la, lb) => [laneX(la) - RN.LW / 2 - 0.3 - (la === -1 ? W.edge || 0 : 0), laneX(lb) + RN.LW / 2 + 0.3 + (lb === 1 ? W.edge || 0 : 0)];
 
-  function addSeg(d0, d1, h0, h1 = h0, plat = false, la = -1, lb = 1) {
-    const s = { d0, d1, h0, h1, plat, la, lb };
+  function addSeg(d0, d1, h0, h1 = h0, plat = false, la = -1, lb = 1, road = false) {
+    const s = { d0, d1, h0, h1, plat, la, lb, road };
     const L = legAt(d0 + 0.01); s.leg = L;
-    const [x0, x1] = xRange(la, lb);
+    const [x0, x1] = xRange(la, lb); s.x0 = x0; s.x1 = x1;
     const geo = rnSlab(T, d0 - L.d0, d1 - L.d0, x0, x1, h0, h1, plat ? Math.min(h0, h1) - 0.55 : (W.ground.bottom ?? -3), 4);
     s.mesh = new T.Mesh(geo, plat ? ctx.mats.plat : ctx.mats.ground);
     s.mesh.position.set(L.x, 0, L.z); s.mesh.rotation.y = L.th;
     s.mesh.receiveShadow = true; s.mesh.castShadow = plat;
     scene.add(s.mesh); segs.push(s);
     return s;
+  }
+  /** Gelände neben einer schmalen Strasse, wo es kein Gelände gibt (Dächer): etwas tiefer, nicht begehbar */
+  const HWF = RN.LW * 1.5 + 0.3 + (W.edge || 0);
+  function addShoulder(d0, d1, L) {
+    if (W.side) return; // Gelände ist schon da
+    const h = -0.32 - (shoulders.length % 3) * 0.025; // leicht versetzt: kein Flimmern, wo sich zwei überlappen
+    const geo = rnSlab(T, d0 - L.d0, d1 - L.d0, -HWF, HWF, h, h, W.ground.bottom ?? -3, 4);
+    const m = new T.Mesh(geo, ctx.mats.ground);
+    m.position.set(L.x, 0, L.z); m.rotation.y = L.th; m.receiveShadow = true;
+    scene.add(m); shoulders.push({ d1, m });
   }
   /** Abgrund (dunkel bzw. Wasser) auf Höhe des Geländes: zeigt Lücken und fehlende Spuren */
   const pitHex = '#' + new T.Color(W.pit.color).getHexString();
@@ -496,16 +521,32 @@ async function runnerStart(host, opts) {
     g.position.set(L.x, W.side.y + 0.015 + (pits.length % 4) * 0.012, L.z); g.rotation.y = L.th; // leicht versetzt: kein Flimmern, wo sich zwei überlappen
     scene.add(g); pits.push({ d1, g, m });
   }
-  /** Schild über dem Weg (Warnung oder Abbiege-Pfeil) */
-  const signGeo = ownGeo(new T.PlaneGeometry(1.3, 1.3));
-  const signTex = {};
-  const mkSign = (txt, bg, fg) => signTex[txt] || (signTex[txt] = rnCanvasTex(T, 256, 256, (g, w) => { g.fillStyle = bg; rnRound(g, 8, 8, w - 16, w - 16, 48); g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 14; rnRound(g, 22, 22, w - 44, w - 44, 36); g.stroke(); g.fillStyle = fg; g.font = '900 160px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, w / 2, w / 2 + 10); }, { repeat: false }));
-  function addSign(d, lat, y, txt, bg = '#ef4444', fg = '#ffffff', size = 1) {
-    const mat = new T.MeshBasicMaterial({ map: mkSign(txt, bg, fg), transparent: true });
-    const m = new T.Mesh(signGeo, mat); m.scale.setScalar(size);
-    const L = legAt(d - 0.01);
-    wposL(L, d, lat, y, m.position); m.rotation.y = L.th;
-    scene.add(m); signs.push({ d, m });
+  /** Kurven-Leitwand: steht geradeaus hinter der Ecke, Pfeile zeigen, wohin es geht */
+  const chevTex = {};
+  const chevMat = (dir) => {
+    if (chevTex[dir]) return chevTex[dir];
+    const t = rnCanvasTex(T, 512, 160, (g, w, h) => {
+      g.fillStyle = '#facc15'; rnRound(g, 0, 0, w, h, 22); g.fill();
+      g.fillStyle = '#1f2937'; rnRound(g, 10, 10, w - 20, h - 20, 16); g.fill();
+      g.fillStyle = '#facc15';
+      for (let k = 0; k < 4; k++) { // Pfeil «<» bzw. «>»: Spitze in Kurvenrichtung
+        const sg = dir > 0 ? 1 : -1, cx = 74 + k * 121 - sg * 17, X = (dx) => cx + sg * dx;
+        g.beginPath(); g.moveTo(X(28), 26); g.lineTo(X(-28), h / 2); g.lineTo(X(28), h - 26); g.lineTo(X(62), h - 26); g.lineTo(X(6), h / 2); g.lineTo(X(62), 26); g.closePath(); g.fill();
+      }
+    }, { repeat: false });
+    own.push(t);
+    return (chevTex[dir] = new T.MeshStandardMaterial({ map: t, roughness: 0.5, emissive: 0x222200, emissiveMap: t, emissiveIntensity: 0.6 }));
+  };
+  const boardGeo = ownGeo(new T.BoxGeometry(3.2, 1.0, 0.12));
+  const postGeo = ownGeo(new T.CylinderGeometry(0.07, 0.07, 1.9, 10));
+  const postMat = new T.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.4, metalness: 0.6 }); own.push(postMat);
+  function addBarrier(L, d, dir) {
+    const g = new T.Group();
+    const b = new T.Mesh(boardGeo, [postMat, postMat, postMat, postMat, chevMat(dir), postMat]); b.position.y = 1.15; b.castShadow = true; g.add(b);
+    for (const sx of [-1.35, 1.35]) { const p2 = new T.Mesh(postGeo, postMat); p2.position.set(sx, 0.95, -0.08); p2.castShadow = true; g.add(p2); }
+    wposL(L, d, 0, 0, g.position); g.rotation.y = L.th;
+    scene.add(g); signs.push({ d, m: g });
+    return g;
   }
   function addObs(kind, lane, d, len = 0) {
     const def = W.obstacles[kind];
@@ -518,7 +559,6 @@ async function runnerStart(host, opts) {
     ob.i = pool.add(...wposL(L, d, ob.x, ob.base + (obsCY[kind] || 0)).toArray(), L.th + (def.ry ?? 0), 1);
     ob.pool = pool; ob.th = L.th; ob.def = def;
     obs.push(ob);
-    if (INTRO[kind]) intro(kind, d);
     return ob;
   }
   function addGems(lane, d0, n, arc = null, up = 0) {
@@ -534,11 +574,10 @@ async function runnerStart(host, opts) {
   /** Bodenhöhe der Grundbahn an der Stelle d (in der Spur von x; x = null: irgendwo), null = Lücke */
   function groundBase(d, x = null) {
     let best = null;
-    const l = x == null ? null : rnClamp(Math.round(x / RN.LW), -1, 1);
     for (let i = segs.length - 1; i >= 0; i--) {
       const s = segs[i];
       if (d < s.d0 || d > s.d1) continue;
-      if (l != null && (l < s.la || l > s.lb || Math.abs(x) > RN.LW * 1.5 + 0.4)) continue;
+      if (x != null && (x < s.x0 - 0.15 || x > s.x1 + 0.15)) continue;
       const h = s.h0 + (s.h1 - s.h0) * ((d - s.d0) / Math.max(0.001, s.d1 - s.d0));
       if (best == null || h > best) best = h;
     }
@@ -546,7 +585,7 @@ async function runnerStart(host, opts) {
   }
   /** Bodenhöhe für die Figur: Grundbahn oder Dach eines Blocks / Rampe in dieser Spur */
   function groundAt(d, x, y) {
-    if (S.miss) return d < S.miss.c.d + HW1 ? groundBase(S.miss.c.d - 0.5, 0) : null; // Kurve verpasst: geradeaus ins Leere
+    if (S.miss) return groundBase(S.miss.c.d - 0.5, 0); // Kurve verpasst: geradeaus bis an die Leitwand
     let h = groundBase(d, x);
     const l = rnLane(x);
     for (const ob of obs) {
@@ -558,6 +597,8 @@ async function runnerStart(host, opts) {
   }
   /** Welche Spuren gibt es an der Stelle d? */
   function lanesAt(d) { let a = 9, b = -9; for (const s of segs) if (d >= s.d0 && d <= s.d1) { a = Math.min(a, s.la); b = Math.max(b, s.lb); } return a > b ? null : [a, b]; }
+  /** Schmale Strasse an der Stelle d: welche Spuren hat sie? (null = normale Bahn) */
+  function roadAt(d) { for (const s of segs) if (s.road && d >= s.d0 && d <= s.d1) return [s.la, s.lb]; return null; }
 
   /* Bauplan erweitern: Muster nacheinander */
   function plan() {
@@ -663,7 +704,6 @@ async function runnerStart(host, opts) {
     const free = [-1, 0, 1].filter((l) => !hole.includes(l));
     addGems(hole[0], d + 6 - 2.6, 4, [d + 6 - 2.6, d + 6 + w + 2.6]);
     if (free.length) addGems(free[0], d + 2, 4);
-    intro('holes', d + 6);
     addSeg(d + 6 + w, d + 14 + w, 0, 0, false);
     return d + 14 + w;
   }
@@ -672,9 +712,8 @@ async function runnerStart(host, opts) {
     const keep = Math.random() < 0.5 ? [-1, 0] : [0, 1], gone = keep[0] === -1 ? 1 : -1;
     const L = Math.min(room - 16, R(36, 56));
     flat(d, d + 7);
-    addSign(d + 1.5, laneX(gone), 2.2, '✕');
-    addSeg(d + 7, d + 7 + L, 0, 0, false, keep[0], keep[1]);
-    addPit(d + 7, d + 7 + L, laneX(gone) - RN.LW / 2 - 0.3 - (W.edge || 0), laneX(gone) + RN.LW / 2 + 0.3);
+    addSeg(d + 7, d + 7 + L, 0, 0, false, keep[0], keep[1], true);
+    addShoulder(d + 7, d + 7 + L, legAt(d + 8));
     // Hindernisse in den zwei Spuren (immer schaffbar)
     let z = d + 18;
     while (z < d + 7 + L - 8) {
@@ -683,7 +722,6 @@ async function runnerStart(host, opts) {
       else { const n = k === 'low' && Math.random() < 0.5 ? 2 : 1; shuffle2([...keep]).slice(0, n).forEach((l) => addObs(k, l, z)); }
       z += o.speed(S.ok) * R(1.3, 1.8);
     }
-    intro('narrow', d + 7);
     addSeg(d + 7 + L, d + 15 + L, 0, 0, false);
     return d + 15 + L;
   }
@@ -703,20 +741,21 @@ async function runnerStart(host, opts) {
   function single(d) {
     const dir = Math.random() < 0.5 ? 1 : -1;
     flat(d, d + 7);
-    for (const l of [-1, 1]) addSign(d + 1.5, laneX(l), 2.2, '✕');
     const c1 = d + 26, g = Math.max(nextGate, c1 + 32), c2 = g + 20, e = c2 + 16; // nach Wand/Hürde genug Zeit bis zum Tor
-    const one = (a, b) => { addSeg(a, b, 0, 0, false, 0, 0); for (const l of [-1, 1]) addPit(a, b, laneX(l) - RN.LW / 2 - 0.3 - (W.edge || 0), laneX(l) + RN.LW / 2 + 0.3 + (W.edge || 0)); };
+    const one = (a, b) => addSeg(a, b, 0, 0, false, 0, 0, true);
     one(d + 7, c1 + HW1);
+    addShoulder(d + 7, c1 + HWF, legAt(d + 8));
     addTurn(c1, dir);
     one(c1 + HW1, c2 + HW1);
+    addShoulder(c1 - HWF, c2 + HWF, legAt(c1 + 1));
     addTurn(c2, -dir);
     one(c2 + HW1, e);
+    addShoulder(c2 - HWF, e, legAt(c2 + 1));
     addObs('low', 0, d + 16);
     addObs(unlocked('tall') && Math.random() < 0.5 ? 'tall' : 'high', 0, c1 + 8);
     addObs('low', 0, c2 + 9);
     addGems(0, c1 + 3, 3); addGems(0, g + 5, 4);
     addVGate(g);
-    intro('single', d + 7);
     nextGate = e + gateEvery() * 0.8;
     flat(e, e + 8);
     return e + 8;
@@ -728,10 +767,7 @@ async function runnerStart(host, opts) {
     legs.push(nl);
     const c = { d: dc, dir, turned: false, done: false };
     corners.push(c);
-    addSign(dc + HW1 + 0.4, 0, 1.6, dir > 0 ? '◀' : '▶', '#f59e0b', '#ffffff', 1.4);
-    // Schild steht im alten Abschnitt hinter der Ecke (dort, wo man geradeaus hinausfallen würde)
-    const sg = signs[signs.length - 1]; wposL(L, dc + HW1 + 0.4, 0, 1.6, sg.m.position); sg.m.rotation.y = L.th; c.sign = sg.m;
-    addPit(dc + HW1, dc + HW1 + 2.4, -3.4, 3.4, L); // geradeaus geht es nicht weiter
+    c.sign = addBarrier(L, dc + HW1 + 0.25, dir); // geradeaus geht es nicht weiter
   }
   function platform(d, room = 60) {
     flat(d, d + 3);
@@ -757,33 +793,44 @@ async function runnerStart(host, opts) {
     addSeg(z, z + 10, 0, 0, false);
     return z + 10;
   }
+  /* Tore: schwebende Antwort-Blasen (keine Bögen), am Boden ein leuchtender Streifen, wo die Antwort zählt */
+  const bubbleGeo = ownGeo(new T.PlaneGeometry(1.94, 0.776));
+  const ACC = W.gate.border || '#a78bfa';
+  const blankTex = rnBubbleTex(T, '?', { accent: ACC, dim: true });
+  own.push(blankTex);
+  const lineGeo3 = ownGeo(new T.PlaneGeometry(RN.LW * 3 + 0.2, 0.22)), lineGeo1 = ownGeo(new T.PlaneGeometry(RN.LW + 0.4, 0.22));
+  const lineMat = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false });
+  own.push(lineMat);
+  function bubble(L, d, lat, y, sc = 1) {
+    const m = new T.Mesh(bubbleGeo, new T.MeshBasicMaterial({ map: blankTex, transparent: true, fog: false, depthWrite: false }));
+    m.scale.setScalar(sc); m.renderOrder = 6;
+    wposL(L, d, lat, y, m.position); m.rotation.y = L.th; Object.assign(m.userData, { L, d, lat, y, sc });
+    scene.add(m);
+    return m;
+  }
+  function gateLine(L, d, geo) {
+    const m = new T.Mesh(geo, lineMat);
+    m.rotation.order = 'YXZ'; m.rotation.set(-Math.PI / 2, L.th, 0);
+    wposL(L, d, 0, 0.035, m.position);
+    scene.add(m);
+    return m;
+  }
   function addGate(d) {
     const L = legAt(d);
-    const g = { d, q: null, passed: false, idx: [], labels: [], vert: false };
-    for (let l = -1; l <= 1; l++) g.idx.push(gatePool.add(...wposL(L, d, laneX(l), 0).toArray(), L.th, 1));
-    for (let l = -1; l <= 1; l++) {
-      const m = new T.Mesh(labelGeo, new T.MeshBasicMaterial({ map: blankTex, transparent: true, fog: true }));
-      wposL(L, d - 0.08, laneX(l), W.gate.labelY ?? 2.55, m.position); m.rotation.y = L.th;
-      scene.add(m); g.labels.push(m);
-    }
+    const g = { d, q: null, passed: false, labels: [], vert: false };
+    for (let l = -1; l <= 1; l++) g.labels.push(bubble(L, d - 0.08, laneX(l), (W.gate.labelY ?? 2.55) - 0.2));
+    g.line = gateLine(L, d, lineGeo3);
     gates.push(g);
   }
   /** Tor auf der einspurigen Strecke: Antworten oben (springen), Mitte (weiterlaufen), unten (rutschen) */
-  const VY = [2.42, 1.42, 0.5];
+  const VY = [2.45, 1.5, 0.55], VMID = 1.5;
   function addVGate(d) {
     const L = legAt(d);
-    const g = { d, q: null, passed: false, idx: [gatePool.add(...wposL(L, d, 0, 0).toArray(), L.th, 1)], labels: [], vert: true };
-    for (let k = 0; k < 3; k++) {
-      const m = new T.Mesh(labelGeo, new T.MeshBasicMaterial({ map: blankTex, transparent: true, fog: true }));
-      m.scale.setScalar(0.92);
-      wposL(L, d - 0.08, 0, VY[k], m.position); m.rotation.y = L.th;
-      scene.add(m); g.labels.push(m);
-    }
+    const g = { d, q: null, passed: false, labels: [], vert: true };
+    for (let k = 0; k < 3; k++) g.labels.push(bubble(L, d - 0.08, 0, VY[k], 0.9));
+    g.line = gateLine(L, d, lineGeo1);
     gates.push(g);
   }
-  const labelGeo = ownGeo(new T.PlaneGeometry(1.62, 0.81));
-  const blankTex = rnLabelTex(T, '?', { bg: '#ffffff', fg: '#9aa3b5', border: W.gate.border || '#f5b301' });
-  own.push(blankTex);
   const shuffle2 = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   /* Frage an das nächste Tor hängen */
@@ -794,7 +841,7 @@ async function runnerStart(host, opts) {
     q.answers.forEach((a, i) => {
       const m = g.labels[i];
       const txt = g.vert ? `${['▲ ', '', '▼ '][i]}${a}` : a;
-      m.material.map = rnLabelTex(T, txt, { border: g.vert ? ['#22c55e', W.gate.border || '#f5b301', '#3b82f6'][i] : W.gate.border || '#f5b301', fg: W.gate.fg || '#14213d' });
+      m.material.map = rnBubbleTex(T, txt, { accent: g.vert ? ['#22c55e', ACC, '#38bdf8'][i] : ACC });
       m.material.needsUpdate = true;
     });
     elQ.innerHTML = q.html;
@@ -823,7 +870,8 @@ async function runnerStart(host, opts) {
       flash('bad');
       if (!res.over) { fig.setAnim('oops'); S.slow = 0.5; setTimeout(() => { if (!S.over) fig.setAnim('run'); }, 450); }
     }
-    g.labels.forEach((m, k) => { m.material.color.set(k === g.q.correct ? 0xa7f3d0 : k === i ? 0xfecaca : 0x9ca3af); });
+    g.labels.forEach((m, k) => { m.material.color.set(k === g.q.correct ? 0xbbf7d0 : k === i ? 0xfecaca : 0x9ca3af); });
+    g.popT = 0; g.pick = i; // Blasen: die richtige platzt, die anderen verblassen
     if (res.over) { end(ok ? 'done' : 'wrong'); return; }
     setTimeout(() => { if (!S.over && !gates.some((x) => !x.passed && x.q)) elAsk.hidden = true; }, ok ? 1000 : 1800);
   }
@@ -854,13 +902,6 @@ async function runnerStart(host, opts) {
   }
   let flashT = 0;
   function flash(kind) { elFlash.className = `rn-flash ${kind}`; void elFlash.offsetWidth; elFlash.classList.add('on'); clearTimeout(flashT); flashT = setTimeout(() => elFlash.classList.remove('on'), 260); }
-  let newT = 0;
-  function showNew(text) {
-    elNew.querySelector('span').textContent = text;
-    elNew.hidden = false; elNew.className = 'rn-new'; void elNew.offsetWidth; elNew.classList.add('pop');
-    clearTimeout(newT); newT = setTimeout(() => { elNew.hidden = true; }, 4200);
-    sound('tone', [784, 988, 1319], 0.09, 'triangle', 0.06);
-  }
 
   /* ---------------- Steuerung ---------------- */
   const act = (a) => {
@@ -878,8 +919,8 @@ async function runnerStart(host, opts) {
       }
       const to = rnClamp(S.lane + (a === 'L' ? -1 : 1), -1, 1);
       if (to === S.lane) { bump(); return; }
-      // nur auf Spuren, die es gibt
-      const ln = lanesAt(S.d + 1);
+      // auf einer schmalen Strasse: nur auf die Spuren, die es gibt
+      const ln = roadAt(S.d + 1);
       if (ln && (to < ln[0] || to > ln[1])) { bump(); return; }
       const blocked = obs.some((ob) => !ob.hit && !ob.mv && ob.lane === to && ob.top != null && S.d + 0.4 > ob.d0 && S.d - 0.3 < ob.d1 && S.y < ob.base + ob.top - 0.3);
       if (blocked) { bump(); return; }
@@ -933,6 +974,18 @@ async function runnerStart(host, opts) {
     S.inv = 1.6; S.slow = 0.35; fig.setAnim('oops'); fig.setMood('oops');
     setTimeout(() => { if (!S.over) { fig.setAnim(S.ground ? 'run' : 'leap'); fig.setMood(''); } }, 600);
   }
+  /** Kurve verpasst: in die Leitwand – dann geht es nach der Ecke weiter */
+  function hitBarrier() {
+    const c = S.miss.c;
+    debris(wposL(S.miss.leg, c.d + HW1, 0, 0.4));
+    sound('noise', 0.3, { freq: 500, gain: 0.08 }); sound('tone', [220, 147], 0.12, 'sawtooth', 0.05);
+    S.shake = 0.6; flash('bad');
+    const res = o.onHit('crash') || {};
+    if (res.over) { end('crash'); return; }
+    S.respawn = { t: 0.8, d: c.d + 3, stop: true };
+    fig.setAnim('oops'); fig.setMood('oops');
+    setTimeout(() => { if (!S.over) fig.setMood(''); }, 900);
+  }
   function fall() {
     if (S.respawn) return;
     sound('tone', [660, 440, 220], 0.12, 'triangle', 0.06);
@@ -966,15 +1019,24 @@ async function runnerStart(host, opts) {
     return false;
   }
   const tmpP = new T.Vector3();
+  const TRACK_HW = RN.LW * 1.5 + 0.3; // Laufspuren (ohne Rand)
   ctx.put = (kind, lat, y, d, ry = 0, sc = 1, rx = 0, rz = 0) => {
     const P = ctx.pools[kind];
     if (!P) return;
     const K = kinds[kind];
     if (K?.def.span && corners.some((c) => Math.abs(c.d - d) < 14)) return; // über die Bahn gespannt: nicht in Kurven
+    if (K && !K.geo.boundingBox) K.geo.computeBoundingBox();
+    // Nichts aus der Kulisse auf die Laufspuren (z. B. Ränder von Dünen): seitlich neben die Bahn schieben
+    if (K && !K.def.span && y < 2.5 && groundBase(d) != null) {
+      const bb = K.geo.boundingBox, sx = typeof sc === 'number' ? sc : sc[0], sz = typeof sc === 'number' ? sc : sc[2];
+      const c = Math.cos(ry), sn = Math.sin(ry);
+      let lo = Infinity, hi = -Infinity;
+      for (const x of [bb.min.x * sx, bb.max.x * sx]) for (const z of [bb.min.z * sz, bb.max.z * sz]) { const v = x * c + z * sn; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      if (lat + hi > -TRACK_HW && lat + lo < TRACK_HW) lat = lat >= 0 ? TRACK_HW - lo + 0.05 : -TRACK_HW - hi - 0.05;
+    }
     const L = legAt(d);
     const p = wposL(L, d, lat, y, tmpP);
     if (K && K.r == null) { // Grundfläche (flache, breite Teile wie Dünen sind breiter als hoch)
-      if (!K.geo.boundingBox) K.geo.computeBoundingBox();
       const bb = K.geo.boundingBox;
       K.r = K.def.r ?? Math.hypot(Math.max(-bb.min.x, bb.max.x), Math.max(-bb.min.z, bb.max.z)) * 0.8;
     }
@@ -1058,14 +1120,14 @@ async function runnerStart(host, opts) {
     if (S.over && S.endWhy === 'fall') { S.vy -= RN.G * dt; S.y = Math.max(S.lastGh - 12, S.y + S.vy * dt); if (S.miss) S.d += S.speed * 0.3 * dt; }
     if (S.respawn) {
       S.respawn.t -= dt;
-      S.vy -= RN.G * dt; S.y += S.vy * dt; if (S.miss) S.d += S.speed * 0.3 * dt;
+      if (!S.respawn.stop) { S.vy -= RN.G * dt; S.y += S.vy * dt; if (S.miss) S.d += S.speed * 0.3 * dt; }
       if (S.respawn.t <= 0) {
         if (S.miss) { S.miss.c.done = true; S.miss = null; }
         S.d = S.respawn.d;
         for (const c of corners) if (!c.done && c.d <= S.d + 0.5) { c.turned = true; c.done = true; }
         if (groundBase(S.d, laneX(S.lane)) == null) S.lane = 0;
         S.x = laneX(S.lane);
-        S.y = (groundBase(S.d, S.x) ?? 0) + 2.5; S.lastGh = groundBase(S.d, S.x) ?? 0; S.vy = 0; S.ground = false; S.respawn = null; S.inv = 2.2;
+        S.y = (groundBase(S.d, S.x) ?? 0) + (S.respawn.stop ? 0.7 : 2.5); S.lastGh = groundBase(S.d, S.x) ?? 0; S.vy = 0; S.ground = false; S.respawn = null; S.inv = 2.2;
         fig.setAnim('leap');
       }
     } else if (S.started && !S.over) {
@@ -1077,6 +1139,10 @@ async function runnerStart(host, opts) {
         if (c.turned) { c.done = true; continue; }
         if (!S.miss) S.miss = { c, leg: legAt(c.d - 0.01) };
       }
+      if (S.miss && S.d >= S.miss.c.d + HW1 - 0.1) { hitBarrier(); }
+      // Strasse wird schmaler: auf eine Spur schieben, die es weiter vorne gibt
+      const rl = roadAt(S.d + Math.max(2.5, S.speed * 0.32));
+      if (rl && !S.respawn && (S.lane < rl[0] || S.lane > rl[1])) { S.lane = rnClamp(S.lane, rl[0], rl[1]); S.shake = Math.max(S.shake, 0.15); sound('tone', [300], 0.05, 'triangle', 0.03); }
       const tx = laneX(S.lane);
       S.x += (tx - S.x) * (1 - Math.exp(-dt * 15));
       S.slide = Math.max(0, S.slide - dt);
@@ -1122,10 +1188,9 @@ async function runnerStart(host, opts) {
       if (next && S.d >= next.d) passGate(next);
       if (next && next.q && !next.passed) elBar.style.transform = `scaleX(${rnClamp((next.d - S.d) / Math.max(1, next.d - next.armD), 0, 1)})`;
       for (const g of gates) if (g.passed && !g.gone && S.d - (camera.aspect < 0.8 ? 7.4 : 6.2) > g.d - 2.2) {
-        g.gone = true; g.idx.forEach((k) => gatePool.hide(k)); g.labels.forEach((m) => { m.visible = false; });
+        g.gone = true; g.labels.forEach((m) => { m.visible = false; });
       }
       // Neues ankündigen
-      for (const it of intros) if (!it.shown && it.d - S.d < 48) { it.shown = true; showNew(it.text); }
       elDist.textContent = Math.floor(S.d);
       const kmh = Math.round(S.base * 3.6);
       if (elSpeed.textContent !== String(kmh)) { if (+elSpeed.textContent && kmh > +elSpeed.textContent) { elSpeed.parentNode.classList.remove('up'); void elSpeed.offsetWidth; elSpeed.parentNode.classList.add('up'); } elSpeed.textContent = kmh; }
@@ -1145,12 +1210,13 @@ async function runnerStart(host, opts) {
     // aufräumen und weiterbauen
     while (segs.length && segs[0].d1 < S.d - RN.BEHIND) { const s = segs.shift(); scene.remove(s.mesh); s.mesh.geometry.dispose(); }
     for (let i = pits.length - 1; i >= 0; i--) if (pits[i].d1 < S.d - RN.BEHIND) { scene.remove(pits[i].g); pits[i].m.geometry.dispose(); pits.splice(i, 1); }
-    for (let i = signs.length - 1; i >= 0; i--) if (signs[i].d < S.d - RN.BEHIND) { scene.remove(signs[i].m); signs[i].m.material.dispose(); signs.splice(i, 1); }
+    for (let i = signs.length - 1; i >= 0; i--) if (signs[i].d < S.d - RN.BEHIND) { scene.remove(signs[i].m); signs.splice(i, 1); }
+    for (let i = shoulders.length - 1; i >= 0; i--) if (shoulders[i].d1 < S.d - RN.BEHIND - 10) { scene.remove(shoulders[i].m); shoulders[i].m.geometry.dispose(); shoulders.splice(i, 1); }
     for (let i = obs.length - 1; i >= 0; i--) if (obs[i].d1 < S.d - RN.BEHIND) { obs[i].pool.hide(obs[i].i); obs.splice(i, 1); }
     for (let i = gems.length - 1; i >= 0; i--) if (gems[i].d < S.d - 10) { gemPool.hide(gems[i].i); gems.splice(i, 1); }
     for (let i = gates.length - 1; i >= 0; i--) if (gates[i].d < S.d - RN.BEHIND) {
       const g = gates[i];
-      g.idx.forEach((k) => gatePool.hide(k));
+      if (g.line) scene.remove(g.line);
       g.labels.forEach((m) => { scene.remove(m); if (m.material.map !== blankTex) m.material.map?.dispose(); m.material.dispose(); });
       gates.splice(i, 1);
     }
@@ -1158,6 +1224,24 @@ async function runnerStart(host, opts) {
     while (legs.length > 2 && legs[1].d0 < S.d - 260) legs.shift();
     if (!S.over) plan();
     scenery();
+    // Antwort-Blasen: leicht schweben; nach dem Tor platzt die richtige, die anderen verblassen
+    for (const g of gates) {
+      if (g.gone) continue;
+      if (g.popT != null) g.popT += dt;
+      // aus der Ferne grösser (gut lesbar), beim Näherkommen auf die Spur zurück
+      const zs = g.popT == null ? rnClamp((g.d - S.d) / (g.vert ? 8 : 12), 1, g.vert ? 1.4 : 1.5) : 1;
+      g.labels.forEach((m, k) => {
+        const u = m.userData, bob = Math.sin(ctx.time * 2.2 + k * 1.7 + g.d) * 0.06;
+        const y = g.vert ? VMID + (zs - 1) + (u.y - VMID) * zs : u.y + (zs - 1) * 0.7;
+        wposL(u.L, u.d, u.lat * zs, y + bob, m.position);
+        m.scale.setScalar(u.sc * zs);
+        if (g.popT == null) return;
+        const t = g.popT;
+        m.position.y += t * 2.5; // nach oben weg, aus dem Blick
+        if (k === g.q.correct) { const a = Math.min(1, t / 0.35); m.scale.setScalar(u.sc * (1 + a * 0.5)); m.material.opacity = 1 - a; if (a >= 1) m.visible = false; }
+        else { m.material.opacity = Math.max(0, 1 - t * 4); if (t > 0.25) m.visible = false; }
+      });
+    }
     // Kristalle drehen
     const rot = ctx.time * 2.4;
     for (const g of gems) if (!g.got) gemPool.mesh.setMatrixAt(g.i, gemM.compose(gemV.set(g.wp.x, g.y + Math.sin(ctx.time * 3 + g.d) * 0.08, g.wp.z), gemQ.setFromEuler(gemE.set(0, rot + g.d, 0)), gemS));
@@ -1223,14 +1307,14 @@ async function runnerStart(host, opts) {
     if (pit) { pit.position.x = cx; pit.position.z = cz; }
     for (const k in ctx.pools) { ctx.pools[k].near.flush(); ctx.pools[k].far?.flush(); }
     for (const k in obsPools) obsPools[k].flush();
-    gatePool.flush(); gemPool.flush();
+    gemPool.flush();
     renderer.render(scene, camera);
   }
 
   function end(why = '') {
     if (S.over) return;
     S.over = true; S.endWhy = why;
-    elAsk.hidden = true; elNew.hidden = true;
+    elAsk.hidden = true;
     const sad = ['crash', 'fall', 'wrong'].includes(why);
     fig.setAnim(sad ? 'oops' : 'cheer');
     setTimeout(() => { S.finishing = true; if (sad) fig.setAnim('shy'); }, sad ? 700 : 200);
@@ -1241,7 +1325,7 @@ async function runnerStart(host, opts) {
   const api = {
     get state() { return S; },
     /** für Tests: Bauplan und Steuerung */
-    _dbg: { obs, gates, segs, gems, corners, legs, act, groundAt, groundBase, lanesAt, renderer, scene, ctx, step, render, hold: (v) => { hold = v; } },
+    _dbg: { obs, gates, segs, gems, corners, legs, act, groundAt, groundBase, lanesAt, roadAt, renderer, scene, ctx, step, render, hold: (v) => { hold = v; } },
     finish() { end('done'); },
     stop() { end('time'); },
     hud() { return host.querySelector('.rn-host'); },
@@ -1249,15 +1333,15 @@ async function runnerStart(host, opts) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener('keydown', onKey);
-      clearTimeout(newT); clearTimeout(flashT);
+      clearTimeout(flashT);
       fx.forEach((f) => { scene.remove(f.s); f.m.dispose(); });
       gates.forEach((g) => g.labels.forEach((m) => { if (m.material.map !== blankTex) m.material.map?.dispose(); m.material.dispose(); }));
       segs.forEach((s) => s.mesh.geometry.dispose());
       pits.forEach((p) => p.m.geometry.dispose());
-      signs.forEach((s) => s.m.material.dispose());
-      Object.values(signTex).forEach((t) => t.dispose());
+      shoulders.forEach((x) => x.m.geometry.dispose());
+      Object.values(chevTex).forEach((m) => m.dispose());
       own.forEach((x) => { try { x?.dispose?.(); } catch { /* */ } });
-      Object.values(ctx.pools).flatMap((p) => [p.near, p.far]).filter(Boolean).concat(Object.values(obsPools), [gatePool, gemPool]).forEach((p) => p.mesh.dispose());
+      Object.values(ctx.pools).flatMap((p) => [p.near, p.far]).filter(Boolean).concat(Object.values(obsPools), [gemPool]).forEach((p) => p.mesh.dispose());
       W.dispose?.(ctx);
       fig.dispose();
       try { renderer.dispose(); renderer.forceContextLoss(); } catch { /* */ }
