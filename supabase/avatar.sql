@@ -95,6 +95,31 @@ insert into public.fab_avatar_items (id, price, min_earned) values
   ('car:flames:plasma', 18, 0), ('car:flames:rainbow', 25, 0), ('car:glow:cyan', 18, 0), ('car:glow:pink', 18, 0), ('car:glow:green', 18, 0),
   ('car:glow:violet', 18, 0), ('car:glow:gold', 20, 0), ('car:glow:rainbow', 30, 50)
 on conflict (id) do update set price = excluded.price, min_earned = excluded.min_earned;
+-- Erweiterung: noch mehr Teile (Stufen nach Preis: bis 10 Normal, bis 20 Gold, bis 35 Episch, darüber Legendär)
+insert into public.fab_avatar_items (id, price, min_earned) values
+  ('a3:eyes:spiral', 12, 0), ('a3:eyes:robot', 14, 0), ('a3:eyes:diamond', 22, 0), ('a3:top:striped', 8, 0), ('a3:top:hawaii', 14, 0),
+  ('a3:hat:ninja', 8, 0), ('a3:hat:chef', 10, 0), ('a3:hat:santa', 10, 0), ('a3:hat:antlers', 15, 0), ('a3:hat:propeller', 15, 0),
+  ('a3:hat:frog', 16, 0), ('a3:hat:cowboy', 16, 0), ('a3:hat:graduation', 18, 0), ('a3:hat:pirate', 20, 0), ('a3:hat:tophat', 20, 0),
+  ('a3:hat:unicorn', 28, 0), ('a3:hat:dino', 30, 0), ('a3:hat:halo', 45, 80), ('a3:glasses:monocle', 14, 0), ('a3:glasses:ski', 16, 0),
+  ('a3:glasses:mask', 18, 0), ('a3:glasses:rainbow', 22, 0), ('a3:glasses:pixel', 25, 0), ('a3:neck:whistle', 6, 0), ('a3:neck:tie', 8, 0),
+  ('a3:neck:lei', 14, 0), ('a3:neck:diamond', 42, 80), ('a3:hand:donut', 8, 0), ('a3:hand:pizza', 8, 0), ('a3:hand:paintbrush', 8, 0),
+  ('a3:hand:duck', 10, 0), ('a3:hand:tennis', 14, 0), ('a3:hand:telescope', 15, 0), ('a3:hand:fishing', 16, 0), ('a3:hand:lantern', 16, 0),
+  ('a3:hand:sword', 26, 0), ('a3:hand:trident', 30, 0), ('a3:hand:orb', 40, 0), ('a3:hand:laser', 45, 80), ('a3:back:quiver', 18, 0),
+  ('a3:back:tank', 18, 0), ('a3:back:surfboard', 26, 0), ('a3:back:shell', 28, 0), ('a3:back:bat', 32, 0), ('a3:back:fairy', 42, 0),
+  ('a3:back:phoenix', 55, 120), ('a3:pet:penguin', 35, 0), ('a3:pet:owl', 38, 0), ('a3:pet:parrot', 38, 0), ('a3:pet:fox', 40, 0),
+  ('a3:pet:panda', 42, 0), ('a3:pet:slime', 45, 60), ('a3:pet:unicorn', 60, 150), ('a3:effect:snow', 22, 0), ('a3:effect:leaves', 22, 0),
+  ('a3:effect:confetti', 30, 0), ('a3:effect:lightning', 40, 80), ('a3:effect:fire', 48, 100), ('a3:effect:coins', 60, 150), ('a3:emote:run', 10, 0),
+  ('a3:emote:robo', 15, 0), ('a3:emote:hero', 22, 0), ('car:body:banana', 25, 0), ('car:body:shoe', 28, 0), ('car:body:snail', 30, 0),
+  ('car:body:bee', 32, 0), ('car:body:dragon', 50, 100), ('car:finish:carbon', 16, 0), ('car:finish:candy', 24, 0), ('car:finish:neon', 28, 0),
+  ('car:finish:gold', 45, 100), ('car:pattern:waves', 10, 0), ('car:pattern:camo', 14, 0), ('car:pattern:hearts', 15, 0), ('car:pattern:zebra', 15, 0),
+  ('car:pattern:pixel', 16, 0), ('car:pattern:leopard', 16, 0), ('car:pattern:tiger', 18, 0), ('car:pattern:circuit', 25, 0), ('car:pattern:galaxy', 30, 0),
+  ('car:pattern:rainbow', 36, 0), ('car:rims:flower', 14, 0), ('car:rims:fire', 24, 0), ('car:rims:rainbow', 28, 0), ('car:rims:diamond', 40, 80),
+  ('car:wing:heart', 18, 0), ('car:wing:jet', 24, 0), ('car:wing:dragon', 30, 0), ('car:wing:angel', 42, 80), ('car:exhaust:candy', 14, 0),
+  ('car:exhaust:trumpet', 16, 0), ('car:exhaust:rocket', 22, 0), ('car:flames:gold', 18, 0), ('car:flames:sun', 20, 0), ('car:flames:ice', 22, 0),
+  ('car:flames:shadow', 24, 0), ('car:glow:red', 18, 0), ('car:glow:orange', 18, 0), ('car:glow:white', 18, 0), ('car:topper:flag', 8, 0),
+  ('car:topper:antenna', 10, 0), ('car:topper:duck', 15, 0), ('car:topper:propeller', 18, 0), ('car:topper:siren', 25, 0), ('car:topper:crown', 32, 0),
+  ('car:topper:unicorn', 40, 80), ('car:topper:trophy', 48, 120)
+on conflict (id) do update set price = excluded.price, min_earned = excluded.min_earned;
 
 -- Münz-Protokoll: jede Ausgabe (Kauf, Spiel) mit Zeit; request verhindert doppeltes Abbuchen
 create table if not exists public.fab_coin_log (

@@ -51,7 +51,7 @@ const W3_PAINT = [0xff5a36, 0xe2483d, 0xf97316, 0xf5c518, 0x84cc16, 0x16a34a, 0x
 
 /* ---------------- Katalog ----------------
    [wert, name, icon, preis, extras] – extras: c = wie viele Farben wählbar (0, 1, 2), u = ab so vielen gesammelten Münzen */
-const W3_RARITY = { basic: 'Basis', common: 'Normal', rare: 'Selten', epic: 'Episch', legend: 'Legendär' };
+const W3_RARITY = { basic: 'Basis', common: 'Normal', rare: 'Gold', epic: 'Episch', legend: 'Legendär' };
 const w3Rarity = (p) => (!p ? 'basic' : p <= 10 ? 'common' : p <= 20 ? 'rare' : p <= 35 ? 'epic' : 'legend');
 function w3Items(pre, slot, list, cat = slot) {
   return list.map(([v, name, icon, price = 0, x = {}]) => ({
@@ -109,6 +109,41 @@ const CAR_ITEMS = [
   ...w3Items('car', 'flames', [['classic', 'Orange', '🔥', 0, { c: 0 }], ['blue', 'Blau', '💙', 12, { c: 0 }], ['green', 'Grün', '💚', 12, { c: 0 }], ['violet', 'Violett', '💜', 12, { c: 0 }], ['plasma', 'Plasma', '🩷', 18, { c: 0 }], ['rainbow', 'Regenbogen', '🌈', 25, { c: 0 }]]),
   ...w3Items('car', 'glow', [['none', 'Aus', '—', 0, { c: 0 }], ['cyan', 'Türkis', '🩵', 18, { c: 0 }], ['pink', 'Pink', '🩷', 18, { c: 0 }], ['green', 'Grün', '💚', 18, { c: 0 }], ['violet', 'Violett', '💜', 18, { c: 0 }], ['gold', 'Gold', '💛', 20, { c: 0 }], ['rainbow', 'Regenbogen', '🌈', 30, { c: 0, u: 50 }]]),
 ];
+/* Erweiterung: noch mehr Teile (Preise: bis 10 Normal, bis 20 Gold, bis 35 Episch, darüber Legendär) */
+A3_ITEMS.push(
+  ...w3Items('a3', 'eyes', [['spiral', 'Spiralaugen', '😵‍💫', 12], ['robot', 'Roboteraugen', '🤖', 14], ['diamond', 'Diamantaugen', '💎', 22]], 'body'),
+  ...w3Items('a3', 'top', [['striped', 'Ringel-Shirt', '🦓', 8, { c: 2 }], ['hawaii', 'Hawaiihemd', '🌺', 14, { c: 2 }]]),
+  ...w3Items('a3', 'hat', [['ninja', 'Stirnband', '🥷', 8, { c: 2 }], ['chef', 'Kochmütze', '👨‍🍳', 10, { c: 0 }], ['santa', 'Zipfelmütze', '🎅', 10], ['antlers', 'Geweih', '🦌', 15, { c: 0 }],
+    ['propeller', 'Propellermütze', '🚁', 15, { c: 2 }], ['frog', 'Froschmütze', '🐸', 16], ['cowboy', 'Cowboyhut', '🤠', 16, { c: 2 }], ['graduation', 'Doktorhut', '🎓', 18],
+    ['pirate', 'Piratenhut', '🏴‍☠️', 20, { c: 0 }], ['tophat', 'Zylinder', '🎩', 20, { c: 2 }], ['unicorn', 'Einhorn-Horn', '🦄', 28, { c: 0 }], ['dino', 'Dino-Mütze', '🦖', 30, { c: 2 }],
+    ['halo', 'Heiligenschein', '😇', 45, { c: 0, u: 80 }]], 'acc'),
+  ...w3Items('a3', 'glasses', [['monocle', 'Monokel', '🧐', 14, { c: 0 }], ['ski', 'Skibrille', '⛷️', 16], ['mask', 'Heldenmaske', '🦹', 18], ['rainbow', 'Regenbogen-Brille', '🌈', 22, { c: 0 }], ['pixel', 'Pixel-Brille', '😎', 25, { c: 0 }]], 'acc'),
+  ...w3Items('a3', 'neck', [['whistle', 'Trillerpfeife', '📯', 6, { c: 0 }], ['tie', 'Krawatte', '👔', 8, { c: 2 }], ['lei', 'Blumenkette', '🌺', 14, { c: 0 }], ['diamond', 'Diamantkette', '💎', 42, { c: 0, u: 80 }]], 'acc'),
+  ...w3Items('a3', 'hand', [['donut', 'Donut', '🍩', 8, { c: 0 }], ['pizza', 'Pizzastück', '🍕', 8, { c: 0 }], ['paintbrush', 'Pinsel', '🖌️', 8], ['duck', 'Badeente', '🐤', 10, { c: 0 }],
+    ['tennis', 'Tennisschläger', '🎾', 14, { c: 0 }], ['telescope', 'Fernrohr', '🔭', 15, { c: 0 }], ['fishing', 'Angel', '🎣', 16, { c: 0 }], ['lantern', 'Laterne', '🏮', 16, { c: 0 }],
+    ['sword', 'Ritterschwert', '🗡️', 26, { c: 0 }], ['trident', 'Dreizack', '🔱', 30, { c: 0 }], ['orb', 'Zauberkugel', '🔮', 40], ['laser', 'Laserschwert', '⚔️', 45, { u: 80 }]]),
+  ...w3Items('a3', 'back', [['quiver', 'Köcher', '🏹', 18, { c: 0 }], ['tank', 'Taucherflasche', '🤿', 18, { c: 0 }], ['surfboard', 'Surfbrett', '🏄', 26, { c: 2 }], ['shell', 'Schildkrötenpanzer', '🐢', 28, { c: 0 }],
+    ['bat', 'Fledermausflügel', '🦇', 32], ['fairy', 'Feenflügel', '🧚', 42, { c: 2 }], ['phoenix', 'Phönixflügel', '🔥', 55, { c: 0, u: 120 }]]),
+  ...w3Items('a3', 'pet', [['penguin', 'Pinguin', '🐧', 35, { c: 0 }], ['owl', 'Eule', '🦉', 38], ['parrot', 'Papagei', '🦜', 38], ['fox', 'Fuchs', '🦊', 40], ['panda', 'Panda', '🐼', 42, { c: 0 }],
+    ['slime', 'Glibber', '🟢', 45, { u: 60 }], ['unicorn', 'Einhorn', '🦄', 60, { u: 150 }]], 'fun'),
+  ...w3Items('a3', 'effect', [['snow', 'Schneeflocken', '❄️', 22, { c: 0 }], ['leaves', 'Blätterwirbel', '🍃', 22, { c: 0 }], ['confetti', 'Konfetti', '🎊', 30, { c: 0 }],
+    ['lightning', 'Blitze', '⚡', 40, { c: 0, u: 80 }], ['fire', 'Feuer-Aura', '🔥', 48, { c: 0, u: 100 }], ['coins', 'Münzregen', '🪙', 60, { c: 0, u: 150 }]], 'fun'),
+  ...w3Items('a3', 'emote', [['run', 'Rennen', '🏃', 10, { c: 0 }], ['robo', 'Roboter-Tanz', '🤖', 15, { c: 0 }], ['hero', 'Heldenpose', '🦸', 22, { c: 0 }]]),
+);
+CAR_ITEMS.push(
+  ...w3Items('car', 'body', [['banana', 'Bananen-Kart', '🍌', 25, { c: 0 }], ['shoe', 'Turnschuh', '👟', 28, { c: 0 }], ['snail', 'Schnecke', '🐌', 30, { c: 0 }], ['bee', 'Biene', '🐝', 32, { c: 0 }],
+    ['dragon', 'Drache', '🐉', 50, { c: 0, u: 100 }]]),
+  ...w3Items('car', 'finish', [['carbon', 'Carbon', '🖤', 16, { c: 0 }], ['candy', 'Bonbon-Lack', '🍬', 24, { c: 0 }], ['neon', 'Neon', '🌟', 28, { c: 0 }], ['gold', 'Goldlack', '🏆', 45, { c: 0, u: 100 }]]),
+  ...w3Items('car', 'pattern', [['waves', 'Wellen', '🌊', 10], ['camo', 'Tarnmuster', '🪖', 14], ['hearts', 'Herzen', '💖', 15], ['zebra', 'Zebra', '🦓', 15], ['pixel', 'Pixel', '👾', 16],
+    ['leopard', 'Leopard', '🐆', 16], ['tiger', 'Tiger', '🐯', 18], ['circuit', 'Platine', '🔌', 25], ['galaxy', 'Galaxie', '🌌', 30], ['rainbow', 'Regenbogen', '🌈', 36]]),
+  ...w3Items('car', 'rims', [['flower', 'Blume', '🌼', 14, { c: 0 }], ['fire', 'Feuerrad', '🔥', 24, { c: 0 }], ['rainbow', 'Regenbogen', '🌈', 28, { c: 0 }], ['diamond', 'Diamant', '💎', 40, { c: 0, u: 80 }]]),
+  ...w3Items('car', 'wing', [['heart', 'Herz', '💗', 18, { c: 0 }], ['jet', 'Düsenflügel', '✈️', 24, { c: 0 }], ['dragon', 'Drachenflügel', '🐲', 30, { c: 0 }], ['angel', 'Engelsflügel', '😇', 42, { c: 0, u: 80 }]]),
+  ...w3Items('car', 'exhaust', [['candy', 'Zuckerstange', '🍭', 14, { c: 0 }], ['trumpet', 'Trompete', '🎺', 16, { c: 0 }], ['rocket', 'Raketendüse', '🚀', 22, { c: 0 }]]),
+  ...w3Items('car', 'flames', [['gold', 'Gold', '💛', 18, { c: 0 }], ['sun', 'Sonne', '☀️', 20, { c: 0 }], ['ice', 'Eis', '🧊', 22, { c: 0 }], ['shadow', 'Schatten', '🌑', 24, { c: 0 }]]),
+  ...w3Items('car', 'glow', [['red', 'Rot', '❤️', 18, { c: 0 }], ['orange', 'Orange', '🧡', 18, { c: 0 }], ['white', 'Weiss', '🤍', 18, { c: 0 }]]),
+  ...w3Items('car', 'topper', [['none', 'Nichts', '—', 0, { c: 0 }], ['flag', 'Fähnchen', '🚩', 8, { c: 0 }], ['antenna', 'Antennen-Ball', '🔴', 10, { c: 0 }], ['duck', 'Gummiente', '🐤', 15, { c: 0 }],
+    ['propeller', 'Propeller', '🚁', 18, { c: 0 }], ['siren', 'Blaulicht', '🚨', 25, { c: 0 }], ['crown', 'Krone', '👑', 32, { c: 0 }], ['unicorn', 'Einhorn-Horn', '🦄', 40, { c: 0, u: 80 }], ['trophy', 'Pokal', '🏆', 48, { c: 0, u: 120 }]]),
+);
 const W3_ITEM = Object.fromEntries([...A3_ITEMS, ...CAR_ITEMS].map((i) => [i.id, i]));
 const w3Item = (pre, slot, v) => W3_ITEM[`${pre}:${slot}:${v}`];
 const w3Slot = (pre, slot) => (pre === 'a3' ? A3_ITEMS : CAR_ITEMS).filter((i) => i.slot === slot);
@@ -124,7 +159,7 @@ const A3_DEFAULT = {
   wrist: 'none', wristC: 0x2453d6, wristC2: 0x5eead4, bag: 'none', bagC: 0x22c55e, bagC2: 0xf5c518, back: 'none', backC: 0xe2483d, backC2: 0xf5c518,
   hand: 'none', handC: 0xe2483d, pet: 'none', petC: 0xf59e0b, effect: 'none', effectC: 0xa78bfa, emote: 'wave',
 };
-const CAR_DEFAULT = { v: 1, body: 'formula', paint: 0xff5a36, paint2: 0xffffff, finish: 'gloss', pattern: 'none', rims: 'classic', wing: 'standard', exhaust: 'chrome', flames: 'classic', glow: 'none', num: 1 };
+const CAR_DEFAULT = { v: 1, body: 'formula', paint: 0xff5a36, paint2: 0xffffff, finish: 'gloss', pattern: 'none', rims: 'classic', wing: 'standard', exhaust: 'chrome', flames: 'classic', glow: 'none', topper: 'none', num: 1 };
 const A3_COLOR_KEYS = ['skin', 'eyeC', 'hairC2', 'topC', 'topT', 'topU', 'bottomC', 'bottomT', 'shoesC', 'shoesC2', 'hatC', 'hatC2', 'glassesC', 'neckC', 'neckC2', 'wristC', 'wristC2', 'bagC', 'bagC2', 'backC', 'backC2', 'handC', 'petC', 'effectC'];
 
 /** Gespeicherte Daten säubern: unbekannte Werte → Grundausstattung (so bricht nie etwas, auch bei alten Ständen) */

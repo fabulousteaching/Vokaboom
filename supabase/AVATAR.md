@@ -62,7 +62,7 @@ Ohne diese Schritte läuft Teilmal wie bisher; die Datenbank ist schon für beid
 
 ## 3D-Avatar in Vokaboom und Teilmal
 
-Seit November 2026 ist der **3D-Avatar** (runde Voxel-Figur, über 170 Teile, Animationen) der Avatar in **beiden** Tools –
+Seit November 2026 ist der **3D-Avatar** (runde Voxel-Figur, über 230 Teile, Animationen) der Avatar in **beiden** Tools –
 mit derselben Oberfläche: grosse drehbare Figur, Kategorien, Vorschaubilder, Anprobieren, Kaufen, automatisch speichern.
 Die Dateien `js/avatar3d.js`, `js/shop3d.js`, `js/world3d.js`, `css/world3d.css` und `js/vendor/three.module.min.js` sind
 in beiden Repositories **gleich** (wie `avatar.js`, `avatar.css` und `avatar.sql`). Nur Teilmal hat zusätzlich die **Garage**
@@ -80,3 +80,8 @@ fürs Turbo-Rennen (sie erscheint nur, wo das Rennen geladen ist).
 - three.js und der Baukasten werden erst geladen, wenn man den 3D-Avatar öffnet bzw. sein Bild zeichnet.
 
 **Dafür `supabase/avatar.sql` nochmals ganz ausführen** (ergänzt `m2d` und `fab_migrate_2d`; bestehende Daten bleiben).
+
+## Stufen im Shop
+
+Jedes Teil hat eine Stufe nach seinem Preis: **Normal** (bis 10 Münzen, grau), **Gold** (bis 20, golden), **Episch** (bis 35, lila) und **Legendär** (darüber, Regenbogen-Rahmen). Manche legendären Teile gibt es erst ab einer Anzahl insgesamt gesammelter Münzen (z. B. Phönixflügel ab 120, Einhorn ab 150, Münzregen ab 150). Die Preise stehen in `fab_avatar_items` – nach einer Erweiterung `avatar.sql` nochmals ausführen, sonst lehnt die Datenbank Käufe neuer Teile ab.
+

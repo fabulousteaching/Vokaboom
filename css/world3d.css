@@ -70,9 +70,13 @@
 .w3-price .av-coin { width: 15px; height: 15px; }
 .w3-lock { padding: 1px 6px; background: #12262A; color: #fff; }
 .w3-rar { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; border-radius: 99px; font: 700 .58rem Lexend, system-ui, sans-serif; font-style: normal; text-transform: uppercase; letter-spacing: .04em; color: #fff; white-space: nowrap; }
-.w3-item.r-rare { border-color: #93c5fd; } .w3-item.r-rare .w3-rar, .w3-rar-dot.r-rare { background: #2563eb; }
+/* Stufen: Normal (grau), Gold, Episch (lila), Legendär (Regenbogen, leuchtet) */
+.w3-item.r-rare { border-color: #fcd34d; } .w3-item.r-rare .w3-rar, .w3-rar-dot.r-rare { background: linear-gradient(90deg, #d97706, #f59e0b); }
 .w3-item.r-epic { border-color: #c4b5fd; } .w3-item.r-epic .w3-rar, .w3-rar-dot.r-epic { background: #7c3aed; }
-.w3-item.r-legend { border-color: #fcd34d; box-shadow: 0 0 0 2px rgba(252, 211, 77, .35); } .w3-item.r-legend .w3-rar, .w3-rar-dot.r-legend { background: linear-gradient(90deg, #f59e0b, #ec4899); }
+.w3-item.r-legend { border-color: transparent; background-image: linear-gradient(var(--paper, #fff), var(--paper, #fff)), linear-gradient(120deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7); background-origin: border-box; background-clip: padding-box, border-box; box-shadow: 0 0 12px -2px rgba(168, 85, 247, .45); }
+.w3-item.r-legend .w3-rar, .w3-rar-dot.r-legend { background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7); background-size: 200% 100%; animation: w3-rainbow 3s linear infinite; }
+@keyframes w3-rainbow { to { background-position: 200% 0; } }
+@media (prefers-reduced-motion: reduce) { .w3-item.r-legend .w3-rar, .w3-rar-dot.r-legend { animation: none; } }
 .w3-item.on { border-color: var(--brand); }
 .w3-rar-dot { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 99px; font: 700 .6rem Lexend, system-ui, sans-serif; font-style: normal; text-transform: uppercase; color: #fff; background: #94a3b8; vertical-align: middle; }
 .w3-rar-dot.r-basic, .w3-rar-dot.r-common { background: #94a3b8; }

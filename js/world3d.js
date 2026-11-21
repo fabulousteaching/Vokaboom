@@ -99,6 +99,7 @@ const CAR_CATS = [
     { t: 'info', html: 'Deine Figur fährt selbst! Die Grundformen sind gratis, die besonderen kosten Münzen. Alle fahren gleich schnell.' },
     { t: 'items', slot: 'body', label: 'Karosserie' },
     { t: 'info', html: 'Der Hotdog hat feste Farben – Lack und Muster gelten hier nicht.', when: (d) => d.body === 'hotdog' },
+    { t: 'info', html: 'Bananen-Kart und Biene haben feste Farben – Lack und Muster gelten hier nicht.', when: (d) => d.body === 'banana' || d.body === 'bee' },
   ] },
   { id: 'paint', icon: '🎨', name: 'Lack', groups: [
     { t: 'color', key: 'paint', label: 'Farbe', colors: W3_PAINT },
@@ -111,6 +112,7 @@ const CAR_CATS = [
   { id: 'rims', icon: '🛞', name: 'Felgen', groups: [{ t: 'items', slot: 'rims', label: 'Felgen' }] },
   { id: 'wing', icon: '🪽', name: 'Spoiler', groups: [{ t: 'items', slot: 'wing', label: 'Heckflügel' }, { t: 'items', slot: 'exhaust', label: 'Auspuff' }] },
   { id: 'turbo', icon: '🔥', name: 'Turbo & Licht', groups: [{ t: 'items', slot: 'flames', label: 'Turbo-Flammen' }, { t: 'items', slot: 'glow', label: 'Unterboden-Licht' }] },
+  { id: 'topper', icon: '🚩', name: 'Dach', groups: [{ t: 'items', slot: 'topper', label: 'Hinten oben auf dem Kart' }] },
   { id: 'num', icon: '🔢', name: 'Nummer', groups: [{ t: 'num', key: 'num', label: 'Startnummer' }] },
 ];
 const W3_ANIM_NAMES = { idle: 'Stehen', wave: '👋 Winken', cheer: '🙌 Jubeln' };
@@ -324,7 +326,7 @@ function w3Random() {
     Object.assign(d, { topC: pick(W3_CLOTH), topT: pick(W3_TRIM), bottomC: pick(W3_PANTS), shoesC: pick(W3_CLOTH), shoesC2: pick(W3_TRIM), hatC: pick(W3_CLOTH), backC: pick(W3_CLOTH), neckC: pick(W3_CLOTH), bagC: pick(W3_CLOTH) });
     w3PlayAnim('cheer', 1800);
   } else {
-    for (const slot of ['body', 'finish', 'pattern', 'rims', 'wing', 'exhaust', 'flames', 'glow']) d[slot] = pick(ownList(slot));
+    for (const slot of ['body', 'finish', 'pattern', 'rims', 'wing', 'exhaust', 'flames', 'glow', 'topper']) d[slot] = pick(ownList(slot));
     Object.assign(d, { paint: pick(W3_PAINT), paint2: pick(W3_PAINT) });
     w3Turbo(1500);
   }

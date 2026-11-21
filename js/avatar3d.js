@@ -1498,17 +1498,25 @@ function vxFxTex(kind) {
   if (kind === 'bubble') { g.strokeStyle = 'rgba(190,240,255,.95)'; g.lineWidth = 4; g.beginPath(); g.arc(0, 0, 24, 0, Math.PI * 2); g.stroke(); g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(-9, -9, 6, 0, Math.PI * 2); g.fill(); }
   if (kind === 'note') { g.fillStyle = '#5b21b6'; g.beginPath(); g.ellipse(-8, 14, 11, 8, -0.4, 0, Math.PI * 2); g.fill(); g.fillRect(1, -24, 5, 38); g.fillRect(1, -24, 18, 7); }
   if (kind === 'glow') { const r = g.createRadialGradient(0, 0, 2, 0, 0, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(-32, -32, 64, 64); }
+  if (kind === 'snow') { g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.lineCap = 'round'; for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 24, Math.sin(a) * 24); g.moveTo(Math.cos(a) * 14, Math.sin(a) * 14); g.lineTo(Math.cos(a + 0.5) * 22, Math.sin(a + 0.5) * 22); g.stroke(); } }
+  if (kind === 'leaf') { g.fillStyle = '#4ade80'; g.beginPath(); g.ellipse(0, 0, 13, 24, 0.5, 0, Math.PI * 2); g.fill(); g.strokeStyle = '#166534'; g.lineWidth = 3; g.beginPath(); g.moveTo(-10, 18); g.lineTo(10, -18); g.stroke(); }
+  if (kind === 'confetti') { g.fillStyle = '#ffffff'; g.fillRect(-12, -20, 24, 40); }
+  if (kind === 'bolt') { g.fillStyle = '#fde047'; g.beginPath(); g.moveTo(6, -30); g.lineTo(-14, 4); g.lineTo(0, 4); g.lineTo(-6, 30); g.lineTo(16, -6); g.lineTo(2, -6); g.closePath(); g.fill(); }
+  if (kind === 'flame') { const r = g.createRadialGradient(0, 10, 2, 0, 4, 28); r.addColorStop(0, 'rgba(255,250,200,1)'); r.addColorStop(0.45, 'rgba(255,150,30,.9)'); r.addColorStop(1, 'rgba(255,40,0,0)'); g.fillStyle = r; g.beginPath(); g.moveTo(0, -30); g.quadraticCurveTo(26, 10, 0, 30); g.quadraticCurveTo(-26, 10, 0, -30); g.fill(); }
+  if (kind === 'coin') { g.fillStyle = '#f4b400'; g.beginPath(); g.arc(0, 0, 24, 0, Math.PI * 2); g.fill(); g.fillStyle = '#ffcf3f'; g.beginPath(); g.arc(0, 0, 18, 0, Math.PI * 2); g.fill(); g.fillStyle = '#e09a00'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('★', 0, 1); }
   return cv;
 }
 function vxEffect(T, id, color = 0xffffff) {
-  const kinds = { sparkles: 'star', hearts: 'heart', bubbles: 'bubble', notes: 'note', aura: 'glow' };
+  const kinds = { sparkles: 'star', hearts: 'heart', bubbles: 'bubble', notes: 'note', aura: 'glow', snow: 'snow', leaves: 'leaf', confetti: 'confetti', lightning: 'bolt', fire: 'flame', coins: 'coin' };
+  const fall = id === 'snow' || id === 'leaves' || id === 'confetti' || id === 'coins';
   if (!kinds[id]) return null;
   const tex = new T.CanvasTexture(vxFxTex(kinds[id])); tex.colorSpace = T.SRGBColorSpace;
   const g = new T.Group();
   const n = id === 'aura' ? 16 : 18;
   const parts = [];
   for (let i = 0; i < n; i++) {
-    const mat = new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: id === 'aura' ? color : 0xffffff, blending: id === 'aura' || id === 'sparkles' ? T.AdditiveBlending : T.NormalBlending });
+    const mat = new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: id === 'aura' ? color : 0xffffff, blending: id === 'aura' || id === 'sparkles' || id === 'fire' || id === 'lightning' ? T.AdditiveBlending : T.NormalBlending });
+    if (id === 'confetti') mat.color.setHSL(i / n, 0.85, 0.6);
     const sp = new T.Sprite(mat);
     parts.push({ sp, a: (i / n) * Math.PI * 2, r: 0.9 + (i % 3) * 0.18, y: (i / n) * 2.4, sp0: 0.2 + Math.random() * 0.3, ph: Math.random() * 6 });
     g.add(sp);
@@ -1520,6 +1528,9 @@ function vxEffect(T, id, color = 0xffffff) {
       if (id === 'aura') { const a = p.a + t * 0.9; p.sp.position.set(Math.cos(a) * 1.0, 0.08 + Math.sin(t * 3 + p.ph) * 0.03, Math.sin(a) * 1.0); p.sp.scale.setScalar(0.45); p.sp.material.opacity = 0.55; continue; }
       if (id === 'sparkles') { const a = p.a + t * 0.6; p.sp.position.set(Math.cos(a) * p.r * 1.1, 0.3 + p.y, Math.sin(a) * p.r * 1.1); const k = 0.5 + 0.5 * Math.sin(t * 4 + p.ph); p.sp.scale.setScalar(0.1 + 0.16 * k); p.sp.material.opacity = 0.4 + 0.6 * k; continue; }
       const life = (t * p.sp0 + p.ph / 6) % 1;
+      if (id === 'fire') { const a = p.a + t * 0.5; p.sp.position.set(Math.cos(a) * 0.75, 0.05 + life * 1.6, Math.sin(a) * 0.75); p.sp.scale.setScalar(0.5 - life * 0.3); p.sp.material.opacity = (1 - life) * 0.9; continue; }
+      if (id === 'lightning') { const on = Math.sin(t * 9 + p.ph * 5) > 0.7; p.sp.position.set(Math.cos(p.a + t) * p.r, 0.5 + p.y * 0.8, Math.sin(p.a + t) * p.r); p.sp.scale.setScalar(0.3); p.sp.material.opacity = on ? 1 : 0; continue; }
+      if (fall) { p.sp.position.set(Math.cos(p.a) * p.r * 0.9 + Math.sin(t * 1.5 + p.ph) * 0.15, 2.9 - life * 2.8, Math.sin(p.a) * p.r * 0.7); p.sp.material.rotation = t * 2 + p.ph; p.sp.scale.setScalar(id === 'coins' ? 0.2 : id === 'confetti' ? 0.12 : 0.16); p.sp.material.opacity = Math.min(1, (1 - life) * 3) * Math.min(1, life * 8); continue; }
       p.sp.position.set(Math.cos(p.a) * p.r + Math.sin(t + p.ph) * 0.1, 0.4 + life * 2.4, Math.sin(p.a) * p.r * 0.7);
       p.sp.scale.setScalar(id === 'notes' ? 0.24 : 0.2 + life * 0.08);
       p.sp.material.opacity = Math.min(1, (1 - life) * 2) * Math.min(1, life * 6);
@@ -1587,6 +1598,15 @@ function vxFaceCanvas(look, over = {}) {
       g.strokeStyle = ink; g.lineWidth = 0.5 * U;
       g.beginPath(); g.moveTo(X(cx - 1.9), Y(cy + 0.3)); g.quadraticCurveTo(X(cx), Y(cy - 1.1), X(cx + 1.9), Y(cy + 0.3)); g.stroke();
       if (f.lashes) { g.lineWidth = 0.3 * U; g.beginPath(); g.moveTo(X(cx + side * 1.8), Y(cy + 0.2)); g.lineTo(X(cx + side * 2.5), Y(cy + 0.6)); g.stroke(); }
+    } else if (es === 'robot') {
+      g.fillStyle = '#0f172a'; g.fillRect(X(cx - 2.1), Y(cy + 1.5), 4.2 * U, 3 * U);
+      g.fillStyle = '#22d3ee'; g.fillRect(X(cx - 1.6), Y(cy + 0.5), 3.2 * U, 1 * U);
+      g.globalAlpha = 0.5; g.fillRect(X(cx - 1.9), Y(cy + 0.8), 3.8 * U, 1.6 * U); g.globalAlpha = 1;
+    } else if (es === 'spiral') {
+      g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(X(cx), Y(cy), 2.1 * U, 2.3 * U, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = ink; g.lineWidth = 0.32 * U; g.beginPath();
+      for (let a = 0; a < Math.PI * 6; a += 0.2) { const r = (a / (Math.PI * 6)) * 1.9; g.lineTo(X(cx + Math.cos(a * side) * r), Y(cy + Math.sin(a * side) * r)); }
+      g.stroke();
     } else if (es === 'dot') {
       g.fillStyle = '#1b1422'; g.beginPath(); g.ellipse(X(cx), Y(cy), 0.95 * U, 1.35 * U, 0, 0, Math.PI * 2); g.fill();
       dot(cx - 0.3, cy + 0.5, 0.3, '#ffffff');
@@ -1604,6 +1624,7 @@ function vxFaceCanvas(look, over = {}) {
       g.fillStyle = ig; g.beginPath(); g.arc(X(ix), Y(iy), ir * U, 0, Math.PI * 2); g.fill();
       if (es === 'heart') { g.fillStyle = '#ec4899'; heartPath(ix, iy - 0.1, 1.05); g.fill(); dot(ix - 0.5, iy + 0.6, 0.3, '#ffffff'); }
       else if (es === 'star') { g.fillStyle = '#fffbe6'; starPath(ix, iy, 1.25, 0.55); g.fill(); }
+      else if (es === 'diamond') { g.fillStyle = '#e0f7ff'; g.beginPath(); g.moveTo(X(ix), Y(iy + 1.3)); g.lineTo(X(ix + 1), Y(iy)); g.lineTo(X(ix), Y(iy - 1.3)); g.lineTo(X(ix - 1), Y(iy)); g.closePath(); g.fill(); dot(ix - 0.35, iy + 0.45, 0.28, '#ffffff'); }
       else if (cat) { g.fillStyle = '#120d16'; g.beginPath(); g.ellipse(X(ix), Y(iy), 0.32 * U, 1.35 * U, 0, 0, Math.PI * 2); g.fill(); dot(ix - 0.6, iy + 0.6, 0.28, '#ffffff'); }
       else {
         dot(ix, iy, es === 'sparkle' ? 0.78 : 0.72, '#120d16');
@@ -1823,7 +1844,7 @@ function vxRoundAll(F, look) {
  *   bag: { id, c, c2 }, hand: id | { id, c }, pet: { id, c }, effect: { id, c } }
  * Liefert { root, parts, setAnim(name), update(dt), tris(), dispose() }
  */
-const VX_ANIMS = ['idle', 'wave', 'cheer', 'dance', 'hold', 'present', 'jump', 'clap', 'think', 'spin', 'bow', 'flex', 'sit', 'shy', 'laugh', 'drive'];
+const VX_ANIMS = ['idle', 'wave', 'cheer', 'dance', 'hold', 'present', 'jump', 'clap', 'think', 'spin', 'bow', 'flex', 'sit', 'shy', 'laugh', 'drive', 'run', 'robo', 'hero'];
 function vxFigure(T, look, { lite = false } = {}) {
   const P = vxBody(look);
   const use = (reg, o, tag, ...args) => { if (o && reg[o.id]) { vxTagAll(P, tag); reg[o.id](...args, o); vxTagAll(P, null); } };
@@ -1918,6 +1939,8 @@ function vxFigure(T, look, { lite = false } = {}) {
     run: () => { const s = Math.sin(st.ph), c = Math.cos(st.ph); return { k: 30, lrx: s * 0.95, llx: -s * 0.95, arx: -s * 0.9 + hold * 0.4, alx: s * 0.9, arz: 0.14, alz: -0.14, by: Math.abs(c) * 0.06, tx: 0.2, hx: -0.12, tz: s * 0.04, ty: s * 0.06 }; },
     leap: (t) => ({ k: 16, lrx: -1.05, llx: 0.5, arx: -0.5, alx: 0.4, arz: 0.75 + Math.sin(t * 9) * 0.05, alz: -0.75, tx: 0.12, hx: -0.18 }),
     slide: () => ({ k: 20, drop: 0.5, tx: -1.0, lrx: -1.4, llx: -1.25, arx: 0.35, alx: 0.35, arz: 0.5, alz: -0.5, hx: 0.55 }),
+    robo: (t) => { const s = Math.floor(t * 4) % 4; return { k: 22, arz: [1.5, 0.2, 1.5, 0.2][s], alz: [-0.2, -1.5, -0.2, -1.5][s], arx: [-0.4, -1.5, 0, -1.5][s], alx: [-1.5, -0.4, -1.5, 0][s], hy: [0.4, -0.4, 0.4, -0.4][s], ty: [0.15, -0.15, 0.15, -0.15][s], by: s % 2 ? 0.03 : 0 }; },
+    hero: (t) => ({ k: 10, arz: 2.9, arx: -0.3, alz: -0.25, alx: 0.2, tx: -0.05, hx: -0.25, hy: 0.2, by: 0.02 + Math.sin(t * 2) * 0.02, lrx: -0.15, llx: 0.1 }),
     oops: (t) => ({ k: 14, arz: 2.3 + Math.sin(t * 22) * 0.35, alz: -2.3 - Math.sin(t * 22) * 0.35, tx: -0.35, hx: -0.25, lrx: -0.5, llx: 0.3, by: 0.05 }),
     // im Kart: sitzen, Beine nach vorne, beide Hände am Lenkrad; lenken mit st.steer (-1 links … 1 rechts)
     drive: (t) => { const s = st.steer; return { lrx: -1.45, llx: -1.45, arx: -1.12 + s * 0.2, alx: -1.12 - s * 0.2, arz: -0.36, alz: 0.36, hy: -s * 0.3, tz: s * 0.09, hx: 0.04 + Math.sin(t * 9) * 0.008, by: st.mood === 'turbo' ? Math.abs(Math.sin(t * 22)) * 0.012 : 0 }; },
@@ -1949,6 +1972,8 @@ function vxFigure(T, look, { lite = false } = {}) {
     leap: () => ({ mouth: 'laugh', eyes: 'happy' }),
     slide: () => ({ mouth: 'o', eyes: 'happy' }),
     oops: () => ({ mouth: 'o', brows: 'raised' }),
+    robo: () => ({ mouth: 'calm', eyes: 'cool' }),
+    hero: () => ({ mouth: 'grin', brows: 'angry' }),
     drive: () => (st.mood === 'turbo' ? { mouth: 'laugh', eyes: 'happy' } : st.mood === 'oops' ? { mouth: 'o', brows: 'raised' } : st.mood === 'win' ? { mouth: 'laugh', eyes: 'happy' } : { mouth: baseMouth === 'calm' ? 'smirk' : 'grin' }),
   };
   st.blink = 1.5 + Math.random() * 2;
@@ -1989,3 +2014,302 @@ function vxFigure(T, look, { lite = false } = {}) {
     dispose() { root.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); faces.forEach((t) => t.dispose()); decalMat.dispose(); fx?.userData.dispose(); },
   };
 }
+
+/* =========================================================
+   Weitere Teile (Shop-Erweiterung): Hüte, Brillen, Ketten, Handgegenstände, Rückenteile, Haustiere, Oberteile
+   Gleiche Masse wie oben: Kopf grob x -6..5, y 0..11, z -6..5 (vorne +z); Rumpf x -5..4, y 0..10, z -3..2;
+   Brillen fein (z = 13 vorne, Augen bei x = ±6, y = 12); Handgegenstände mit Griff bei (0, 0, 0).
+   ========================================================= */
+Object.assign(VX_HATS, {
+  /** Kochmütze */
+  chef(head) {
+    const H = VX_HEAD;
+    vxHatDome(head, () => 0xffffff, { band: 0xe5e7eb });
+    for (let k = 0; k < 6; k++) { const r = 5 + (k >= 3 ? 1.3 : 0) - (k === 5 ? 1.2 : 0); for (let x = -7; x <= 6; x++) for (let z = -7; z <= 6; z++) if ((x + 0.5) ** 2 + (z + 0.5) ** 2 <= r * r) head.set(x, H.y1 + 3 + k, z, vxRand(x, k, z, 91) < 0.16 ? 0xf1f5f9 : 0xffffff); }
+  },
+  /** Cowboyhut mit breiter, seitlich hochgebogener Krempe */
+  cowboy(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0x8b5a2b;
+    vxHatDome(head, () => c, { band: o.c2 ?? 0x3b2416 });
+    for (let x = -12; x <= 11; x++) for (let z = -10; z <= 9; z++) { const d = Math.hypot((x + 0.5) / 12, (z + 0.5) / 10); if (d <= 1 && d > 0.42) head.set(x, H.y1 - 1 + (Math.abs(x + 0.5) > 8.5 ? 2 : Math.abs(x + 0.5) > 6.5 ? 1 : 0), z, vxShade(c, -0.08)); }
+    for (let y = H.y1 + 2; y <= H.y1 + 7; y++) { const k = 1 - (y - H.y1 - 2) * 0.05; for (let x = -6; x <= 5; x++) for (let z = -6; z <= 5; z++) if ((x + 0.5) ** 2 / (30 * k) + (z + 0.5) ** 2 / (24 * k) <= 1 && !(y >= H.y1 + 6 && Math.abs(x + 0.5) < 1.5)) head.set(x, y, z, y === H.y1 + 2 ? o.c2 ?? 0x3b2416 : c); }
+  },
+  /** Zylinder */
+  tophat(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0x1f2430;
+    vxHatDome(head, () => c);
+    for (let x = -9; x <= 8; x++) for (let z = -9; z <= 8; z++) { const d = Math.hypot(x + 0.5, z + 0.5); if (d <= 8.6 && d > 5) head.set(x, H.y1 - 1, z, c, 1); }
+    for (let y = H.y1 + 2; y <= H.y1 + 9; y++) for (let x = -6; x <= 5; x++) for (let z = -6; z <= 5; z++) if (Math.hypot(x + 0.5, z + 0.5) <= 5.6) head.set(x, y, z, y === H.y1 + 3 ? o.c2 ?? 0xdc2626 : c, 1);
+  },
+  /** Piratenhut (Zweispitz) mit Feder */
+  pirate(head) {
+    const H = VX_HEAD;
+    vxHatDome(head, () => 0x1f2430);
+    for (let x = -10; x <= 9; x++) { const h = Math.round(5 - Math.abs(x + 0.5) * 0.38); for (let y = 0; y <= h; y++) for (const z of [-1, 0, 1]) head.set(x, H.y1 + 1 + y, z, y === h ? 0xd4a017 : 0x1f2430, y === h ? 3 : 0); }
+    vxSprite(head, ['.X.', 'XXX', '.X.'], { X: 0xffffff }, -2, H.y1 + 5, 2, 1);
+    vxLine(head, [3, H.y1 + 4, -1], [7, H.y1 + 10, -2], 0xef4444); vxLine(head, [4, H.y1 + 4, -1], [8, H.y1 + 9, -2], 0xf97316);
+  },
+  /** Propellermütze */
+  propeller(head, o) {
+    const c = o.c ?? 0x3b82f6, c2 = o.c2 ?? 0xef4444, cols = [c, c2, 0xfacc15, 0x22c55e];
+    vxHatDome(head, (x, y, z) => cols[Math.floor((Math.atan2(z + 0.5, x + 0.5) + Math.PI) / (Math.PI / 2)) & 3]);
+    const y0 = VX_HEAD.y1 + 3;
+    head.box(-1, y0, -1, 0, y0 + 1, 0, 0x9ca3af, 3);
+    for (let x = -8; x <= 7; x++) head.set(x, y0 + 2, x < 0 ? -1 : 0, x < 0 ? c2 : 0xfacc15, 1);
+  },
+  /** Einhorn-Horn mit Öhrchen */
+  unicorn(head) {
+    const y0 = vxHairTop(head, 6) - 1;
+    for (let k = 0; k < 19; k++) { const r = 2.9 * (1 - k / 20); for (let x = -4; x <= 3; x++) for (let z = -2; z <= 6; z++) if (Math.hypot(x + 0.5, z - 2 + k * 0.12) <= r + 0.35) head.set(x, y0 + k, z, Math.floor((k + (Math.atan2(z - 2, x + 0.5) + 3.2) * 1.2)) % 3 === 0 ? 0xf9a8d4 : 0xfde68a, 3); }
+    for (const x of [-6, 5]) { head.box(x, y0 - 1, -1, x + 1, y0 + 2, 0, 0xffffff); head.set(x + (x < 0 ? 1 : 0), y0, 1, 0xf9a8d4); }
+  },
+  /** Zipfelmütze */
+  santa(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0xdc2626;
+    vxHatDome(head, () => c, { band: 0xffffff });
+    vxRing(head, H.x0 - 1, H.z0 - 1, H.x1 + 1, H.z1 + 1, H.y1 - 1, 1, () => 0xffffff);
+    for (let k = 0; k < 8; k++) vxBall(head, -0.5 + k * k * 0.11, H.y1 + 3 + k - k * k * 0.07, -0.5, 4.4 * (1 - k / 9), c);
+    vxBall(head, 6.5, H.y1 + 6.4, -0.5, 1.7, 0xffffff);
+  },
+  /** Doktorhut */
+  graduation(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0x1f2430;
+    vxHatDome(head, () => c);
+    head.box(-8, H.y1 + 3, -8, 7, H.y1 + 3, 7, c, 1);
+    head.set(-1, H.y1 + 4, -1, 0xfacc15, 3);
+    vxLine(head, [-1, H.y1 + 4, -1], [6, H.y1 + 3, 5], 0xfacc15); head.box(6, H.y1, 5, 6, H.y1 + 2, 5, 0xfacc15);
+  },
+  /** Dino-Mütze mit Zacken */
+  dino(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0x22c55e, c2 = o.c2 ?? 0xfacc15;
+    vxHatDome(head, (x, y, z) => (vxRand(x, y, z, 93) < 0.12 ? vxShade(c, -0.15) : c), { band: vxShade(c, -0.2) });
+    for (let k = 0; k < 6; k++) vxSpike(head, [0, H.y1 + 2, 4 - k * 2], [0, 1, -0.2], 4 - (k % 2), 1.3, [c2], 95, null, 'acc');
+    for (let x = -5; x <= 4; x += 2) head.set(x, H.y1 - 3, H.z1 + 2, 0xffffff);
+  },
+  /** Heiligenschein (leuchtet) */
+  halo(head) {
+    const y0 = vxHairTop(head) + 3;
+    for (let a = 0; a < 56; a++) { const t = (a / 56) * Math.PI * 2; head.set(Math.round(Math.cos(t) * 5.2 - 0.5), y0, Math.round(Math.sin(t) * 5.2 - 0.5), 0xfde68a, 2); }
+  },
+  /** Stirnband */
+  ninja(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0xdc2626;
+    for (const y of [8, 9]) vxRing(head, H.x0, H.z0, H.x1, H.z1, y, 1, () => c);
+    head.box(-1, 8, H.z1 + 2, 0, 9, H.z1 + 2, o.c2 ?? 0xffffff, 3);
+    vxLine(head, [0, 8, H.z0 - 2], [3, 5, H.z0 - 4], c); vxLine(head, [-1, 8, H.z0 - 2], [-3, 4, H.z0 - 3], c);
+  },
+  /** Rentier-Geweih */
+  antlers(head) {
+    const y0 = VX_HEAD.y1 - 1, c = 0x8b5a2b; // am Schädel verankert, ragt aus den Haaren
+    const thick = (a, b) => { const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) * 2); for (let i = 0; i <= n; i++) { const t = i / n; vxBall(head, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, 0.9, c); } };
+    for (const s2 of [-1, 1]) {
+      const bx = s2 < 0 ? -4 : 3;
+      thick([bx, y0, 0], [bx + s2 * 3, y0 + 11, 0]); thick([bx + s2 * 2, y0 + 7, 0], [bx + s2 * 6, y0 + 8, 0]); thick([bx + s2 * 2.5, y0 + 9, 0], [bx + s2 * 2.5, y0 + 13, 0]);
+    }
+  },
+  /** Froschmütze mit Glupschaugen */
+  frog(head, o) {
+    const H = VX_HEAD, c = o.c ?? 0x4ade80;
+    vxHatDome(head, () => c, { band: vxShade(c, -0.18) });
+    for (const x of [-4, 3]) { vxBall(head, x, H.y1 + 3.5, 0.5, 2.3, 0xffffff); head.box(x, H.y1 + 3, 2, x + 1, H.y1 + 4, 2, 0x111827, 1); }
+  },
+});
+Object.assign(VX_GLASSES, {
+  /** Monokel mit Kettchen */
+  monocle: () => { const s = new VoxSet(); for (let x = 1; x <= 11; x++) for (let y = 7; y <= 17; y++) { const d = Math.hypot(x + 0.5 - 6, y + 0.5 - 12); if (d <= 3.7 && d > 2.8) s.set(x, y, 13, 0xd4a017, 3); } vxLine(s, [9, 9, 13], [11, 2, 11], 0xd4a017, 3); return s; },
+  /** Pixel-Sonnenbrille */
+  pixel: () => {
+    const s = new VoxSet();
+    for (let x = -11; x <= 10; x++) s.set(x, 14, 13, 0x111111, 1);
+    for (const [x0, x1] of [[-10, -2], [1, 9]]) for (let x = x0; x <= x1; x++) for (let y = 10; y <= 13; y++) { if (y === 10 && (x === x0 || x === x1)) continue; s.set(x, y, 13, y === 13 && (x === x0 + 1 || x === x0 + 2) ? 0xffffff : 0x111111, 1); }
+    for (const sg of [-1, 1]) vxLine(s, [sg < 0 ? -12 : 11, 14, 13], [sg < 0 ? -13 : 12, 13, -1], 0x111111, 1);
+    return s;
+  },
+  /** Regenbogen-Brille */
+  rainbow: () => {
+    const s = new VoxSet(); vxGlassFrame(s, (x, y) => { const d = Math.hypot(x, y); return d <= 3.6 && d > 2.4 ? 1 : 0; }, 0xffffff);
+    const R = [0xef4444, 0xf97316, 0xfacc15, 0x22c55e, 0x3b82f6, 0x8b5cf6];
+    for (const v of s.m.values()) v.c = R[Math.abs(Math.floor((v.y - 7) / 2)) % 6];
+    return s;
+  },
+  /** Skibrille (verspiegelt) */
+  ski: (o) => {
+    const s = new VoxSet(), c = o.c ?? 0x1f2430;
+    for (let a = 0; a < 120; a++) { const t = (a / 120) * Math.PI * 2, x = Math.round(Math.cos(t) * 13.4 - 0.5), z = Math.round(Math.sin(t) * 13.4 - 0.5); if (z < 9) for (const y of [11, 12, 13]) s.set(x, y, z, c); }
+    for (let x = -11; x <= 10; x++) for (let y = 8; y <= 16; y++) { const d = Math.hypot((x + 0.5) / 11.2, (y + 0.5 - 12) / 4.4); if (d <= 1) s.set(x, y, 13, d > 0.86 ? c : vxMix(0xf97316, 0xec4899, (y - 8) / 8), 1); }
+    return s;
+  },
+  /** Heldenmaske */
+  mask: (o) => {
+    const s = new VoxSet(), c = o.c ?? 0x1f2430;
+    for (let x = -12; x <= 11; x++) for (let y = 9; y <= 15; y++) {
+      const hole = [-6, 6].some((cx) => Math.hypot((x + 0.5 - cx) / 2.6, (y + 0.5 - 12) / 2.2) < 1);
+      if (!hole && Math.abs(x + 0.5) < 11.6 - Math.max(0, y - 13) * 2.5 - Math.max(0, 10 - y) * 2) s.set(x, y, 13, c, 1);
+    }
+    for (const sg of [-1, 1]) vxLine(s, [sg < 0 ? -12 : 11, 12, 13], [sg < 0 ? -13 : 12, 12, -1], c, 1);
+    return s;
+  },
+});
+Object.assign(VX_NECK, {
+  /** Krawatte */
+  tie(T, o) {
+    const c = o.c ?? 0xdc2626, c2 = o.c2 ?? 0xfacc15;
+    T.box(-1, 9, 4, 0, 10, 5, vxShade(c, -0.15));
+    for (let y = 2; y <= 8; y++) for (let x = -1; x <= 0; x++) T.set(x, y, 4, y % 3 === 0 ? c2 : c);
+    T.set(-1, 1, 4, c).set(0, 1, 4, c);
+  },
+  /** Blumenkette */
+  lei(T) {
+    const cols = [0xff5fa8, 0xffd23f, 0xff7a1a, 0xffffff, 0xb06bff];
+    for (let x = -5; x <= 4; x++) { const y = 10 - Math.round(3 * (1 - ((x + 0.5) / 5) ** 2)); T.set(x, y, 4, cols[(x + 10) % 5], 1); T.set(x, y + 1, 4, cols[(x + 12) % 5], 1); }
+    for (const x of [-5, 4]) for (let z = -3; z <= 3; z++) T.set(x + (x < 0 ? -1 : 1), 10, z, cols[(z + 10) % 5], 1);
+  },
+  /** Diamantkette (leuchtet) */
+  diamond(T) {
+    for (let x = -4; x <= 3; x++) { const y = 10 - Math.round(3 * (1 - ((x + 0.5) / 4.2) ** 2)); T.set(x, y, 4, 0xe5e7eb, 3); }
+    for (let y = 2; y <= 6; y++) { const r = y <= 4 ? y - 2 : 6 - y; for (let x = -r; x <= r; x++) T.set(x, y, 5, y === 4 ? 0xbae6fd : 0x67e8f9, 2); }
+  },
+  /** Trillerpfeife */
+  whistle(T) {
+    vxLine(T, [-4, 10, 4], [-1, 5, 4], 0xef4444); vxLine(T, [3, 10, 4], [0, 5, 4], 0xef4444);
+    T.box(-1, 3, 4, 1, 4, 6, 0xfacc15, 1); T.set(1, 4, 7, 0xfacc15, 1);
+  },
+});
+Object.assign(VX_HAND, {
+  sword: { rx: Math.PI / 2, rz: 0.2, build() { const s = new VoxSet(); s.box(0, -3, 0, 0, 0, 0, 0x7c4a1c); s.box(-3, 1, 0, 3, 1, 0, 0xd4a017, 3); for (let y = 2; y <= 18; y++) s.box(-1, y, 0, 1, y, 0, y === 18 ? 0xe5e7eb : (y % 4 === 0 ? 0xcbd5e1 : 0xe5e7eb), 3); s.set(0, 19, 0, 0xe5e7eb, 3); s.set(0, -4, 0, 0xd4a017, 3); return s; } },
+  fishing: { x: 3, build() { const s = new VoxSet(); s.box(0, 0, 0, 0, 22, 0, 0x7c4a1c); s.box(-1, 3, 0, 1, 4, 1, 0x9ca3af, 3); vxLine(s, [0, 22, 0], [6, 10, 0], 0xe5e7eb); s.box(5, 7, 0, 8, 9, 0, 0xf97316); s.set(9, 8, 0, 0xf97316); s.set(9, 9, 0, 0xf97316); s.set(9, 7, 0, 0xf97316); s.set(5, 8, 1, 0x111111); return s; } },
+  lantern: { x: 2, build() { const s = new VoxSet(); s.box(0, 0, 0, 0, 6, 0, 0x4b5563, 3); s.box(-2, -6, -2, 1, -6, 1, 0x374151, 3); s.box(-2, -1, -2, 1, -1, 1, 0x374151, 3); s.box(-1, -5, -1, 0, -2, 0, 0xffd36b, 2); for (const [x, z] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) s.box(x, -5, z, x, -2, z, 0x374151, 3); return s; } },
+  tennis: { rx: Math.PI / 2, build() { const s = new VoxSet(); s.box(0, 0, 0, 0, 7, 0, 0x1f2430); for (let x = -4; x <= 4; x++) for (let y = 8; y <= 18; y++) { const d = Math.hypot(x / 4.6, (y - 13) / 5.6); if (d <= 1) s.set(x, y, 0, d > 0.8 ? 0xef4444 : ((x + y) % 2 ? 0xf8fafc : 0xe2e8f0), d > 0.8 ? 1 : 0); } return s; } },
+  donut: { z: 2, build() { const s = new VoxSet(); for (let x = -4; x <= 3; x++) for (let y = 0; y <= 7; y++) for (let z = -1; z <= 1; z++) { const d = Math.hypot(x + 0.5, y - 3.5); if (d <= 4 && d >= 1.6) s.set(x, y, z, z >= 1 ? (vxRand(x, y, z, 7) < 0.25 ? [0xffffff, 0x60a5fa, 0xfacc15][Math.floor(vxRand(x, y, 1) * 3)] : 0xf472b6) : 0xd6a15a); } return s; } },
+  pizza: { rx: Math.PI / 2, build() { const s = new VoxSet(); for (let y = 0; y <= 10; y++) for (let x = -Math.floor(y / 2); x <= Math.floor(y / 2); x++) s.set(x, y, 0, y >= 9 ? 0xd6a15a : (vxRand(x, y, 0, 3) < 0.15 ? 0xdc2626 : 0xfacc15)); return s; } },
+  duck: { z: 2, build() { const s = new VoxSet(); vxBall(s, 0, 2, 0, 3, 0xfacc15, { mat: 1 }); vxBall(s, 0, 6, 1, 2, 0xfacc15, { mat: 1 }); s.box(-1, 5, 3, 0, 5, 4, 0xf97316, 1); s.set(-2, 7, 2, 0x111111).set(1, 7, 2, 0x111111); return s; } },
+  laser: { rx: Math.PI / 2, iter: 4, build(o) { const s = new VoxSet(), c = o?.c ?? 0x22d3ee; s.box(-1, -3, -1, 0, 1, 0, 0x9ca3af, 3); s.box(-1, 2, -1, 0, 2, 0, 0x374151, 3); for (let y = 3; y <= 22; y++) s.box(-1, y, -1, 0, y, 0, y > 20 ? vxShade(c, 0.4) : c, 2); return s; } },
+  orb: { z: 3, build(o) { const s = new VoxSet(); s.box(-2, 0, -2, 1, 1, 1, 0xd4a017, 3); vxBall(s, -0.5, 4.5, -0.5, 3.2, (x, y, z) => vxMix(o?.c ?? 0x8b5cf6, 0x22d3ee, Math.max(0, Math.min(1, (y - 2) / 6))), { mat: 2 }); return s; } },
+  trident: { rx: Math.PI / 2, rz: 0.15, build() { const s = new VoxSet(), g = 0xfacc15; s.box(0, -6, 0, 0, 16, 0, g, 3); s.box(-3, 16, 0, 3, 16, 0, g, 3); for (const x of [-3, 0, 3]) s.box(x, 17, 0, x, x === 0 ? 22 : 20, 0, g, 3); return s; } },
+  telescope: { rx: Math.PI / 2, build() { const s = new VoxSet(); for (let y = 0; y <= 14; y++) { const r = y < 5 ? 1 : y < 10 ? 1.4 : 1.9; for (let x = -2; x <= 1; x++) for (let z = -2; z <= 1; z++) if (Math.hypot(x + 0.5, z + 0.5) <= r) s.set(x, y, z, y === 4 || y === 9 ? 0xd4a017 : 0x7c4a1c, y === 4 || y === 9 ? 3 : 0); } return s; } },
+  paintbrush: { rx: Math.PI / 2, build(o) { const s = new VoxSet(); s.box(0, 0, 0, 0, 10, 0, 0xd6a15a); s.box(0, 11, 0, 0, 12, 0, 0x9ca3af, 3); s.box(-1, 13, -1, 0, 16, 0, o?.c ?? 0x3b82f6); return s; } },
+});
+Object.assign(VX_BACK, {
+  /** Schildkrötenpanzer */
+  shell(T) {
+    for (let x = -6; x <= 5; x++) for (let y = -1; y <= 11; y++) for (let z = -9; z <= -4; z++) {
+      const d = ((x + 0.5) / 6.3) ** 2 + ((y - 5) / 6.6) ** 2 + ((z + 4) / 5) ** 2;
+      if (d > 1 || z > -4) continue;
+      const hex = (Math.floor((x + 20) / 3) + Math.floor((y + 20) / 3)) % 2;
+      T.set(x, y, z, d > 0.86 ? 0xd9c27a : hex ? 0x4d7c2f : 0x3f6a25);
+    }
+  },
+  /** Köcher mit Pfeilen */
+  quiver(T) {
+    for (let y = 0; y <= 9; y++) T.box(2 - Math.floor(y / 3), y, -7, 4 - Math.floor(y / 3), y, -5, 0x7c4a1c);
+    for (const [x, c] of [[0, 0xef4444], [1, 0x3b82f6], [-1, 0xfacc15]]) { vxLine(T, [x + 1, 9, -6], [x - 1, 14, -6], 0xd6a15a); T.box(x - 2, 14, -6, x - 1, 15, -6, c); }
+    vxLine(T, [-4, 10, 4], [3, 1, 4], 0x7c4a1c);
+  },
+  /** Surfbrett */
+  surfboard(T, o) {
+    const c = o.c ?? 0x22d3ee, c2 = o.c2 ?? 0xffffff;
+    for (let y = -6; y <= 17; y++) { const w = Math.round(3.4 * Math.sin(((y + 7) / 25) * Math.PI)); for (let x = -w; x <= w; x++) T.set(x, y, -6, Math.abs(x) <= 0 ? c2 : c, 1); }
+    vxLine(T, [-4, 10, 4], [3, 1, 4], 0x1f2430);
+  },
+  /** Fledermausflügel */
+  bat(T, o) {
+    const c = o.c ?? 0x4c1d95, rib = 0x1f2430;
+    for (const s of [-1, 1]) for (let i = 0; i <= 11; i++) {
+      const x = s > 0 ? 5 + i : -6 - i, yu = 9 + Math.round(i * 0.45), yl = 3 + Math.round(Math.abs(Math.sin(i * 0.8)) * 3) + Math.round(i * 0.3);
+      for (let y = yl; y <= yu; y++) T.set(x, y, -5, i % 4 === 0 ? rib : c);
+    }
+  },
+  /** Feenflügel (leuchten) */
+  fairy(T, o) {
+    const c = o.c ?? 0xa5f3fc, c2 = o.c2 ?? 0xf0abfc;
+    for (const s of [-1, 1]) for (const [cx, cy, rx, ry] of [[7.5, 11, 4.5, 5], [6.5, 3.5, 3.2, 3]]) for (let x = -14; x <= 14; x++) for (let y = -2; y <= 17; y++) {
+      const dx = (x + 0.5 - s * cx) / rx, dy = (y - cy) / ry, d = dx * dx + dy * dy;
+      if (d > 1 || Math.sign(x + 0.5) !== s) continue;
+      T.set(x, y, -5, d > 0.8 ? 0xffffff : vxMix(c, c2, d), 2);
+    }
+  },
+  /** Taucherflasche */
+  tank(T) {
+    for (const x0 of [-3, 1]) { for (let y = 0; y <= 9; y++) T.box(x0, y, -8, x0 + 1, y, -6, y === 9 ? 0x374151 : 0xfacc15, y === 9 ? 3 : 1); T.set(x0, 10, -7, 0x9ca3af, 3); }
+    vxLine(T, [-1, 10, -7], [-2, 12, -2], 0x1f2430);
+  },
+  /** Phönixflügel (glühend) */
+  phoenix(T) {
+    for (const s of [-1, 1]) for (let i = 0; i <= 13; i++) {
+      const x = s > 0 ? 5 + i : -6 - i, yl = 3 + Math.round(i * 0.25), yu = 9 + Math.round(i * 0.55) + (i % 3 === 2 ? 1 : 0);
+      for (let y = yl; y <= yu; y++) T.set(x, y, -5, vxMix(0xffd23f, 0xff3d00, Math.min(1, (y - yl) / Math.max(1, yu - yl) * 0.6 + i / 26)), 2);
+    }
+  },
+});
+Object.assign(VX_PETS, {
+  penguin() {
+    const s = new VoxSet();
+    vxBall(s, 0, 5, 1, 4.2, (x, y, z) => (z >= 3 && Math.abs(x + 0.5) < 3 && y < 9 ? 0xffffff : 0x1f2430), { sy: 1.4 });
+    s.box(-1, 7, 6, 0, 7, 7, 0xf59e0b); for (const x of [-2, 1]) s.box(x, 0, 2, x + 1, 0, 4, 0xf59e0b);
+    for (const x of [-5, 4]) s.box(x, 3, 0, x, 7, 2, 0x1f2430);
+    return { s, eyes: [[-3, 17], [3, 17]], front: 11 };
+  },
+  fox(o) {
+    const s = new VoxSet(), c = o.c ?? 0xf97316;
+    s.box(-2, 1, -4, 2, 4, 3, c); for (const [x, z] of [[-2, -4], [1, -4], [-2, 2], [1, 2]]) s.box(x, 0, z, x + 1, 0, z + 1, 0x1f2430);
+    s.box(-3, 4, 1, 3, 9, 6, c); s.box(-2, 4, 6, 2, 6, 8, 0xffffff); s.box(-1, 6, 9, 0, 6, 9, 0x1f2430);
+    for (const x of [-3, 2]) { s.box(x, 10, 3, x + 1, 12, 4, c); s.set(x + (x < 0 ? 1 : 0), 12, 4, 0x1f2430); }
+    vxSpike(s, [0, 3, -5], [0, 0.6, -1], 7, 1.8, [c], 1, null, null); vxBall(s, 0, 5.5, -11, 1.4, 0xffffff);
+    return { s, eyes: [[-3, 15], [3, 15]], front: 13 };
+  },
+  panda() {
+    const s = new VoxSet();
+    vxBall(s, 0, 4, 0, 4, (x, y) => (y < 4 ? 0x1f2430 : 0xffffff)); vxBall(s, 0, 10, 1, 3.6, 0xffffff);
+    for (const x of [-3, 3]) vxBall(s, x, 13, 0, 1.2, 0x1f2430);
+    for (const x of [-2, 1]) s.box(x, 10, 4, x + 1, 11, 4, 0x1f2430);
+    s.set(-1, 8, 5, 0x1f2430).set(0, 8, 5, 0x1f2430);
+    return { s, eyes: [[-3, 21], [3, 21]], eyeC: 0xffffff, front: 10 };
+  },
+  parrot(o) {
+    const s = new VoxSet(), c = o.c ?? 0xef4444;
+    vxBall(s, 0, 5, 0, 3, c, { sy: 1.3 }); vxBall(s, 0, 10, 1, 2.6, c);
+    s.box(-1, 9, 4, 0, 10, 5, 0xfde68a, 1); s.set(-1, 8, 5, 0x1f2430);
+    for (const x of [-4, 3]) s.box(x, 3, -1, x, 7, 2, x < 0 ? 0x22c55e : 0x3b82f6);
+    vxLine(s, [0, 3, -3], [0, -2, -6], 0x3b82f6); vxLine(s, [1, 3, -3], [1, -1, -6], 0xfacc15);
+    for (const x of [-2, 1]) s.box(x, 0, 0, x, 1, 1, 0x9ca3af);
+    return { s, eyes: [[-3, 21], [3, 21]], front: 9 };
+  },
+  owl(o) {
+    const s = new VoxSet(), c = o.c ?? 0x92400e;
+    vxBall(s, 0, 5, 0, 4.2, (x, y, z) => (z >= 3 && y < 7 ? 0xfde68a : c), { sy: 1.25 });
+    for (const x of [-4, 3]) s.box(x, 10, 0, x + 1, 11, 1, c);
+    for (const x of [-3, 1]) s.box(x, 6, 4, x + 2, 8, 4, 0xffffff);
+    s.box(-1, 5, 5, 0, 5, 5, 0xf59e0b);
+    return { s, eyes: [[-4, 14], [3, 14]], front: 9 };
+  },
+  unicorn(o) {
+    const s = new VoxSet(), c = o.c ?? 0xffffff, R = [0xef4444, 0xf97316, 0xfacc15, 0x22c55e, 0x3b82f6, 0x8b5cf6];
+    s.box(-2, 3, -5, 2, 7, 4, c); for (const [x, z] of [[-2, -5], [1, -5], [-2, 3], [1, 3]]) s.box(x, 0, z, x + 1, 2, z + 1, c);
+    s.box(-2, 7, 2, 2, 12, 6, c); s.box(-2, 8, 7, 2, 10, 8, c);
+    for (let y = 6; y <= 12; y++) s.box(0, y, 0 + (y > 9 ? 1 : 0), 0, y, 1 + (y > 9 ? 1 : 0), R[y % 6]);
+    for (let k = 0; k < 6; k++) s.set(0, 3 + k, -6 - (k % 2), R[k]);
+    for (let k = 0; k < 4; k++) s.set(0, 13 + k, 5 + Math.floor(k / 2), 0xfacc15, 3);
+    return { s, eyes: [[-3, 23], [2, 23]], front: 13 };
+  },
+  slime(o) {
+    const s = new VoxSet(), c = o.c ?? 0x4ade80;
+    vxBall(s, 0, 3, 0, 4.2, (x, y, z) => (vxRand(x, y, z, 31) < 0.06 ? vxShade(c, 0.35) : c), { mat: 1, sy: 0.85, avoid: (x, y) => y < 0 });
+    vxBall(s, 0, 7, 0, 1.6, c, { mat: 1 });
+    return { s, eyes: [[-3, 9], [3, 9]], front: 9 };
+  },
+});
+Object.assign(VX_TOPS, {
+  /** Ringel-Shirt */
+  striped(P, o) {
+    P.torso.paint((v) => (v.y >= 2 ? (v.y % 2 ? o.c : o.trim) : null));
+    for (const arm of [P.armR, P.armL]) arm.paint((v) => (v.y >= -3 ? (v.y % 2 ? o.c : o.trim) : null));
+  },
+  /** Hawaiihemd mit Blumen */
+  hawaii(P, o) {
+    const flower = (x, y, z) => vxRand(Math.floor((x + 20) / 2), Math.floor((y + 20) / 2), Math.floor((z + 20) / 2), 41) < 0.22;
+    P.torso.paint((v) => (v.y >= 2 ? (flower(v.x, v.y, v.z) ? (vxRand(v.x, v.y, v.z, 3) < 0.5 ? o.trim : 0xfacc15) : o.c) : null));
+    for (const arm of [P.armR, P.armL]) arm.paint((v) => (v.y >= -3 ? (flower(v.x, v.y, v.z) ? o.trim : o.c) : null));
+    for (let y = 6; y <= 10; y++) P.torso.recolor(y > 8 ? -1 : 0, y, 2, 0xffffff).recolor(y > 8 ? 0 : -1, y, 2, P.skin);
+    for (const x of [-3, 2]) P.torso.recolor(x, 10, 2, 0xffffff);
+  },
+});
