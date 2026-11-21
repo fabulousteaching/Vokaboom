@@ -191,7 +191,85 @@ function vxGeometry(T, set, { ao = 0.14, noise = 0.025, seed = 0 } = {}) {
  * Jede sichtbare Voxel-Fläche wird zu einem Viereck; dessen Ecken liegen in den Nachbarzellen und werden geglättet.
  * decal: optional { test(v, a, s) → bool, uv(x, y, z) → [u, v] } – sammelt Flächen für ein aufgelegtes Bild (Gesicht).
  */
-function vxSmoothGeometry(T, set, { iter = VOX.round, ao = 0, noise = 0, seed = 0, decal = null } = {}) {
+/**
+ * Glatte Oberfläche (für Lack, Kunststoff …): Das Voxel-Volumen wird weichgezeichnet (Gauss, sigma in Voxeln).
+ * - Normalen aus dem Gefälle des weichen Volumens → Glanzlichter ohne „Knet-Wellen“
+ * - dicke Stellen (innen > 0,75) werden auf die glatte Hülle (Wert 0,5) gezogen; dünne Teile (Stangen, Flügel) bleiben, wie sie sind
+ */
+function vxField(set, sigma) {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (const v of set.m.values()) { if (v.x < x0) x0 = v.x; if (v.y < y0) y0 = v.y; if (v.z < z0) z0 = v.z; if (v.x > x1) x1 = v.x; if (v.y > y1) y1 = v.y; if (v.z > z1) z1 = v.z; }
+  const R = Math.max(1, Math.ceil(sigma * 2.5)), pad = R + 2;
+  const ox = x0 - pad, oy = y0 - pad, oz = z0 - pad;
+  const nx = x1 - x0 + 1 + pad * 2, ny = y1 - y0 + 1 + pad * 2, nz = z1 - z0 + 1 + pad * 2;
+  let a = new Float32Array(nx * ny * nz), b = new Float32Array(nx * ny * nz);
+  for (const v of set.m.values()) a[(v.x - ox) + nx * ((v.y - oy) + ny * (v.z - oz))] = 1;
+  const K = []; let ks = 0;
+  for (let i = -R; i <= R; i++) { const w = Math.exp(-(i * i) / (2 * sigma * sigma)); K.push(w); ks += w; }
+  for (let i = 0; i < K.length; i++) K[i] /= ks;
+  const pass = (dx, dy, dz) => {
+    const st = dx + nx * (dy + ny * dz), len = dx ? nx : dy ? ny : nz;
+    b.fill(0);
+    for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      const i = x + nx * (y + ny * z), c = dx ? x : dy ? y : z;
+      let acc = 0;
+      for (let k = -R; k <= R; k++) { const cc = c + k; if (cc >= 0 && cc < len) acc += a[i + k * st] * K[k + R]; }
+      b[i] = acc;
+    }
+    [a, b] = [b, a];
+  };
+  pass(1, 0, 0); pass(0, 1, 0); pass(0, 0, 1);
+  const F = a;
+  const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= nx || y >= ny || z >= nz ? 0 : F[x + nx * (y + ny * z)]);
+  // Wert an einer Stelle der Oberfläche (Voxel v liegt bei v + 0,5)
+  const val = (px, py, pz) => {
+    const gx = px - 0.5 - ox, gy = py - 0.5 - oy, gz = pz - 0.5 - oz;
+    const ix = Math.floor(gx), iy = Math.floor(gy), iz = Math.floor(gz), fx = gx - ix, fy = gy - iy, fz = gz - iz;
+    let s = 0;
+    for (let d = 0; d < 8; d++) {
+      const ax = d & 1, ay = (d >> 1) & 1, az = (d >> 2) & 1;
+      s += at(ix + ax, iy + ay, iz + az) * (ax ? fx : 1 - fx) * (ay ? fy : 1 - fy) * (az ? fz : 1 - fz);
+    }
+    return s;
+  };
+  const grad = (px, py, pz, h = 0.5) => [
+    (val(px + h, py, pz) - val(px - h, py, pz)) / (2 * h),
+    (val(px, py + h, pz) - val(px, py - h, pz)) / (2 * h),
+    (val(px, py, pz + h) - val(px, py, pz - h)) / (2 * h)];
+  return { val, grad };
+}
+function vxFieldRefine(P, N, nv, set, sigma, project = true) {
+  const { val, grad } = vxField(set, sigma);
+  for (let i = 0; i < nv; i++) {
+    let x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+    let g = grad(x, y, z), gl = Math.hypot(g[0], g[1], g[2]);
+    if (gl < 0.02) continue; // kein klares Gefälle (z. B. tief in einer Spalte): Mesh-Normale behalten
+    let nxv = -g[0] / gl, nyv = -g[1] / gl, nzv = -g[2] / gl;
+    if (project && val(x - nxv * 1.3, y - nyv * 1.3, z - nzv * 1.3) > 0.75) {
+      const sx = x, sy = y, sz = z;
+      for (let it = 0; it < 3; it++) {
+        const f = val(x, y, z) - 0.5;
+        g = grad(x, y, z); const g2 = g[0] * g[0] + g[1] * g[1] + g[2] * g[2];
+        if (g2 < 1e-4) break;
+        let k = f / g2;
+        const st = Math.hypot(g[0] * k, g[1] * k, g[2] * k);
+        if (st > 0.4) k *= 0.4 / st;
+        x -= g[0] * k; y -= g[1] * k; z -= g[2] * k;
+      }
+      const d = Math.hypot(x - sx, y - sy, z - sz);
+      if (d > 0.8) { const f = 0.8 / d; x = sx + (x - sx) * f; y = sy + (y - sy) * f; z = sz + (z - sz) * f; }
+      P[i * 3] = x; P[i * 3 + 1] = y; P[i * 3 + 2] = z;
+      g = grad(x, y, z); gl = Math.hypot(g[0], g[1], g[2]) || 1;
+      nxv = -g[0] / gl; nyv = -g[1] / gl; nzv = -g[2] / gl;
+    }
+    // Normale: weiche Feld-Normale, bei schwachem Gefälle mit der Mesh-Normale gemischt
+    const w = Math.min(1, gl / 0.12);
+    const mx = N[i * 3] * (1 - w) + nxv * w, my = N[i * 3 + 1] * (1 - w) + nyv * w, mz = N[i * 3 + 2] * (1 - w) + nzv * w;
+    const l = Math.hypot(mx, my, mz) || 1;
+    N[i * 3] = mx / l; N[i * 3 + 1] = my / l; N[i * 3 + 2] = mz / l;
+  }
+}
+function vxSmoothGeometry(T, set, { iter = VOX.round, ao = 0, noise = 0, seed = 0, decal = null, field = 0, project = true } = {}) {
   const S = VOX.S;
   const vid = new Map(), P = [];
   const EDGES = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
@@ -267,6 +345,7 @@ function vxSmoothGeometry(T, set, { iter = VOX.round, ao = 0, noise = 0, seed = 
     if (q.dec) { const l = Math.hypot(n[0], n[1], n[2]) || 1; q.dec = n[2] / l > 0.35; } // Gesichtsbild nur auf Flächen, die nach vorne zeigen
   }
   for (let i = 0; i < nv; i++) { const l = Math.hypot(N[i * 3], N[i * 3 + 1], N[i * 3 + 2]) || 1; N[i * 3] /= l; N[i * 3 + 1] /= l; N[i * 3 + 2] /= l; }
+  if (field > 0) vxFieldRefine(P, N, nv, set, field, project);
   // Dreiecke je Material
   const per = new Map();
   const dPos = [], dNor = [], dUv = [];
@@ -1817,7 +1896,7 @@ function vxFigure(T, look, { lite = false } = {}) {
   if (look.effect) { fx = vxEffect(T, look.effect.id, look.effect.c); if (fx) root.add(fx); }
 
   /* Animationen: Zielhaltung pro Bild, weich überblendet */
-  const st = { anim: 'idle', t: 0, cur: {}, steer: 0, mood: '' };
+  const st = { anim: 'idle', t: 0, cur: {}, steer: 0, mood: '', rate: 1, ph: 0 };
   const hold = item ? -0.55 : 0;
   const poses = {
     idle: (t) => ({ by: Math.sin(t * 2.2) * 0.006, hx: Math.sin(t * 1.3) * 0.03, hy: Math.sin(t * 0.6) * 0.12, arx: hold + Math.sin(t * 2.2) * 0.05, alx: -Math.sin(t * 2.2) * 0.05, arz: 0.04, alz: -0.04 }),
@@ -1835,6 +1914,11 @@ function vxFigure(T, look, { lite = false } = {}) {
     sit: (t) => ({ drop: 0.62, lrx: -1.5, llx: -1.5, arx: -0.7, alx: -0.7, arz: 0.15, alz: -0.15, by: Math.sin(t * 2) * 0.005, hy: Math.sin(t * 0.7) * 0.15 }),
     shy: (t) => ({ arx: 0.35, alx: 0.35, arz: -0.2, alz: 0.2, hx: 0.22, hy: Math.sin(t * 1.2) * 0.1, tz: Math.sin(t * 1.6) * 0.04 }),
     laugh: (t) => ({ tx: -0.12 + Math.abs(Math.sin(t * 9)) * 0.06, by: Math.abs(Math.sin(t * 9)) * 0.04, arx: -0.4, alx: -0.4, arz: -0.3, alz: 0.3, hx: -0.2 }),
+    // Lauf-Spiel: rennen (Tempo mit setRate), springen, rutschen, stolpern; k = wie schnell die Haltung wechselt
+    run: () => { const s = Math.sin(st.ph), c = Math.cos(st.ph); return { k: 30, lrx: s * 0.95, llx: -s * 0.95, arx: -s * 0.9 + hold * 0.4, alx: s * 0.9, arz: 0.14, alz: -0.14, by: Math.abs(c) * 0.06, tx: 0.2, hx: -0.12, tz: s * 0.04, ty: s * 0.06 }; },
+    leap: (t) => ({ k: 16, lrx: -1.05, llx: 0.5, arx: -0.5, alx: 0.4, arz: 0.75 + Math.sin(t * 9) * 0.05, alz: -0.75, tx: 0.12, hx: -0.18 }),
+    slide: () => ({ k: 20, drop: 0.5, tx: -1.0, lrx: -1.4, llx: -1.25, arx: 0.35, alx: 0.35, arz: 0.5, alz: -0.5, hx: 0.55 }),
+    oops: (t) => ({ k: 14, arz: 2.3 + Math.sin(t * 22) * 0.35, alz: -2.3 - Math.sin(t * 22) * 0.35, tx: -0.35, hx: -0.25, lrx: -0.5, llx: 0.3, by: 0.05 }),
     // im Kart: sitzen, Beine nach vorne, beide Hände am Lenkrad; lenken mit st.steer (-1 links … 1 rechts)
     drive: (t) => { const s = st.steer; return { lrx: -1.45, llx: -1.45, arx: -1.12 + s * 0.2, alx: -1.12 - s * 0.2, arz: -0.36, alz: 0.36, hy: -s * 0.3, tz: s * 0.09, hx: 0.04 + Math.sin(t * 9) * 0.008, by: st.mood === 'turbo' ? Math.abs(Math.sin(t * 22)) * 0.012 : 0 }; },
   };
@@ -1861,6 +1945,10 @@ function vxFigure(T, look, { lite = false } = {}) {
     flex: () => ({ mouth: 'grin', brows: 'angry' }),
     shy: () => ({ mouth: 'wavy', brows: 'sad', blush: true }),
     laugh: () => ({ mouth: 'laugh', eyes: 'happy' }),
+    run: () => (st.mood === 'win' ? { mouth: 'laugh', eyes: 'happy' } : st.mood === 'oops' ? { mouth: 'o', brows: 'raised' } : { mouth: baseMouth === 'calm' ? 'smirk' : 'grin' }),
+    leap: () => ({ mouth: 'laugh', eyes: 'happy' }),
+    slide: () => ({ mouth: 'o', eyes: 'happy' }),
+    oops: () => ({ mouth: 'o', brows: 'raised' }),
     drive: () => (st.mood === 'turbo' ? { mouth: 'laugh', eyes: 'happy' } : st.mood === 'oops' ? { mouth: 'o', brows: 'raised' } : st.mood === 'win' ? { mouth: 'laugh', eyes: 'happy' } : { mouth: baseMouth === 'calm' ? 'smirk' : 'grin' }),
   };
   st.blink = 1.5 + Math.random() * 2;
@@ -1873,9 +1961,10 @@ function vxFigure(T, look, { lite = false } = {}) {
   }
   function update(dt) {
     st.t += dt;
+    st.ph += dt * 14 * st.rate;
     expression(dt);
     const target = poses[st.anim](st.t);
-    const k = 1 - Math.exp(-dt * 9);
+    const k = 1 - Math.exp(-dt * (target.k || 9));
     for (const key of keys) {
       const goal = target[key] || 0;
       if (key === 'ty' && st.anim !== 'spin' && st.cur.ty != null && Math.abs(st.cur.ty) > Math.PI) st.cur.ty = ((st.cur.ty + Math.PI) % (Math.PI * 2)) - Math.PI;
@@ -1892,6 +1981,8 @@ function vxFigure(T, look, { lite = false } = {}) {
     /** im Kart: lenken (-1 … 1) und Stimmung ('', 'turbo', 'oops', 'win') */
     setSteer(s) { st.steer = Math.max(-1, Math.min(1, s || 0)); },
     setMood(m) { st.mood = m || ''; },
+    /** Lauf-Tempo (1 = normal) */
+    setRate(r) { st.rate = Math.max(0.3, Math.min(2.5, r || 1)); },
     get anim() { return st.anim; },
     update,
     tris() { let n = 0; root.traverse((o) => { if (o.isMesh) n += o.geometry.attributes.position.count / 3; }); return n; },

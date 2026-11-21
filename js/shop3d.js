@@ -330,6 +330,29 @@ const w3Script = (path) => new Promise((res, rej) => {
   s.onerror = () => rej(new Error(path));
   document.head.appendChild(s);
 });
+/** Welten-Lauf (js/runner3d.js + js/runworlds.js) erst bei Bedarf laden. Die Liste der Welten steht hier, damit die Startkarte sie schon zeigen kann. */
+const RUN_WORLD_INFO = [
+  { id: 'jungle', name: 'Dschungel', emoji: '🌴', desc: 'Alter Steinweg mitten durch den Urwald' },
+  { id: 'roofs', name: 'Über den Dächern', emoji: '🏙️', desc: 'Von Hochhaus zu Hochhaus in der Abendsonne' },
+  { id: 'desert', name: 'Wüste', emoji: '🏜️', desc: 'Dünen, Schluchten und alte Ruinen' },
+  { id: 'castle', name: 'Ritterburg', emoji: '🏰', desc: 'Zwischen Burgmauern, Türmen und Fahnen' },
+  { id: 'sea', name: 'Unter Wasser', emoji: '🐠', desc: 'Über den Meeresgrund zwischen Korallen' },
+];
+let w3RunnerP = null;
+function w3LoadRunner() {
+  if (typeof runnerStart === 'function' && typeof RUN_WORLDS === 'object') return w3LoadEngine();
+  if (!w3RunnerP) {
+    w3RunnerP = w3LoadEngine()
+      .then(() => (typeof runnerStart === 'function' ? null : w3Script('js/runner3d.js')))
+      .then(() => (typeof RUN_WORLDS === 'object' ? null : w3Script('js/runworlds.js')))
+      .catch((e) => { w3RunnerP = null; throw e; });
+  }
+  return w3RunnerP;
+}
+/** Welt-Auswahl (Startkarte in beiden Tools) */
+function w3RunWorldsHTML(cur, action = 'run-world') {
+  return `<div class="rn-worlds" role="radiogroup" aria-label="Welt">${RUN_WORLD_INFO.map((w) => `<button type="button" class="rn-world w-${w.id}" data-action="${action}" data-v="${w.id}" role="radio" aria-checked="${w.id === cur}"><span class="e" aria-hidden="true">${w.emoji}</span><b>${w.name}</b><small>${w.desc}</small></button>`).join('')}</div>`;
+}
 /** Avatar-Baukasten (js/avatar3d.js) und – wo es das Rennen gibt – Karts im Avatar-Stil (js/kartvox.js) erst bei Bedarf laden */
 function w3LoadEngine() {
   if (typeof vxFigure === 'function' && (typeof kartVoxModel === 'function' || !w3Garage())) return Promise.resolve();
