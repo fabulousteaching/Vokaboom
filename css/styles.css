@@ -1584,3 +1584,60 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 .tool-tile.vokaboom:hover { border-color: #4F46E5; }
 .tool-tile.teilmal { background: color-mix(in srgb, #0F766E 11%, var(--paper-2)); border-color: color-mix(in srgb, #0F766E 30%, transparent); }
 .tool-tile.teilmal:hover { border-color: #0F766E; }
+
+/* =========================================================
+   📱 Spiele auf Handy und Tablet: nie breiter als der Bildschirm;
+   quer (wenig Höhe) ohne Titel und mit weniger Rand
+   ========================================================= */
+.game-mode { grid-template-columns: minmax(0, 1fr); }
+.game-mode > *, .game-area > * { min-width: 0; }
+.game-area { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 560px) { .view:has(> .game-mode) { padding-top: 12px; padding-bottom: 28px; } .game-mode .mode-title { font-size: 1.35rem; } }
+@media (max-height: 560px) and (orientation: landscape) {
+  .view:has(> .game-mode) { padding-top: 8px; padding-bottom: 12px; }
+  .game-mode > .mode-bar { display: none; }
+  .topbar-inner { min-height: 54px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  /* Ballon-Platzen: Himmel so hoch wie der Bildschirm */
+  .balloon-sky { height: max(200px, calc(100dvh - 110px)); border-radius: 18px; }
+  .balloon-top { font-size: 1rem; }
+  /* Blitzrunde: Karte links, Knöpfe rechts */
+  .game-blitz .game-area { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); column-gap: 14px; row-gap: .5rem; align-items: center; }
+  .game-blitz .game-area > :is(.blitz-top, .progress, .hint) { grid-column: 1 / -1; margin: 0; }
+  .game-blitz .hint { font-size: .8rem; }
+  .blitz-stage { min-height: 0; height: max(140px, calc(100dvh - 190px)); }
+  .blitz-card { padding: .8rem 1.6rem; font-size: 2rem; }
+  .blitz-buttons { grid-template-columns: 1fr; align-self: stretch; align-content: center; }
+  /* Weck nicht den Drachen: Drache links, Wort und Buchstaben rechts */
+  .rocket-card { grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); column-gap: 14px; row-gap: .4rem; align-items: center; padding: 10px 14px; }
+  .rocket-card > .progress-label { grid-column: 1 / -1; margin: 0; }
+  .rocket-card .dg-stage { grid-column: 1; }
+  .rocket-card .dg-svg { max-height: calc(100dvh - 160px); width: auto; max-width: 100%; margin: 0 auto; }
+  .rocket-card .dg-say { font-size: .8rem; }
+  .rocket-card .rk-body { grid-column: 2; gap: .5rem; }
+  .rocket-card .rk-body > p { display: none; }
+  .rk-keys { grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
+  .rk-key { height: 36px; font-size: 1rem; }
+  .rk-l { height: 36px; }
+  /* Buchstabensalat: Anhören links, Buchstaben rechts */
+  .scramble-card { grid-template-columns: auto minmax(0, 1fr); grid-auto-flow: row dense; column-gap: 18px; row-gap: .5rem; align-items: center; padding: 10px 14px; }
+  .scramble-card > * { grid-column: 1; margin: 0; }
+  .scramble-card > :is(.scr-slots, .scr-tiles, .feedback) { grid-column: 2; }
+  /* Wortsuchsel: Gitter so hoch wie der Bildschirm, Wörter daneben */
+  .search-wrap { grid-template-columns: auto minmax(0, 1fr); gap: 14px; }
+  .ws-grid { width: calc(100dvh - 92px); padding: 6px; }
+  .ws-cell { font-size: .95rem; border-radius: 6px; }
+  /* Duell: beide Hälften nebeneinander */
+  .duel { grid-template-rows: none; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .duel-half { padding: 10px; gap: .5rem; }
+  .duel-half.p1 { transform: none; }
+  .duel-mid { flex-direction: column; box-shadow: none; }
+  .duel-opt { min-height: 44px; }
+  /* Memory (Zuordnen): zwei lange Reihen */
+  .match-mode { gap: 6px; }
+  .match-mode .mem-hint { display: none; }
+  .match-mode .mode-title { display: none; }
+  .match-mode .mem-grid { grid-template-columns: none; grid-auto-flow: column; grid-template-rows: repeat(2, max(64px, calc((100dvh - 160px) / 2))); grid-auto-columns: minmax(0, calc((100dvh - 160px) * .75)); justify-content: center; max-width: none; gap: 6px; }
+  .match-mode .mem { aspect-ratio: auto; height: 100%; }
+}

@@ -84,6 +84,21 @@
   .rn-ask { top: 88px; padding: 6px 16px 13px; min-width: min(80%, 290px); }
   .rn-ask small { font-size: .62rem; letter-spacing: .04em; }
  }
+/* Handy quer: Bühne so hoch wie der Bildschirm, Frage-Karte kleiner zwischen Anzeige links und Werten rechts */
+@media (max-height: 560px) and (orientation: landscape) {
+  .rn { height: calc(100dvh - 80px); min-height: 220px; border-radius: 16px; }
+  #rnwrap > .rn-load { min-height: 220px; }
+  .rn-top { left: 8px; right: 8px; top: 8px; }
+  .rn-stats { flex-direction: column; align-items: flex-end; gap: 4px; }
+  .rn-stats > span { padding: 3px 8px; font-size: .75rem; }
+  .rn-ask { top: 8px; padding: 4px 14px 9px; min-width: 0; max-width: 38%; border-radius: 16px; }
+  .rn-ask small { font-size: .55rem; letter-spacing: .03em; }
+  .rn-q { font-size: 1.5rem; }
+  .rn-q img, .rn-q svg, .rn-q .card-pic { max-height: 44px; }
+  .rn .run-hud, .rn-hud-box { padding: 3px 9px; gap: .45rem; font-size: .8rem; }
+  .rn .run-hud b { font-size: 1rem; }
+  .rn .run-hud .heart { width: 15px; height: 15px; }
+}
 /* Anzeige des Tools (Leben, Zeit, richtige) über dem Spiel */
 .rn .run-hud { padding: 6px 12px; border-radius: 99px; background: rgba(255, 255, 255, .92); box-shadow: 0 6px 18px -10px rgba(0, 0, 0, .5); }
 .rn-hud-box { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 99px; background: rgba(255, 255, 255, .92); font-weight: 800; color: #14213d; }

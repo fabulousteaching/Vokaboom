@@ -122,6 +122,7 @@ Mit „Ein Wort zählt ab … Punkten“ (Standard 60) stellst du ein, wie stren
 
 ## Browser
 
+- **Handy und iPad:** Alle Spiele sind auf Handy (hoch und quer) und iPad geprüft. Quer auf dem Handy fällt der Spieltitel weg, und die Spiele ordnen sich nebeneinander an (Ballon-Himmel so hoch wie der Bildschirm, Blitzrunde mit Knöpfen rechts, Drache links und Buchstaben rechts, Wortsuchsel mit Gitter links, Duell nebeneinander, Memory in zwei Reihen, Welten-Lauf mit kleinerer Frage-Karte). Nichts ist breiter als der Bildschirm.
 - **Spracherkennung** gibt es in Chrome, Edge und Safari (auch auf iPad/iPhone). Firefox kann das nicht; dort bewerten sich die Kinder selbst (anhören und vergleichen).
 - **Vorlesen**: Für angemeldete Lehrpersonen und Kinder mit Klassen-Login lesen zwei Frauenstimmen von [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) vor (frei nutzbar, Apache-2.0-Lizenz): britisch Emma und amerikanisch Heart. Jedes Wort wird nur einmal auf dem Gerät der Lehrperson erzeugt und im Audio-Speicher des Kontos abgelegt; Kinder-Geräte spielen die fertigen Aufnahmen sofort ab (siehe `supabase/ANLEITUNG.md`). Wer nicht angemeldet ist, hört zuerst die beste Frauenstimme seines Geräts; die Vokaboom-Stimme lädt im Hintergrund (einmalig ca. 90 MB, nicht im Datensparmodus) und liest danach vor. Über einen QR-Code geteilte Portionen spielen sofort die gespeicherten Aufnahmen der Lehrperson ab. Fehlt eine Aufnahme, und für deutsche Wörter, liest die Gerätestimme.
 
