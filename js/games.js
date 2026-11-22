@@ -1248,9 +1248,10 @@ async function runnerBegin(set) {
     hudHTML: hud(),
     hint: 'Lauf durch das richtige Wort',
     sound: db.settings.sound !== false,
-    gateEvery: 84,
+    gateEvery: 52, // häufiger Fragen
     startLevel: runnerSkill(set).start, // wer die Wörter schon gut kann, bekommt früher schwierigere Hindernisse
-    speed: (n) => Math.min(13, 8.2 + n * 0.15), // jedes richtige Wort ein bisschen schneller
+    unlock: { holes: 1, tall: 3, narrow: 5, roller: 7, single: 9 }, // neue Hindernisse kommen früher dazu
+    speed: (n) => Math.min(14.5, 8.6 + n * 0.3), // jedes richtige Wort spürbar schneller
     ask: () => {
       const w = pickNext(G.s.pk);
       const others = shuffle(G.s.words.filter((x) => x !== w && gameForm(x).toLowerCase() !== gameForm(w).toLowerCase())).slice(0, 2);

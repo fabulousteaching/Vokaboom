@@ -1062,10 +1062,7 @@ const RW_SEA = (() => {
     },
     decorate(ctx, wrap) {
       // Taucherhelm aus Glas und Luftblasen
-      const { T } = ctx;
-      const m = new T.MeshPhysicalMaterial({ color: 0xd8f6ff, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0, clearcoat: 1, depthWrite: false });
-      const h = new T.Mesh(new T.SphereGeometry(0.42, 24, 16), m); h.position.set(0, 1.32, 0); h.renderOrder = 4;
-      wrap.add(h); ctx.own.push(m, h.geometry);
+      // (Vokaboom: keine Glasblase um den Kopf – wirkte störend)
     },
     extras(ctx) {
       const { T } = ctx; const scene = ctx.fx;

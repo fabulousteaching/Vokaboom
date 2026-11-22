@@ -1193,7 +1193,7 @@ async function runnerStart(host, opts) {
       // Neues ankündigen
       elDist.textContent = Math.floor(S.d);
       const kmh = Math.round(S.base * 3.6);
-      if (elSpeed.textContent !== String(kmh)) { if (+elSpeed.textContent && kmh > +elSpeed.textContent) { elSpeed.parentNode.classList.remove('up'); void elSpeed.offsetWidth; elSpeed.parentNode.classList.add('up'); } elSpeed.textContent = kmh; }
+      if (elSpeed.textContent !== String(kmh)) elSpeed.textContent = kmh; // nur die Zahl, ohne Aufblinken
     }
     // rollende Hindernisse bewegen (erst, wenn sie in Sicht sind)
     for (const ob of obs) {
