@@ -27,6 +27,7 @@ const gamesOn = (set) => GAMES.filter((g) => !(set?.gamesOff || []).includes(g.i
 /* ---------- Hilfen ---------- */
 const G = { id: '', timers: [], raf: 0, keys: null, s: {} };
 function stopGame() {
+  if (typeof ambStop === 'function') ambStop();
   if (G.runner) { try { G.runner.dispose(); } catch (e) { console.warn(e); } G.runner = null; }
   ['rainCleanup', 'wsCleanup', 'fishCleanup', 'bridgeCleanup', 'detCleanup', 'gavCleanup', 's3Cleanup'].forEach((k) => { if (G[k]) { try { G[k](); } catch (e) { console.warn(e); } G[k] = null; } });
   G.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });

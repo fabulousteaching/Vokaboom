@@ -757,3 +757,11 @@
 .pt-stage .pt-bottle.flying .pt-label, .pt-stage .pt-bottle.flying .pt-mean { opacity: 0 !important; }
 .pt-stage.s3d .pt-glass { width: 56px; height: 72px; }
 @media (max-width: 700px) { .pt-stage.s3d .pt-glass { width: 40px; height: 52px; } }
+
+/* Vignette über den 3D-Spielen */
+.fx-vig { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(10, 5, 30, .38) 100%); }
+/* Zaubertrank: Meldungen oben an der Decke einblenden (nicht über dem Avatar) */
+.pt-msg { place-items: start center; padding-top: 8px; }
+.pt-msg .pt-msgbox { padding: .45rem 1.1rem; }
+.pt-msg:has(.pt-next) { place-content: start center; padding-top: 8px; }
+@media (min-width: 701px) { .pt-msg { padding-left: 20%; padding-right: 26%; } }

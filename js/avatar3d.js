@@ -1985,6 +1985,7 @@ function vxFigure(T, look, { lite = false } = {}) {
     if (decalMat.map !== tex) decalMat.map = tex;
   }
   function update(dt) {
+    dt = Math.max(0, Math.min(0.1, dt || 0)); // nie rückwärts (sonst läuft die Figur davon)
     st.t += dt;
     st.ph += dt * 14 * st.rate;
     expression(dt);

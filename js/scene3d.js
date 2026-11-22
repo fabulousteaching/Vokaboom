@@ -15,7 +15,7 @@ const s3Rand = (i, s = 0) => { const x = Math.sin(i * 127.1 + s * 311.7) * 43758
  * 3D-Bühne in host (Spielfeld) einsetzen. build(ctl) baut die feste Kulisse (wird bei Grössenänderung neu gebaut).
  * Gibt die Steuerung zurück oder null (dann bleibt die 2D-Grafik).
  */
-async function s3Mount(host, build) {
+async function s3Mount(host, build, opts = {}) {
   if (!host || typeof gavOK !== 'function' || !gavOK() || typeof w3LoadRunner !== 'function') return null;
   const gid = G.id;
   try { await w3Three(); await w3LoadRunner(); } catch (e) { console.warn('3D-Bühne laden', e); return null; }
@@ -23,8 +23,9 @@ async function s3Mount(host, build) {
   const T = w3T();
   let renderer;
   try { renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' }); } catch (e) { console.warn(e); return null; }
-  renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(typeof fxPR === 'function' ? fxPR() : Math.min(1.75, window.devicePixelRatio || 1));
   renderer.toneMapping = T.NeutralToneMapping; renderer.toneMappingExposure = 1.06;
+  if (opts.shadows && typeof fxQuality === 'function' && fxQuality() === 'high') { renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap; }
   renderer.setClearColor(0x000000, 0);
   const scene = new T.Scene();
   if (typeof w3Lights === 'function') w3Lights(T, scene, renderer, false);
@@ -35,7 +36,7 @@ async function s3Mount(host, build) {
   host.insertBefore(cv, host.firstChild);
   const geoCache = new Map(), own = [];
   const ctl = {
-    T, scene, cam, W: 0, H: 0, alive: true, t: 0, frames: [], tracks: [], group: null,
+    T, scene, cam, renderer, W: 0, H: 0, alive: true, t: 0, frames: [], tracks: [], group: null, post: null,
     /** Voxel-Modell bauen: build(B) füllt den Baukasten, u = Pixel pro Voxel. Mit key wird die Geometrie gemerkt. */
     geo(key, build, { u = 6, iter = 2, field = 1, project = true, center = false } = {}) {
       if (key && geoCache.has(key)) return geoCache.get(key);
@@ -74,6 +75,7 @@ async function s3Mount(host, build) {
         geoCache.forEach((g) => g.dispose()); own.forEach((x) => x?.dispose?.());
         renderer.dispose(); renderer.forceContextLoss?.();
       } catch { /* egal */ }
+      ctl.post?.dispose(); vig.remove();
       cv.remove(); host.classList.remove('s3d');
     },
   };
@@ -82,6 +84,7 @@ async function s3Mount(host, build) {
     if (!W || !H) return;
     ctl.W = W; ctl.H = H;
     renderer.setSize(W, H, false);
+    ctl.post?.setSize(W, H);
     cv.style.width = `${W}px`; cv.style.height = `${H}px`;
     Object.assign(cam, { left: 0, right: W, top: 0, bottom: -H }); cam.updateProjectionMatrix();
     if (ctl.group) { scene.remove(ctl.group); ctl.group.traverse((o) => { if (o.isMesh && !([...geoCache.values()].includes(o.geometry))) o.geometry.dispose(); }); }
@@ -123,14 +126,20 @@ async function s3Mount(host, build) {
       }
     }
   }
+  // Leuchten (nur auf Geräten, die es schaffen) und Messung der Bildrate
+  if (opts.bloom && typeof fxBloom === 'function') fxBloom(renderer, scene, cam, opts.bloom).then((p) => { if (ctl.alive) ctl.post = p; else p?.dispose(); });
+  const meter = typeof fxMeter === 'function' ? fxMeter(() => { ctl.post?.dispose(); ctl.post = null; renderer.shadowMap.enabled = false; renderer.setPixelRatio(1); ctl.W = 0; rebuild(); }) : () => {};
+  // Vignette: Ränder leicht dunkler, lenkt den Blick in die Mitte
+  const vig = document.createElement('div'); vig.className = 'fx-vig'; vig.setAttribute('aria-hidden', 'true'); host.appendChild(vig);
   let last = performance.now(), raf = 0, first = true;
   const loop = (now) => {
     if (!ctl.alive) return;
     if (G.id !== gid || !host.isConnected) { ctl.dispose(); return; }
-    const dt = Math.min(0.05, (now - last) / 1000); last = now; ctl.t += dt;
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; ctl.t += dt;
     for (const f of ctl.frames) { try { f(dt, ctl.t); } catch (e) { console.warn(e); } }
     syncTracks();
-    renderer.render(scene, cam);
+    meter(dt);
+    if (ctl.post) ctl.post.render(); else renderer.render(scene, cam);
     if (first) { first = false; host.classList.add('s3d'); }
     raf = requestAnimationFrame(loop);
   };
@@ -292,13 +301,15 @@ function s3FishLive(el, o, c) {
 function s3FishScene(ctl) {
   const s = G.s, T = ctl.T, W = ctl.W, H = ctl.H, wy = s.waterY || H * 0.4, L = s.L, lv = s.fishLevel || 1;
   const add = (o) => ctl.add(o);
-  // Wasser (hinten): Farbverlauf
+  // Himmel und Wasser (hinten): Farbverlauf
+  add(ctl.grad(0, 0, W, wy + 4, L.sky[0], L.sky[1], -1000));
   add(ctl.grad(0, wy, W, H - wy, L.water[0], L.water[1], -600));
   // Sonne
   const sun = ctl.mesh(ctl.geo('sun', (B) => B.ell(0, 0, 0, 6, 6, 3, 0xffe680, { mat: 2 }), { u: 5, iter: 2, center: true }));
   add(ctl.at(sun, W * 0.88, H * 0.1 + 10, -900));
-  const halo = new T.Mesh(new T.CircleGeometry(60, 32), new T.MeshBasicMaterial({ color: 0xfff3b0, transparent: true, opacity: 0.25 }));
-  ctl.own(halo.geometry, halo.material); add(ctl.at(halo, W * 0.88, H * 0.1 + 10, -950));
+  const halo = typeof fxGlow === 'function' ? fxGlow(T, 0xfff0b0, 190, 0.75) : new T.Mesh(new T.CircleGeometry(60, 32), new T.MeshBasicMaterial({ color: 0xfff3b0, transparent: true, opacity: 0.25 }));
+  add(ctl.at(halo, W * 0.88, H * 0.1 + 10, -950));
+  ctl.frame((dt, t) => { halo.material.opacity = 0.65 + Math.sin(t * 0.8) * 0.1; });
   // Wolken
   const clouds = [];
   for (let i = 0; i < 3; i++) {
@@ -400,7 +411,7 @@ function s3FishScene(ctl) {
 function s3Fishing() {
   const st = $('#fi-stage');
   if (!st || typeof s3Mount !== 'function') return;
-  s3Mount(st, s3FishScene).then((ctl) => {
+  s3Mount(st, s3FishScene, { bloom: { strength: 0.55, radius: 0.6, threshold: 0.82 } }).then((ctl) => {
     if (!ctl) return;
     G.s.s3 = ctl;
     ctl.track('.fi-fish', (el) => s3FishModel(ctl, el), {
@@ -547,7 +558,14 @@ function s3PotionScene(ctl) {
   add(ctl.at(wall, 0, 0, -900));
   const fu = bu;
   const floor = ctl.mesh(ctl.geo(null, (B) => { for (let x = 0; x < nx; x++) for (let y = 0; y < Math.ceil((H - floorY) / fu) + 1; y++) B.box(x, -y, -3, x, -y, 0, (x % 8 === 0) ? 0x2a1608 : rnShade(0x6b4226, (s3Rand(Math.floor(x / 8) + y * 0.3) - 0.5) * 0.2 - y * 0.03)); }, { u: fu, iter: 1 }));
-  add(ctl.at(floor, 0, floorY, -880));
+  add(ctl.at(floor, 0, floorY, -880)); floor.receiveShadow = true;
+  if (ctl.renderer.shadowMap.enabled) {
+    wall.receiveShadow = true;
+    const key = new T.DirectionalLight(0xffe6c0, 1.1); key.castShadow = true;
+    key.position.set(W * 0.25, 260, 900); key.target.position.set(W * 0.55, -H * 0.6, -900);
+    key.shadow.mapSize.set(1024, 1024); Object.assign(key.shadow.camera, { left: -W, right: W, top: H, bottom: -H, near: 10, far: 4000 }); key.shadow.bias = -0.002;
+    add(key); add(key.target);
+  }
   // Fenster mit Nachthimmel und Mond
   const win = $('.pt-window');
   if (win) {
@@ -570,6 +588,7 @@ function s3PotionScene(ctl) {
       for (const ry of rows) { const y = -Math.round((ry - r.y) / su) - 1; B.box(0, y - 1, -3, sw, y, 4, rnVar(0x7a5030, 0.06)); }
     }, { u: su, iter: 1 }));
     add(ctl.at(cab, r.x, r.y, -300));
+    cab.receiveShadow = true;
   }
   // Kräuterbündel oben, Bücherstapel, Kerzen
   const books = ctl.mesh(ctl.geo('books', (B) => { [0x8a3a6b, 0x2d6bff, 0x2e9e6b, 0xe2b53a, 0xd7263d, 0x6a35b5].forEach((c, i) => { const h = 10 + (i * 5) % 6; B.box(i * 3, 0, -3, i * 3 + 2, h, 3, (x, y) => (y === h - 1 ? 0xffe9b0 : c)); }); B.box(-1, -2, -4, 19, -1, 4, 0x5a3a22); B.ell(24, 3, 0, 3, 3, 3, 0xc4a0ff, { mat: 1 }); }, { u: 3.2, iter: 1 }));
@@ -579,6 +598,7 @@ function s3PotionScene(ctl) {
   for (const [x, sc] of [[18, 1], [W - 24, 0.8]]) {
     add(ctl.at(ctl.mesh(candle), x, floorY - 2, -400)).scale.setScalar(sc);
     const f = ctl.mesh(flameG); add(ctl.at(f, x, floorY - 2 - 48 * sc, -399)); f.scale.setScalar(sc);
+    if (typeof fxGlow === 'function') { const gl = fxGlow(T, 0xffb347, 120 * sc, 0.55); add(ctl.at(gl, x, floorY - 2 - 50 * sc, -398)); ctl.frame((dt, t) => { gl.material.opacity = 0.45 + Math.sin(t * 9 + x) * 0.08 + Math.sin(t * 23 + x) * 0.05; }); }
     ctl.frame((dt, t) => { f.scale.set(sc * (1 + Math.sin(t * 13 + x) * 0.08), sc * (1 + Math.sin(t * 17 + x) * 0.15), sc); });
   }
   // Kessel: glatter, runder Metallkessel (leicht von oben, man sieht hinein), leuchtender Trank, Blasen, Dampf, Feuer
@@ -598,6 +618,7 @@ function s3PotionScene(ctl) {
     const prof = [[0.001, 0.05], [0.45, 0.0], [0.78, 0.08], [0.97, 0.3], [1.0, 0.48], [0.95, 0.68], [0.84, 0.84], [0.8, 0.9]].map(([x, y]) => new T.Vector2(x * R, y * Hp));
     const potG = new T.LatheGeometry(prof, 48); ctl.own(potG);
     const pot = new T.Mesh(potG, metal); cg.add(pot);
+    pot.castShadow = true;
     const inG = new T.CylinderGeometry(R * 0.79, R * 0.7, Hp * 0.2, 48, 1, true); ctl.own(inG);
     const inM = new T.Mesh(inG, inner); inM.position.y = Hp * 0.8; cg.add(inM);
     const rimG = new T.TorusGeometry(R * 0.82, R * 0.07, 14, 56); ctl.own(rimG);
@@ -618,6 +639,8 @@ function s3PotionScene(ctl) {
     const brewG = new T.CircleGeometry(R * 0.78, 48); ctl.own(brewM, brewG);
     const brew = new T.Mesh(brewG, brewM); brew.rotation.x = -Math.PI / 2; brew.position.y = Hp * 0.84; cg.add(brew);
     const glow = new T.PointLight(0x7cffb2, 2.2, R * 6, 1.2); glow.position.set(0, Hp * 1.15, R * 0.3); cg.add(glow);
+    const halo = typeof fxGlow === 'function' ? fxGlow(T, 0x7cffb2, R * 2.6, 0.22) : null;
+    if (halo) { halo.position.set(0, Hp * 1.0, R * 0.2); cg.add(halo); }
     // Blasen auf dem Trank
     const bubM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.5, transparent: true, opacity: 0.9, roughness: 0.1 });
     const bubG = new T.SphereGeometry(1, 14, 10); ctl.own(bubM, bubG);
@@ -658,6 +681,7 @@ function s3PotionScene(ctl) {
       const isGlow = cauldron.classList.contains('glow'), isFail = cauldron.classList.contains('fail'), busy = cauldron.classList.contains('brewing');
       brewM.emissiveIntensity = isGlow ? 1.2 + Math.sin(t * 8) * 0.25 : isFail ? 0.05 : 0.5 + Math.sin(t * 2) * 0.1;
       glow.intensity = isGlow ? 5 : isFail ? 0.2 : 2 + Math.sin(t * 2) * 0.3;
+      if (halo) { halo.material.color.copy(brewNow); halo.material.opacity = isGlow ? 0.6 + Math.sin(t * 8) * 0.15 : isFail ? 0.03 : 0.18 + Math.sin(t * 2) * 0.04; }
       runeM.emissiveIntensity = isGlow ? 2 : isFail ? 0.1 : 0.8 + Math.sin(t * 2.5) * 0.3;
       brew.position.y = Hp * 0.84 + Math.sin(t * 3) * Hp * 0.006;
       cg.rotation.z = busy || cauldron.classList.contains('fx-dance') ? Math.sin(t * 30) * 0.03 : 0;
@@ -721,6 +745,7 @@ function s3BottleModel(ctl, el) {
   const sh = new T.Mesh(shG, S3_GLASS.shine); sh.position.set(-rb * 0.5, bodyY + rb * 0.1, rb * 0.9); sh.rotation.z = 0.35;
   const grp = new T.Group();
   grp.add(liquid, glass, rim, cork, sh);
+  glass.castShadow = true; cap.castShadow = true;
   grp.userData = { base: { w }, liquid, cork, corkY: top + h * 0.04, bubs, lr, ph: Math.random() * 6, popT: null, pourT: null, fill: 1, h };
   return grp;
 }
@@ -747,7 +772,7 @@ function s3BottleLive(el, o, c) {
 function s3Potion() {
   const st = $('#pt-stage');
   if (!st || typeof s3Mount !== 'function') return;
-  s3Mount(st, s3PotionScene).then((ctl) => {
+  s3Mount(st, s3PotionScene, { bloom: { strength: 0.5, radius: 0.5, threshold: 0.86 }, shadows: true }).then((ctl) => {
     if (!ctl) return;
     G.s.s3 = ctl;
     ctl.track('.pt-glass', (el) => s3BottleModel(ctl, el), { z: 200, update: s3BottleLive });

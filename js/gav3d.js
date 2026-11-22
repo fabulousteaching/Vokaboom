@@ -71,7 +71,7 @@ async function gavMount(host, opts = {}) {
     fig = vxFigure(T, a3Look(cfg));
     renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' });
   } catch (e) { console.warn('3D-Avatar bauen', e); return null; }
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(typeof fxPR === 'function' ? Math.min(2, fxPR() * 1.15) : Math.min(2, window.devicePixelRatio || 1));
   renderer.toneMapping = T.NeutralToneMapping; renderer.toneMappingExposure = 1.08;
   renderer.setClearColor(0x000000, 0);
   const scene = new T.Scene();
@@ -138,7 +138,7 @@ async function gavMount(host, opts = {}) {
   const loop = (now) => {
     if (!ctl.alive) return;
     if (G.id !== gid || !host.isConnected) { ctl.dispose(); return; }
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
     fit();
     feet.rotation.set(0, ctl.rotY, ctl.lean);
     spin.rotation.set(ctl.spinX, 0, ctl.spinZ);

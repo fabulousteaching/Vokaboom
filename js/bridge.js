@@ -57,6 +57,7 @@ function bridgeBegin(set, theme, n, stage) {
   const top = $('.br-hud'), bar = $('.topbar');
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   bridgeAsk();
+  if (typeof ambStart === 'function') ambStart(theme === 'jungle' ? 'jungle' : theme);
   // 3D-Brücke mit Blick von hinten (js/bridge3d.js); ohne 3D: 2D-Brücke
   const flat = () => {
     if (typeof s3Bridge === 'function') s3Bridge();

@@ -18,9 +18,9 @@ async function b3Mount(stage) {
   const T = w3T(), s = G.s, P = S3_BRIDGE[s.theme] || S3_BRIDGE.jungle, TH = s.T;
   let renderer;
   try { renderer = new T.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' }); } catch (e) { return null; }
-  renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(typeof fxPR === 'function' ? fxPR() : Math.min(1.75, window.devicePixelRatio || 1));
   renderer.toneMapping = T.NeutralToneMapping; renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.enabled = typeof fxQuality !== 'function' || fxQuality() === 'high'; renderer.shadowMap.type = T.PCFSoftShadowMap;
   const cv = renderer.domElement; cv.className = 'b3-canvas'; cv.setAttribute('aria-hidden', 'true');
   stage.insertBefore(cv, stage.firstChild);
   const scene = new T.Scene();
@@ -150,13 +150,13 @@ async function b3Mount(stage) {
   function fit() {
     const w = stage.clientWidth, h = stage.clientHeight;
     if (w === W && h === H) return;
-    W = w; H = h; renderer.setSize(w, h, false); cv.style.width = `${w}px`; cv.style.height = `${h}px`;
+    W = w; H = h; renderer.setSize(w, h, false); cv.style.width = `${w}px`; cv.style.height = `${h}px`; post?.setSize(w, h);
     cam.aspect = w / h; cam.fov = w / h < 0.9 ? 70 : 50; cam.updateProjectionMatrix();
   }
   const loop = (now) => {
     if (!alive) return;
     if (G.id !== gid || !stage.isConnected) { ctl.dispose(); return; }
-    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; t += dt;
     fit();
     for (const tw of tweens.slice()) { tw.t += dt; const k = Math.min(1, tw.t / tw.ms); tw.fn(k); if (k >= 1) { tweens.splice(tweens.indexOf(tw), 1); tw.res(); } }
     fig.update(dt);
@@ -174,12 +174,15 @@ async function b3Mount(stage) {
     camPos.lerp(cp, Math.min(1, dt * 2.5)); camLook.lerp(cl, Math.min(1, dt * 2.5));
     cam.position.copy(camPos); cam.lookAt(camLook);
     sun.position.set(hero.position.x - 5, 10, hero.position.z + 4); sun.target.position.set(hero.position.x, 0, hero.position.z - 2);
-    renderer.render(scene, cam);
+    meter(dt);
+    if (post) post.render(); else renderer.render(scene, cam);
     raf = requestAnimationFrame(loop);
   };
   const walkTo = async (z, ms) => {
     const z0 = hero.position.z;
     fig.setAnim('run'); fig.setRate(0.6);
+    const steps = Math.max(1, Math.round(ms / 260));
+    for (let k = 0; k < steps; k++) setTimeout(() => { if (ctl.alive && typeof sfxx === 'function') sfxx('step'); }, k * 260 + 60);
     await tween(ms, (k) => { const zz = z0 + (z - z0) * k; hero.position.z = zz; hero.position.y = (zz < 0 && zz > -L ? plankY(zz) + 0.06 : 0) + Math.abs(Math.sin(k * Math.PI * 2)) * 0.03; });
     fig.setRate(1);
   };
@@ -192,7 +195,7 @@ async function b3Mount(stage) {
       const rot = (Math.random() - 0.5) * 2;
       tone([523, 784], 0.07, 'triangle', 0.08);
       await tween(560, (k) => { const e = 1 + 2.4 * Math.pow(k - 1, 3) + 1.4 * Math.pow(k - 1, 2); p.position.set(0, plankY(z) + 5 * (1 - e), z); p.rotation.set(rot * (1 - k), rot * 0.5 * (1 - k), 0); });
-      tone([196], 0.06, 'square', 0.05);
+      if (typeof sfxx === 'function') sfxx('thud'); else tone([196], 0.06, 'square', 0.05);
       puff(new T.Vector3(0, plankY(z), z), s.theme === 'ice' ? 0xffffff : 0xd8c8a8, 16, 1.2);
       ctl.next = i + 1;
       await walkTo(z, 520);
@@ -227,11 +230,18 @@ async function b3Mount(stage) {
     dispose() {
       if (!ctl.alive) return;
       ctl.alive = false; alive = false; cancelAnimationFrame(raf);
-      try { fig.dispose(); own.forEach((x) => x.dispose?.()); skyTex.dispose(); renderer.dispose(); renderer.forceContextLoss?.(); } catch { /* egal */ }
-      cv.remove(); stage.classList.remove('b3d');
+      try { post?.dispose(); fig.dispose(); own.forEach((x) => x.dispose?.()); skyTex.dispose(); renderer.dispose(); renderer.forceContextLoss?.(); } catch { /* egal */ }
+      cv.remove(); vig.remove(); stage.classList.remove('b3d');
     },
   };
+  let post = null;
   fit();
+  // Leuchten (Lava, Sonne, Funken) – nur wenn das Gerät es schafft
+  if (typeof fxBloom === 'function') fxBloom(renderer, scene, cam, { strength: s.theme === 'lava' ? 0.9 : 0.45, radius: 0.6, threshold: s.theme === 'lava' ? 0.7 : 0.85 }).then((p) => { if (ctl.alive) post = p; else p?.dispose(); });
+  const meter = typeof fxMeter === 'function' ? fxMeter(() => { post?.dispose(); post = null; renderer.shadowMap.enabled = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); renderer.setPixelRatio(1); W = 0; fit(); }) : () => {};
+  const vig = document.createElement('div'); vig.className = 'fx-vig'; vig.setAttribute('aria-hidden', 'true'); stage.appendChild(vig);
+  // Sonne am Himmel mit Schein
+  if (typeof fxGlow === 'function') { const sg2 = fxGlow(T, s.theme === 'lava' ? 0xff7a3a : 0xfff0c0, 26, s.theme === 'lava' ? 0.5 : 0.8); sg2.position.set(-14, 16, -L - 60); scene.add(sg2); }
   raf = requestAnimationFrame(loop);
   stage.classList.add('b3d');
   const prev = G.s3Cleanup;

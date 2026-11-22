@@ -81,6 +81,7 @@ function startPotion(set) {
   potionRound();
   // 3D-Avatar (wenn möglich) neben dem Kessel
   if (typeof s3Potion === 'function') s3Potion();
+  if (typeof ambStart === 'function') ambStart('lab');
   if (typeof gavMount === 'function') gavMount($('#pt-avatar'), { rotY: 0.55 }).then((c) => { if (c && G.id === 'potion') { G.s.av3 = c; c.setAnim('idle'); } });
 }
 /** kurze Bewegung des 3D-Avatars */
@@ -138,7 +139,7 @@ async function potionPick(i) {
   const x0 = r0.left - st.left, y0 = r0.top - st.top;
   const x1 = cv.left - st.left + cv.width * 0.5 - r0.width * 1.05, y1 = cv.top - st.top - r0.height * 1.15;
   ptAnim('present');
-  tone([660], 0.05, 'sine', 0.05);
+  if (typeof sfxx === 'function') sfxx('clink'); else tone([660], 0.05, 'sine', 0.05);
   await ptTween(520, (k) => {
     const e = k * k * (3 - 2 * k);
     fly.style.transform = `translate(${(x1 - x0) * e}px, ${(y1 - y0) * e - Math.sin(k * Math.PI) * 70}px)`;

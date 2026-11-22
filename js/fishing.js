@@ -104,6 +104,7 @@ function fishBegin(set, level) {
   fishLayout();
   // 3D-Avatar (wenn möglich), hält die Angel
   if (typeof s3Fishing === 'function') s3Fishing();
+  if (typeof ambStart === 'function') ambStart(['lake', 'mountain', 'sea'][level - 1] || 'lake');
   if (typeof gavMount === 'function') gavMount($('#fi-avatar'), { rotY: 0.6 }).then((c) => { if (c && G.id === 'fish') { G.s.av3 = c; c.setAnim('hold'); } });
   const onResize = () => fishLayout();
   window.addEventListener('resize', onResize);
