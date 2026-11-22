@@ -9,11 +9,29 @@
 
 const DET_CASES = 10;
 
+const DET_MODE_KEY = 'vokaboom.detMode';
 function startDetective(set) {
+  const L = LANGS[langOf(set)].name;
+  let last = 'de';
+  try { last = localStorage.getItem(DET_MODE_KEY) || 'de'; } catch { /* egal */ }
+  $('#view').innerHTML = gameShell('Hör-Detektiv', `<div class="test-card setup choose-card">
+    <h2>Welche Karten möchtest du?</h2>
+    <p class="muted">Du hörst ein Wort auf ${L} und suchst die passende Karte.</p>
+    <div class="choose-grid">
+      <button class="choose-tile ${last === 'de' ? 'last' : ''}" data-action="det-start" data-mode="de"><span class="choose-demo big-emoji" aria-hidden="true">🇩🇪</span>
+        <strong>Deutsche Wörter</strong><small>Auf den Karten steht das deutsche Wort (am Anfang mit Bild).</small></button>
+      <button class="choose-tile ${last === 'fx' ? 'last' : ''}" data-action="det-start" data-mode="fx"><span class="choose-demo big-emoji" aria-hidden="true">${langOf(set) === 'fr' ? '🇫🇷' : '🇬🇧'}</span>
+        <strong>Wörter auf ${L}</strong><small>Auf den Karten steht das Wort auf ${L} – welches hast du gehört?</small></button>
+    </div>
+  </div>`);
+}
+function detBegin(set, mode) {
   stopGame();
   G.id = 'det';
+  mode = mode === 'fx' ? 'fx' : 'de';
+  try { localStorage.setItem(DET_MODE_KEY, mode); } catch { /* egal */ }
   const words = gameWords(set);
-  Object.assign(G.s, { set, lang: langOf(set), words, pk: makePicker(words), case: 0, score: 0, first: 0, tries: 0, results: [], done: false, busy: false });
+  Object.assign(G.s, { set, mode, lang: langOf(set), words, pk: makePicker(words), case: 0, score: 0, first: 0, tries: 0, results: [], done: false, busy: false });
   const canSay = typeof canSpeak === 'function' && canSpeak();
   $('#view').innerHTML = gameShell('Hör-Detektiv', `
     <div class="det-lab det-file">
@@ -32,7 +50,6 @@ function startDetective(set) {
       <div class="det-desk">
         <div class="det-listen">
           <button class="det-play" id="det-play" data-action="det-play" aria-label="Wort anhören"><span class="det-reel" aria-hidden="true"></span>${icon('speaker', 'big')}<span>Anhören</span><span class="det-reel" aria-hidden="true"></span></button>
-          <button class="btn ghost small det-slow" data-action="det-play" data-slow="1">${icon('snail')} Langsam</button>
           <p class="det-hint" id="det-hint">Hör genau hin – welche Karte passt?</p>
         </div>
         <div class="det-slot" id="det-slot"></div>
@@ -54,7 +71,7 @@ function detCase() {
   const w = pickNext(s.pk);
   s.cur = w;
   const n = Math.min(s.case <= 4 ? 4 : 6, s.words.length);
-  const noPic = s.case >= 8;
+  const noPic = s.case >= 8 || s.mode === 'fx';
   // ähnlich klingende Wörter zuerst (ab Fall 5)
   const key = (x) => gameForm(x).toLowerCase();
   let others = s.words.filter((x) => x !== w && key(x) !== key(w) && (x.german || '').toLowerCase() !== (w.german || '').toLowerCase());
@@ -69,7 +86,7 @@ function detCase() {
       <span class="det-tab">FALL ${s.case}</span>
       <div class="det-page"><span class="det-clip" aria-hidden="true"></span>
         <div class="det-cards n${cards.length} ${withPic ? 'pics' : 'words'}" id="det-cards">${cards.map((c, i) => `<button class="det-card" data-action="det-pick" data-i="${i}" style="--d:${0.55 + i * 0.06}s">
-          ${withPic ? `<span class="det-pic">${picHTML(c, s.lang, 'card-pic')}</span>` : ''}<span class="det-de" lang="de">${esc(c.german || '?')}</span>
+          ${withPic ? `<span class="det-pic">${picHTML(c, s.lang, 'card-pic')}</span>` : ''}${s.mode === 'fx' ? `<span class="det-de" lang="${s.lang}">${esc(gameForm(c))}</span>` : `<span class="det-de" lang="de">${esc(c.german || '?')}</span>`}
           <span class="det-mark" aria-hidden="true"></span></button>`).join('')}</div>
       </div>
       <div class="det-cover" aria-hidden="true"><span class="det-cover-t">AKTE</span><span class="det-cover-n">Fall ${s.case}</span><span class="det-secret">STRENG GEHEIM</span><span class="det-cover-print"></span></div>
@@ -77,7 +94,7 @@ function detCase() {
   const folder = $('#det-folder');
   gLater(() => { folder.classList.remove('enter'); folder.classList.add('open'); tone([392, 523], 0.06, 'triangle', 0.04); }, 420);
   gLater(() => { if (G.s === s) s.busy = false; }, 900);
-  $('#det-hint').textContent = noPic ? 'Jetzt ohne Bilder: Welches deutsche Wort passt?' : s.case >= 5 ? 'Achtung, die Wörter klingen ähnlich!' : 'Hör genau hin – welche Karte passt?';
+  $('#det-hint').textContent = s.case >= 5 ? 'Achtung, die Wörter klingen ähnlich!' : 'Hör genau hin – welche Karte passt?';
   const play = $('#det-play'); play?.classList.add('pulse');
 }
 function detPlay(slow) {
@@ -97,13 +114,13 @@ function detPick(i) {
     s.results.push(s.tries === 1 ? 'ok' : 'late');
     markResult(s.pk, s.cur, s.tries === 1, s.tries === 1 ? 'correct' : 'almost'); // zweiter Versuch = „fast“
     el.classList.add('yes');
-    el.insertAdjacentHTML('beforeend', `<span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
+    el.insertAdjacentHTML('beforeend', detReveal(s.cur));
     sfx.good();
     detProgress();
     detClose(true);
   } else {
     el.classList.add('no');
-    el.insertAdjacentHTML('beforeend', `<span class="det-word wrong" lang="${s.lang}">${esc(gameForm(c))}</span>`);
+    el.insertAdjacentHTML('beforeend', detReveal(c, true));
     sfx.bad();
     if (s.tries >= 2) { // zweiter Fehler: Lösung zeigen
       s.busy = true;
@@ -111,29 +128,42 @@ function detPick(i) {
       markResult(s.pk, s.cur, false);
       const j = s.cards.indexOf(s.cur);
       $$('.det-card')[j]?.classList.add('show');
-      $$('.det-card')[j]?.insertAdjacentHTML('beforeend', `<span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
+      $$('.det-card')[j]?.insertAdjacentHTML('beforeend', detReveal(s.cur));
       detProgress();
       detClose(false);
     }
   }
   $('#det-score').textContent = `${s.score} Punkte`;
 }
-/** Akte stempeln, zuklappen und auf den Stapel legen – dann kommt die nächste */
+/** Was nach dem Antippen auf der Karte erscheint: bei deutschen Karten das Wort in der Fremdsprache, sonst die Bedeutung */
+function detReveal(w, wrong = false) {
+  const s = G.s;
+  return s.mode === 'fx'
+    ? `<span class="det-word ${wrong ? 'wrong' : ''}" lang="de">${esc(w.german || '?')}</span>`
+    : `<span class="det-word ${wrong ? 'wrong' : ''}" lang="${s.lang}">${esc(gameForm(w))}</span>`;
+}
+/** Akte zuklappen, dann drückt ein Stempel GELÖST/UNGELÖST auf den Deckel, dann auf den Stapel – und die nächste kommt */
 function detClose(solved) {
   const s = G.s, folder = $('#det-folder');
+  const t0 = solved ? 800 : 1800; // so lange bleibt die offene Akte sichtbar
+  gLater(() => { folder?.classList.remove('open'); folder?.classList.add('closing'); tone([330, 262], 0.06, 'triangle', 0.04); }, t0);
+  gLater(() => { // Stempel kommt von oben und drückt
+    if (!folder) return;
+    folder.insertAdjacentHTML('beforeend', `<span class="det-stamper ${solved ? 'ok' : 'no'}" aria-hidden="true"><i></i><b></b></span>`);
+  }, t0 + 650);
   gLater(() => {
     if (!folder) return;
     folder.insertAdjacentHTML('beforeend', `<span class="det-bigstamp ${solved ? 'ok' : 'no'}">${solved ? 'GELÖST' : 'UNGELÖST'}</span>`);
-    tone(solved ? [196] : [120], 0.12, 'square', 0.06);
-  }, solved ? 900 : 1700);
-  gLater(() => { folder?.classList.remove('open'); folder?.classList.add('closing'); tone([330, 262], 0.06, 'triangle', 0.04); }, solved ? 1700 : 2600);
-  gLater(() => { folder?.classList.add('leave'); }, solved ? 2350 : 3250);
+    folder.classList.add('thud');
+    tone(solved ? [150, 110] : [110, 80], 0.1, 'square', 0.08);
+  }, t0 + 650 + 380);
+  gLater(() => { folder?.classList.add('leave'); }, t0 + 650 + 1300);
   gLater(() => {
     const pile = $('#det-pile'), n = $('#det-pile-n');
     if (pile) { pile.insertAdjacentHTML('afterbegin', `<i class="${solved ? 'ok' : 'no'}" style="--r:${(Math.random() - 0.5) * 10}deg"></i>`); pile.classList.remove('bump'); void pile.offsetWidth; pile.classList.add('bump'); }
     if (n) n.textContent = String(s.case);
     if (s.case >= DET_CASES) detEnd(); else detCase();
-  }, solved ? 2900 : 3800);
+  }, t0 + 650 + 1850);
 }
 function detProgress() {
   const s = G.s;
@@ -154,5 +184,6 @@ function detEnd() {
 
 const detActions = {
   'det-play': (el) => detPlay(el.dataset.slow === '1'),
+  'det-start': (el) => detBegin(currentSet(), el.dataset.mode),
   'det-pick': (el) => detPick(+el.dataset.i),
 };

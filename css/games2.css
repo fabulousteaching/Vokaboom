@@ -700,3 +700,16 @@
   .pt-shelf { grid-column: 1; grid-row: 2; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .pt-lab { grid-column: 1; grid-row: 3; }
 }
+
+/* Hör-Detektiv: Stempel drückt auf die zugeklappte Akte */
+.det-folder.closing .det-bigstamp { opacity: 1; }
+.det-folder .det-bigstamp { animation: none; z-index: 6; }
+.det-folder.thud { animation: det-thud .25s ease; }
+@keyframes det-thud { 40% { transform: scale(.985) translateY(3px); } }
+.det-stamper { position: absolute; left: 50%; top: 50%; z-index: 7; width: 120px; height: 150px; margin: -150px 0 0 -60px; pointer-events: none; animation: det-stamper 1.15s cubic-bezier(.5, 0, .4, 1) forwards; }
+.det-stamper i { position: absolute; left: 38px; top: 0; width: 44px; height: 70px; border-radius: 22px 22px 8px 8px; background: linear-gradient(90deg, #5A3A22, #8B5A2B 45%, #5A3A22); box-shadow: inset 0 -6px 0 rgba(0, 0, 0, .25); }
+.det-stamper b { position: absolute; left: 0; top: 66px; width: 120px; height: 40px; border-radius: 8px; background: linear-gradient(#3A3A46, #22222C); box-shadow: 0 8px 0 currentColor, 0 14px 18px rgba(0, 0, 0, .4); }
+.det-stamper.ok { color: #1E7A4C; } .det-stamper.no { color: #B23B3B; }
+@keyframes det-stamper { 0% { transform: translateY(-260px) rotate(-8deg); opacity: 0; } 25% { opacity: 1; } 33% { transform: translateY(0) rotate(-12deg); } 45% { transform: translateY(12px) rotate(-12deg) scaleY(.92); } 70% { transform: translateY(-30px) rotate(-10deg); opacity: 1; } 100% { transform: translateY(-300px) rotate(-6deg); opacity: 0; } }
+.det-folder .det-bigstamp.ok, .det-folder .det-bigstamp.no { animation: det-ink .3s ease-out both; }
+@keyframes det-ink { from { opacity: 0; filter: blur(2px); transform: translate(-50%, -50%) rotate(-12deg) scale(1.15); } }
