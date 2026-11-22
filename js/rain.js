@@ -10,11 +10,11 @@
 
 const RAIN_LEVELS = {
   1: { name: 'Nieseln', icon: '🌦️', fall: 15, fallMin: 8.5, every: 4.6, everyMin: 2.9, max: 2, streaks: 70, storm: false,
-    sky: ['#2B2D6E', '#6A4C93', '#E98A9B'], city: '#2A2457', win: '#FFD58A' },
+    sky: ['#8FA9BF', '#C9D7E2', '#E9EFF3'], city: '#F3EEE4', win: '#3B4A5C', rain: '80,105,135' },
   2: { name: 'Regen', icon: '🌧️', fall: 12, fallMin: 6.5, every: 3.7, everyMin: 2.2, max: 3, streaks: 130, storm: false,
-    sky: ['#0F1C3F', '#24427A', '#4B79B6'], city: '#14213F', win: '#FFE29A' },
+    sky: ['#6F8396', '#A7B5C1', '#D3DBE2'], city: '#E8E2D6', win: '#33404F', rain: '70,90,115' },
   3: { name: 'Gewitter', icon: '⛈️', fall: 9.5, fallMin: 5, every: 3, everyMin: 1.8, max: 4, streaks: 190, storm: true,
-    sky: ['#070B1A', '#1C2440', '#3A4565'], city: '#0B1022', win: '#C9D8FF' },
+    sky: ['#3B4652', '#66727E', '#97A2AC'], city: '#CFC8BB', win: '#252E38', rain: '210,220,235' },
 };
 const RAIN_MAX_LEVEL = 3; // drei Fehler (Tropfen im Meer oder falsche Antwort), dann versinkt die Stadt – Atlantis
 const RAIN_UP = { 1: 8, 2: 18 }; // so viele gelöste Wörter, dann regnet es stärker
@@ -139,58 +139,61 @@ function rainBackdrop(W, H, dpr, L) {
   const x = c.getContext('2d');
   x.scale(dpr, dpr);
   const g = x.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, L.sky[0]); g.addColorStop(0.55, L.sky[1]); g.addColorStop(1, L.sky[2]);
+  g.addColorStop(0, L.sky[0]); g.addColorStop(0.6, L.sky[1]); g.addColorStop(1, L.sky[2]);
   x.fillStyle = g; x.fillRect(0, 0, W, H);
-  // Mond mit Schein
-  if (!L.storm) {
-    const mx = W * 0.82, my = H * 0.2;
-    const glow = x.createRadialGradient(mx, my, 4, mx, my, 90);
-    glow.addColorStop(0, 'rgba(255,240,210,.45)'); glow.addColorStop(1, 'rgba(255,240,210,0)');
-    x.fillStyle = glow; x.fillRect(mx - 100, my - 100, 200, 200);
-    x.fillStyle = 'rgba(255,246,225,.92)'; x.beginPath(); x.arc(mx, my, 17, 0, Math.PI * 2); x.fill();
-  }
-  // Sterne (nur bei leichtem Regen)
-  if (L.name === 'Nieseln') for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.5})`; x.fillRect(Math.random() * W, Math.random() * H * 0.45, 1.4, 1.4); }
-  // Stadt: zwei Ebenen, hinten heller und neblig
-  const skyline = (base, minH, maxH, col, winA, seed) => {
-    let px = -10, r = seed;
-    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
-    while (px < W + 20) {
-      const bw = 26 + rnd() * 52, bh = minH + rnd() * (maxH - minH);
-      x.fillStyle = col; x.fillRect(px, base - bh, bw, bh + 4);
-      if (rnd() > 0.6) { x.fillRect(px + bw * 0.4, base - bh - 14, 3, 14); } // Antenne
-      for (let wy = base - bh + 8; wy < base - 10; wy += 11) {
-        for (let wx = px + 5; wx < px + bw - 6; wx += 9) {
-          if (rnd() < winA) { x.fillStyle = L.win; x.globalAlpha = 0.35 + rnd() * 0.55; x.fillRect(wx, wy, 4, 5); x.globalAlpha = 1; }
-        }
-      }
-      px += bw + 2 + rnd() * 6;
-    }
-  };
+  let r = 11; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
   const base = H * 0.84;
-  skyline(base, H * 0.2, H * 0.42, shade(L.city, 0.18), 0.12, 7);
-  const fog = x.createLinearGradient(0, base - H * 0.42, 0, base);
-  fog.addColorStop(0, 'rgba(255,255,255,0)'); fog.addColorStop(1, 'rgba(200,215,255,.14)');
-  x.fillStyle = fog; x.fillRect(0, base - H * 0.42, W, H * 0.42);
-  skyline(base, H * 0.1, H * 0.28, L.city, 0.22, 3);
-  // Hafen: Kaimauer, Leuchtturm rechts, Kran links, Palmen
-  x.fillStyle = shade(L.city, -0.2); x.fillRect(0, base - 6, W, 8);
-  const lx = W * 0.9, lh = H * 0.34;
-  x.fillStyle = '#f4efe6'; x.beginPath(); x.moveTo(lx - 14, base); x.lineTo(lx - 9, base - lh); x.lineTo(lx + 9, base - lh); x.lineTo(lx + 14, base); x.fill();
-  x.fillStyle = '#d64545'; for (let k = 1; k < 5; k += 2) { const y0 = base - lh * (k / 5), y1 = base - lh * ((k + 1) / 5); x.fillRect(lx - 14, y1, 28, y0 - y1); }
-  x.fillStyle = '#2b2f45'; x.fillRect(lx - 11, base - lh - 16, 22, 16); x.fillStyle = L.win; x.globalAlpha = 0.9; x.fillRect(lx - 8, base - lh - 13, 16, 10); x.globalAlpha = 1;
-  x.fillStyle = '#d64545'; x.beginPath(); x.moveTo(lx - 13, base - lh - 16); x.lineTo(lx, base - lh - 30); x.lineTo(lx + 13, base - lh - 16); x.fill();
-  const cx0 = W * 0.08; x.strokeStyle = '#e0a526'; x.lineWidth = 4; x.beginPath(); x.moveTo(cx0, base); x.lineTo(cx0, base - H * 0.3); x.lineTo(cx0 + W * 0.12, base - H * 0.3); x.moveTo(cx0, base - H * 0.24); x.lineTo(cx0 + 18, base - H * 0.3); x.stroke();
-  x.lineWidth = 1.5; x.beginPath(); x.moveTo(cx0 + W * 0.1, base - H * 0.3); x.lineTo(cx0 + W * 0.1, base - H * 0.18); x.stroke();
-  for (const px of [W * 0.3, W * 0.62, W * 0.76]) {
-    x.strokeStyle = '#5a3a22'; x.lineWidth = 4; x.beginPath(); x.moveTo(px, base); x.quadraticCurveTo(px + 6, base - 30, px + 2, base - 54); x.stroke();
-    x.fillStyle = '#2f7a4a'; for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k - 2.5) * 0.55; x.beginPath(); x.ellipse(px + 2 + Math.cos(a) * 14, base - 54 + Math.sin(a) * 8, 15, 4, a, 0, Math.PI * 2); x.fill(); }
+  const shade = (hex, amt) => { const n = parseInt(hex.slice(1), 16), f = (v) => Math.round(Math.max(0, Math.min(255, amt >= 0 ? v + (255 - v) * amt : v * (1 + amt)))); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; };
+  // Berge in der Ferne (im Dunst)
+  const hill = (y0, amp, col, seed) => { x.fillStyle = col; x.beginPath(); x.moveTo(0, base); for (let px = 0; px <= W; px += 8) x.lineTo(px, y0 - Math.abs(Math.sin(px * 0.004 + seed)) * amp - Math.sin(px * 0.013 + seed) * amp * 0.2); x.lineTo(W, base); x.fill(); };
+  hill(base - H * 0.28, H * 0.12, shade(L.sky[1], -0.18), 1.3);
+  hill(base - H * 0.2, H * 0.08, shade(L.sky[1], -0.28), 4.1);
+  // der Stadthügel
+  const hx = W * 0.5, hw = W * 0.46, hh = H * 0.3;
+  x.fillStyle = '#8f9a6e'; x.beginPath(); x.moveTo(hx - hw, base); x.quadraticCurveTo(hx - hw * 0.4, base - hh * 1.05, hx, base - hh); x.quadraticCurveTo(hx + hw * 0.45, base - hh * 1.02, hx + hw, base); x.fill();
+  const hillY = (px) => { const t = Math.max(-1, Math.min(1, (px - hx) / hw)); return base - hh * (1 - t * t) * 0.98; };
+  // Häuser in Terrassen: weiss/creme, flache Dächer oder blaue/rote Kuppeln, Bogenfenster
+  const house = (px, py, w, h, roof) => {
+    const wall = shade(L.city, (rnd() - 0.5) * 0.08);
+    x.fillStyle = wall; x.fillRect(px, py - h, w, h);
+    x.fillStyle = 'rgba(0,0,0,.08)'; x.fillRect(px + w * 0.78, py - h, w * 0.22, h);
+    x.fillStyle = L.win;
+    const nw = Math.max(1, Math.floor(w / 12));
+    for (let k = 0; k < nw; k++) { const wx = px + 4 + k * (w - 8) / nw, wy = py - h * 0.62; x.beginPath(); x.moveTo(wx, wy + 8); x.lineTo(wx, wy + 3); x.arc(wx + 2.5, wy + 3, 2.5, Math.PI, 0); x.lineTo(wx + 5, wy + 8); x.fill(); }
+    if (roof === 'dome') { x.fillStyle = rnd() < 0.6 ? '#3D7CC9' : '#C8553D'; x.beginPath(); x.arc(px + w / 2, py - h, w * 0.32, Math.PI, 0); x.fill(); x.fillStyle = wall; x.fillRect(px + w / 2 - 1, py - h - w * 0.32 - 5, 2, 5); }
+    else if (roof === 'tile') { x.fillStyle = '#B9543C'; x.beginPath(); x.moveTo(px - 2, py - h); x.lineTo(px + w / 2, py - h - h * 0.35); x.lineTo(px + w + 2, py - h); x.fill(); }
+    else { x.fillStyle = shade(L.city, -0.12); x.fillRect(px - 1, py - h - 3, w + 2, 3); }
+  };
+  for (let row = 0; row < 5; row++) {
+    let px = hx - hw * (0.85 - row * 0.13);
+    const end = hx + hw * (0.85 - row * 0.13);
+    while (px < end) {
+      const w = 18 + rnd() * 26, h = 14 + rnd() * 16;
+      const gy = hillY(px + w / 2) + row * H * 0.045 + 6;
+      if (gy < base) house(px, Math.min(base, gy), w, h, rnd() < 0.22 ? 'dome' : rnd() < 0.4 ? 'tile' : 'flat');
+      px += w + 2 + rnd() * 5;
+    }
   }
+  // Tempel mit Säulen oben auf dem Hügel
+  { const tw = Math.min(150, W * 0.16), tx = hx - tw / 2, ty = hillY(hx) + 4, th = tw * 0.42;
+    x.fillStyle = shade(L.city, 0.05); x.fillRect(tx - 6, ty - 8, tw + 12, 8); x.fillRect(tx - 3, ty - 13, tw + 6, 5);
+    const n = 6; for (let k = 0; k < n; k++) { const cx0 = tx + 6 + k * (tw - 12) / (n - 1); x.fillStyle = shade(L.city, 0.08); x.fillRect(cx0 - 4, ty - 13 - th, 8, th); x.fillStyle = 'rgba(0,0,0,.08)'; x.fillRect(cx0 + 1, ty - 13 - th, 3, th); }
+    x.fillStyle = shade(L.city, 0.02); x.fillRect(tx - 6, ty - 19 - th, tw + 12, 7);
+    x.beginPath(); x.moveTo(tx - 8, ty - 19 - th); x.lineTo(tx + tw / 2, ty - 19 - th - tw * 0.18); x.lineTo(tx + tw + 8, ty - 19 - th); x.fill(); }
+  // Turm am Hafen (antiker Leuchtturm) rechts
+  { const lx = W * 0.88, lh = H * 0.3;
+    x.fillStyle = shade(L.city, -0.04); x.fillRect(lx - 16, base - lh * 0.45, 32, lh * 0.45); x.fillRect(lx - 11, base - lh * 0.8, 22, lh * 0.35); x.fillRect(lx - 7, base - lh, 14, lh * 0.2);
+    x.fillStyle = '#E0A526'; x.beginPath(); x.arc(lx, base - lh - 3, 6, 0, Math.PI * 2); x.fill(); }
+  // Zypressen
+  for (const px of [W * 0.1, W * 0.17, W * 0.74, W * 0.8]) { const gy = Math.min(base, hillY(px) + 8); x.fillStyle = '#2E4A2E'; x.beginPath(); x.ellipse(px, gy - 26, 6, 26, 0, 0, Math.PI * 2); x.fill(); }
+  // Hafenmauer
+  x.fillStyle = shade(L.city, -0.25); x.fillRect(0, base - 6, W, 8);
+  x.fillStyle = 'rgba(0,0,0,.12)'; for (let px = 0; px < W; px += 22) x.fillRect(px, base - 6, 1.5, 8);
+  // Dunst über der Stadt (Regen)
+  const fog = x.createLinearGradient(0, base - H * 0.45, 0, base);
+  fog.addColorStop(0, 'rgba(255,255,255,0)'); fog.addColorStop(1, L.storm ? 'rgba(160,170,180,.25)' : 'rgba(230,236,240,.28)');
+  x.fillStyle = fog; x.fillRect(0, base - H * 0.45, W, H * 0.45);
   return c;
-  function shade(hex, amt) {
-    const n = parseInt(hex.slice(1), 16), f = (v) => Math.round(Math.min(255, v + (255 - v) * amt));
-    return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
-  }
 }
 function rainStreak(W, H, anyY) {
   const z = Math.random();
@@ -359,7 +362,7 @@ function rainDraw() {
   // Wolken (zwei Ebenen)
   for (const c of s.clouds) {
     const g = x.createRadialGradient(c.x, c.y, c.r * 0.2, c.x, c.y, c.r);
-    const col = s.L.storm ? '70,78,105' : s.L.name === 'Regen' ? '120,140,175' : '190,170,210';
+    const col = s.L.storm ? '70,78,92' : s.L.name === 'Regen' ? '150,160,172' : '215,222,230';
     g.addColorStop(0, `rgba(${col},${c.a})`); g.addColorStop(1, `rgba(${col},0)`);
     x.fillStyle = g; x.beginPath(); x.ellipse(c.x, c.y, c.r * 1.6, c.r * 0.7, 0, 0, Math.PI * 2); x.fill();
   }
@@ -367,7 +370,7 @@ function rainDraw() {
   const ang = s.L.storm ? 0.22 : 0.12;
   x.lineCap = 'round';
   for (const r of s.streaks) {
-    x.strokeStyle = `rgba(200,225,255,${r.a})`; x.lineWidth = r.w;
+    x.strokeStyle = `rgba(${s.L.rain || '200,225,255'},${r.a})`; x.lineWidth = r.w;
     x.beginPath(); x.moveTo(r.x, r.y); x.lineTo(r.x - r.len * ang, r.y - r.len); x.stroke();
   }
   // Wasser

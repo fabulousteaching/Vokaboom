@@ -82,7 +82,7 @@ function startPotion(set) {
   // 3D-Avatar (wenn möglich) neben dem Kessel
   if (typeof s3Potion === 'function') s3Potion();
   if (typeof ambStart === 'function') ambStart('lab');
-  if (typeof gavMount === 'function') gavMount($('#pt-avatar'), { rotY: 0.55 }).then((c) => { if (c && G.id === 'potion') { G.s.av3 = c; c.setAnim('idle'); } });
+  if (typeof gavMount === 'function') gavMount($('#pt-avatar'), { rotY: 0.55, pad: { top: 1.3, x: 1.1 } }).then((c) => { if (c && G.id === 'potion') { G.s.av3 = c; c.setAnim('idle'); } });
 }
 /** kurze Bewegung des 3D-Avatars */
 function ptAnim(name, ms = 0, after = 'idle') {
@@ -113,6 +113,15 @@ function potionRound() {
   $('#pt-shelf').innerHTML = s.bottles.map((b, i) => `<button class="pt-bottle" data-action="pt-bottle" data-i="${i}" lang="${s.lang}" style="--h:${POTION_HUES[i % POTION_HUES.length]};--d:${i * 0.06}s">
       <span class="pt-glass" aria-hidden="true"><i></i></span><span class="pt-label">${esc(gameForm(b.w))}</span></button>`).join('');
   s.busy = false;
+  potionFitRecipe();
+}
+/** Das Rezeptblatt bleibt immer gleich gross: bei mehr Text wird die Schrift kleiner */
+function potionFitRecipe() {
+  const r = $('#pt-recipe');
+  if (!r) return;
+  let fs = 1.4;
+  r.style.setProperty('--rfs', `${fs}rem`);
+  while (fs > 0.72 && r.scrollHeight > r.clientHeight + 1) { fs -= 0.06; r.style.setProperty('--rfs', `${fs.toFixed(2)}rem`); }
 }
 /** Das nächste Wort auf dem Zettel leuchtet (Reihenfolge als Hilfe – ob richtig, zeigt sich erst am Schluss) */
 function potionCur() {
@@ -224,6 +233,7 @@ async function potionReveal() {
     li.classList.add(okSet.includes(w) ? 'done' : 'miss');
     li.insertAdjacentHTML('beforeend', ` <b class="pt-sol" lang="${s.lang}">= ${esc(gameForm(w))}</b>`);
   });
+  potionFitRecipe();
   if (allOk) { s.good++; await potionDone(); return; }
   await potionFail();
 }
@@ -407,13 +417,17 @@ async function potionFx(e) {
   const anim = { float: 'jump', tiny: 'shy', rainbow: 'dance', ducks: 'laugh', disco: 'dance', invisible: 'think', bubble: 'wave', spin: 'spin', food: 'clap', cat: 'laugh', tall: 'flex', fireworks: 'cheer', dance: 'dance', snow: 'shy' }[e.id] || 'cheer';
   if (a3) { a3.setAnim(anim); av.classList.add('fx3d'); }
   const ease = (k) => k * k * (3 - 2 * k);
+  // so viel Platz ist über dem Avatar (bis zum oberen Rand des Spielfelds, höchstens so weit, wie die 3D-Leinwand reicht)
+  const sr = stage.getBoundingClientRect(), ar = av.getBoundingClientRect();
+  const room = Math.max(0, Math.min(ar.height * 1.25, ar.top - sr.top - 12));
+  const tallMax = Math.min(0.75, room / Math.max(1, ar.height));
   const trail = (items, every = 90) => { const id = setInterval(() => { if (G.id !== 'potion') { clearInterval(id); return; } const p = ptAvatarCenter(); ptBurst(p.x, p.y + 30, items, 3, 0.35); }, every); return () => clearInterval(id); };
   let stop = () => {};
   if (a3) {
     switch (e.id) {
       case 'float': // hebt ab, schwebt mit Funkenspur, landet sanft
         stop = trail(['✨', '⭐', col]);
-        await ptTween(3000, (k) => { const up = k < 0.2 ? ease(k / 0.2) : k > 0.8 ? ease((1 - k) / 0.2) : 1; a3.lift = up * 170 + Math.sin(k * 14) * 8; a3.lean = Math.sin(k * 9) * 0.15; });
+        await ptTween(3000, (k) => { const up = k < 0.2 ? ease(k / 0.2) : k > 0.8 ? ease((1 - k) / 0.2) : 1; a3.lift = up * room * 0.85 + Math.sin(k * 14) * Math.min(8, room * 0.05); a3.lean = Math.sin(k * 9) * 0.15; });
         break;
       case 'tiny': // Puff! ganz klein, hüpft herum, Puff! wieder gross
         ptBurst(c.x, c.y, ['💨', '☁️'], 14, 0.6);
@@ -423,11 +437,11 @@ async function potionFx(e) {
         await ptTween(500, (k) => { a3.scale = 0.28 + ease(k) * 0.72 + Math.sin(k * Math.PI) * 0.15; });
         break;
       case 'tall': // Gummiband: lang – breit – lang – normal
-        await ptTween(3000, (k) => { const w = Math.sin(k * Math.PI * 3) * (1 - k * 0.6); a3.sy = 1 + w * 0.75; a3.sx = 1 - w * 0.35; });
+        await ptTween(3000, (k) => { const w = Math.sin(k * Math.PI * 3) * (1 - k * 0.6); a3.sy = 1 + w * (w > 0 ? tallMax : 0.4); a3.sx = 1 - w * 0.35; });
         break;
       case 'spin': // Wirbelsturm: dreht sich immer schneller, hebt dabei ab
         stop = trail(['🌀', '💫', col], 70);
-        await ptTween(2800, (k) => { a3.rotY = 0.55 + ease(k) * Math.PI * 14; a3.lift = Math.sin(k * Math.PI) * 90; });
+        await ptTween(2800, (k) => { a3.rotY = 0.55 + ease(k) * Math.PI * 14; a3.lift = Math.sin(k * Math.PI) * Math.min(90, room * 0.6); });
         a3.rotY = 0.55;
         break;
       case 'invisible': // löst sich in Funken auf, «Buh!» und taucht wieder auf
@@ -438,7 +452,7 @@ async function potionFx(e) {
         await ptTween(400, (k) => { a3.alpha = k; a3.scale = 1 + Math.sin(k * Math.PI) * 0.35; });
         break;
       case 'bubble': // in einer Riesenblase davonschweben
-        await ptTween(3000, (k) => { const up = Math.sin(k * Math.PI); a3.lift = up * 140; a3.lean = Math.sin(k * 7) * 0.2; });
+        await ptTween(3000, (k) => { const up = Math.sin(k * Math.PI); a3.lift = up * room * 0.7; a3.lean = Math.sin(k * 7) * 0.2; });
         ptBurst(c.x, c.y - 100, ['🫧', '💦', '#ffffff'], 24, 0.8);
         break;
       case 'rainbow': case 'disco': case 'dance': // Party: hüpfen und wippen

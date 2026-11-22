@@ -262,7 +262,7 @@ async function b3Mount(stage) {
     const [cp, cl] = camTarget();
     camPos.lerp(cp, Math.min(1, dt * 2.5)); camLook.lerp(cl, Math.min(1, dt * 2.5));
     cam.position.copy(camPos);
-    if (zoom > 0) cam.position.lerp(camLook, zoom * 0.45);
+    if (zoom > 0) cam.position.lerp(camLook, zoom * 0.15); // nur leicht heranfahren: Avatar, Kiste und Münzen bleiben im Bild
     if (shake > 0) { shake = Math.max(0, shake - dt * 1.8); cam.position.x += (Math.random() - 0.5) * shake * 0.35; cam.position.y += (Math.random() - 0.5) * shake * 0.25; }
     cam.lookAt(camLook);
     sun.position.set(hero.position.x - 5, 10, hero.position.z + 4); sun.target.position.set(hero.position.x, 0, hero.position.z - 2);

@@ -838,3 +838,10 @@
 .fi-fish.leaving { pointer-events: none; }
 .fi-fish.leaving .fi-word, .fi-fish.leaving .fi-body-wrap::before { opacity: 0; transition: opacity .15s; }
 .fi-dock::before, .fi-dock::after { display: none; }
+
+/* Zaubertrank: Rezeptblatt mit fester Grösse, Schrift passt sich an (potionFitRecipe) */
+.pt-recipe { width: clamp(210px, 24vw, 260px); height: clamp(180px, 27vh, 230px); min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+.pt-recipe ul { flex: 1; min-height: 0; }
+.pt-recipe li { font-size: var(--rfs, 1.3rem); line-height: 1.25; padding-top: .05em; padding-bottom: .05em; }
+.pt-recipe .pt-sol { font-size: .8em; }
+@media (max-width: 700px) { .pt-recipe { width: min(86vw, 300px); height: 150px; } }

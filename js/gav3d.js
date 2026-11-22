@@ -99,7 +99,7 @@ async function gavMount(host, opts = {}) {
   const cv = renderer.domElement;
   cv.className = 'gav-canvas'; cv.setAttribute('aria-hidden', 'true');
   host.appendChild(cv);
-  const PAD = { x: 0.9, top: 0.55, bottom: 0.25 }; // Platz um das Element herum (Arme hoch, Salto)
+  const PAD = { x: 0.9, top: 0.55, bottom: 0.25, ...(opts.pad || {}) }; // Platz um das Element herum (Arme hoch, Salto, Schweben)
   let size = { w: 0, h: 0, k: 1 };
   function fit() {
     const hw = host.clientWidth || 80, hh = hw * 1.5;
