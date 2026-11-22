@@ -1,7 +1,8 @@
 /* Vokaboom – Übung „Schreiben“ (Nr. 2 im Lernweg)
  * Ein Wort wird gezeigt, das Kind schreibt die Übersetzung. Oben wählbar:
  *   Deutsch → Fremdsprache (das deutsche Wort steht da, man schreibt das englische/französische) oder umgekehrt.
- * Falsche Wörter kommen kurz darauf noch einmal. Zählt für Wiederholen (Vergessenskurve) und Münzen.
+ * Pro Wort 3 Versuche; nach dem dritten falschen kommt die Lösung. Wer nicht gleich beim ersten Mal richtig
+ * schreibt, hat das Wort für die Lernkarten-Berechnung „nicht gewusst“. Falsche Wörter kommen kurz darauf noch einmal. Zählt für Wiederholen (Vergessenskurve) und Münzen.
  */
 'use strict';
 
@@ -18,7 +19,8 @@ function startWrite(set, ids) {
   wr.finished = false;
   wrReset();
 }
-function wrReset() { wr.checked = false; wr.status = ''; clearTimeout(wr.timer); }
+const WR_TRIES = 3; // so oft darf man ein Wort versuchen, dann kommt die Lösung
+function wrReset() { wr.checked = false; wr.status = ''; wr.tries = 0; clearTimeout(wr.timer); }
 const wrWord = (set) => set.words.find((w) => w.id === wr.queue[0]);
 const wrOk = () => [...wr.firstTry.values()].filter(Boolean).length;
 /** was gezeigt wird und was geschrieben werden muss */
@@ -85,8 +87,19 @@ function checkWrite(giveUp = false) {
   if (!giveUp && !input.value.trim()) { input.focus(); input.classList.add('nudge'); setTimeout(() => input.classList.remove('nudge'), 400); return; }
   const P = wrPair(set, w);
   const r = giveUp ? { status: 'wrong' } : wr.dir === 'de' ? checkAnswer(input.value, w) : checkAnswerBase(input.value, { ...w, foreign: w.german });
-  wr.checked = true; wr.status = r.status;
+  // zählt für die Lernkarten (Vergessenskurve) nur beim ersten Versuch: falsch beim 1. Mal = nicht gewusst
   if (!wr.firstTry.has(w.id)) { wr.firstTry.set(w.id, r.status === 'correct'); trackWord(set, w.id, 'write', r.status); }
+  wr.tries = (wr.tries || 0) + 1;
+  if (r.status === 'wrong' && !giveUp && wr.tries < WR_TRIES) {
+    const left = WR_TRIES - wr.tries;
+    $('#w-feedback').innerHTML = `<div class="banner bad">${icon('x')}<div><strong>Noch nicht richtig.</strong> Versuch es nochmal – du hast noch ${left} ${left === 1 ? 'Versuch' : 'Versuche'}.</div></div>`;
+    sfx.bad();
+    input.classList.add('wrong', 'nudge'); setTimeout(() => input.classList.remove('nudge'), 400);
+    input.select(); input.focus();
+    input.addEventListener('input', () => input.classList.remove('wrong'), { once: true });
+    return;
+  }
+  wr.checked = true; wr.status = r.status;
   input.readOnly = true; input.classList.add(r.status);
   $('#w-submit').innerHTML = `Weiter ${icon('right')}`;
   $('#w-more')?.remove();

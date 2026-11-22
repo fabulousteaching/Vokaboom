@@ -49,12 +49,14 @@ function rainBegin(set, mode) {
   try { localStorage.setItem(RAIN_MODE_KEY, mode); } catch { /* egal */ }
   const L = RAIN_LEVELS[1];
   const words = gameWords(set);
+  // „Nochmal“ nach dem Versinken: das Wasser sinkt ab und die Stadt baut sich wieder auf, dann beginnt der Regen
+  const again = G.id === 'rain' && !!G.s.done && (G.s.atl || 0) > 0.3;
   Object.assign(G.s, {
     rainMode: mode, lv: 1, L, set, words, pk: makePicker(words), lang: langOf(set),
     drops: [], sinking: [], slots: [], parts: [], ripples: [], lilies: [], streaks: [], clouds: [], bgOld: null, bgFade: 0, wacc: 0,
     score: 0, combo: 0, best: 0, hits: 0, almost: 0, missed: [], pegel: 0, pegelShown: 0,
-    speed: 1, nextSpawn: 0.8, t: 0, last: 0, flash: 0, bolt: null, nextBolt: 6 + Math.random() * 6,
-    shake: 0, paused: false, done: false, reduce: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+    speed: 1, nextSpawn: again ? 2.6 : 0.8, t: 0, last: 0, flash: 0, bolt: null, nextBolt: 6 + Math.random() * 6,
+    shake: 0, paused: false, done: false, atl: again ? 1 : 0, atlFx: null, s3: null, rebuildT0: again ? performance.now() : 0, reduce: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   });
   $('#view').innerHTML = gameShell('Wörterregen', `
     <div class="rain-hud">
@@ -98,10 +100,11 @@ function rainBegin(set, mode) {
   const top = $('.rain-hud'), bar = $('.topbar');
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   if (input) setTimeout(() => input.focus({ preventScroll: true }), 120);
+  if (again) { const drain = gEvery(() => { G.s.atl = Math.max(0, G.s.atl - 0.02); if (!G.s.atl) clearInterval(drain); }, 40); }
   G.s.last = performance.now();
   const loop = (now) => {
-    if (G.id !== 'rain' || !G.s.stage?.isConnected) return;
-    const dt = Math.min(0.05, (now - G.s.last) / 1000);
+    if (G.id !== 'rain' || G.s.stage !== stage || !stage.isConnected) return; // alte Schleife (nach „Nochmal“) beendet sich
+    const dt = Math.max(0, Math.min(0.05, (now - G.s.last) / 1000));
     G.s.last = now;
     if (!G.s.paused) rainStep(dt);
     rainDraw();

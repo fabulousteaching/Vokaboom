@@ -633,7 +633,7 @@ function s3PotionScene(ctl) {
     // Zierband mit Runen
     const bandG = new T.TorusGeometry(R * 0.985, R * 0.025, 8, 56); ctl.own(bandG);
     const band = new T.Mesh(bandG, metal2); band.rotation.x = Math.PI / 2; band.position.y = Hp * 0.5; cg.add(band);
-    const runeM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.9 }); ctl.own(runeM);
+    const runeM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.25 }); ctl.own(runeM);
     const runeG = new T.OctahedronGeometry(R * 0.06); ctl.own(runeG);
     for (let k = -2; k <= 2; k++) { const a = k * 0.42, m = new T.Mesh(runeG, runeM); m.position.set(Math.sin(a) * R * 0.99, Hp * 0.36, Math.cos(a) * R * 0.99); m.scale.y = 1.5; cg.add(m); }
     // Henkel und Füsse
@@ -642,14 +642,14 @@ function s3PotionScene(ctl) {
     const legG = new T.CylinderGeometry(R * 0.06, R * 0.09, Hp * 0.16, 10); ctl.own(legG);
     for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + 0.5, l = new T.Mesh(legG, metal); l.position.set(Math.sin(a) * R * 0.55, -Hp * 0.04, Math.cos(a) * R * 0.55); cg.add(l); }
     // Trank
-    const brewM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.6, roughness: 0.15, metalness: 0.1 });
+    const brewM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.15, roughness: 0.5, metalness: 0 }); // ruhig: das Feuer unten reicht als Licht
     const brewG = new T.CircleGeometry(R * 0.78, 48); ctl.own(brewM, brewG);
     const brew = new T.Mesh(brewG, brewM); brew.rotation.x = -Math.PI / 2; brew.position.y = Hp * 0.84; cg.add(brew);
-    const glow = new T.PointLight(0x7cffb2, 2.2, R * 6, 1.2); glow.position.set(0, Hp * 1.15, R * 0.3); cg.add(glow);
+    const glow = new T.PointLight(0x7cffb2, 0.5, R * 4, 1.6); glow.position.set(0, Hp * 1.15, R * 0.3); cg.add(glow);
     const halo = typeof fxGlow === 'function' ? fxGlow(T, 0x7cffb2, R * 2.6, 0.22) : null;
     if (halo) { halo.position.set(0, Hp * 1.0, R * 0.2); cg.add(halo); }
     // Blasen auf dem Trank
-    const bubM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.5, transparent: true, opacity: 0.9, roughness: 0.1 });
+    const bubM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.12, transparent: true, opacity: 0.9, roughness: 0.4 });
     const bubG = new T.SphereGeometry(1, 14, 10); ctl.own(bubM, bubG);
     const bubs = Array.from({ length: 9 }, () => { const m = new T.Mesh(bubG, bubM); m.userData = { t: Math.random() * 2, life: 0.8 + Math.random() * 1.2 }; cg.add(m); return m; });
     // Dampf (weiche Wölkchen)
@@ -692,10 +692,10 @@ function s3PotionScene(ctl) {
       swirl += dt * (pouring ? 6 : 0.6);
       brew.rotation.z = swirl; brew.scale.set(1, 1 + (pouring ? Math.sin(t * 14) * 0.04 : 0), 1);
       const isGlow = cauldron.classList.contains('glow'), isFail = cauldron.classList.contains('fail'), busy = cauldron.classList.contains('brewing');
-      brewM.emissiveIntensity = isGlow ? 1.2 + Math.sin(t * 8) * 0.25 : isFail ? 0.05 : 0.5 + Math.sin(t * 2) * 0.1;
-      glow.intensity = isGlow ? 5 : isFail ? 0.2 : 2 + Math.sin(t * 2) * 0.3;
-      if (halo) { halo.material.color.copy(brewNow); halo.material.opacity = isGlow ? 0.6 + Math.sin(t * 8) * 0.15 : isFail ? 0.03 : 0.18 + Math.sin(t * 2) * 0.04; }
-      runeM.emissiveIntensity = isGlow ? 2 : isFail ? 0.1 : 0.8 + Math.sin(t * 2.5) * 0.3;
+      brewM.emissiveIntensity = isGlow ? 0.7 : isFail ? 0.05 : 0.15;
+      glow.intensity = isGlow ? 2.5 : isFail ? 0.1 : 0.5;
+      if (halo) { halo.material.color.copy(brewNow); halo.material.opacity = isGlow ? 0.45 : 0; }
+      runeM.emissiveIntensity = isGlow ? 1 : isFail ? 0.05 : 0.25;
       brew.position.y = Hp * 0.84 + Math.sin(t * 3) * Hp * 0.006;
       cg.rotation.z = busy || cauldron.classList.contains('fx-dance') ? Math.sin(t * 30) * 0.03 : 0;
       const sp = busy ? 2.2 : 1;
@@ -736,8 +736,8 @@ function s3BottleModel(ctl, el) {
   const w = el.offsetWidth || 44, h = el.offsetHeight || 56;
   if (S3_GLASS.T !== T) {
     S3_GLASS.T = T;
-    S3_GLASS.glass = new T.MeshStandardMaterial({ color: 0xe8f4ff, transparent: true, opacity: 0.32, roughness: 0.04, metalness: 0.25, depthWrite: false });
-    S3_GLASS.rim = new T.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.3 });
+    S3_GLASS.glass = new T.MeshStandardMaterial({ color: 0xe8f4ff, transparent: true, opacity: 0.28, roughness: 0.3, metalness: 0, envMapIntensity: 0.4, depthWrite: false });
+    S3_GLASS.rim = new T.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, roughness: 0.3, metalness: 0, envMapIntensity: 0.4 });
     S3_GLASS.cork = new T.MeshStandardMaterial({ color: 0xb07a45, roughness: 0.85 });
     S3_GLASS.shine = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
   }
@@ -749,8 +749,8 @@ function s3BottleModel(ctl, el) {
   const rimG = new T.TorusGeometry(neckR * 1.25, w * 0.035, 8, 20); ctl.own(rimG);
   const rim = new T.Mesh(rimG, S3_GLASS.rim); rim.rotation.x = Math.PI / 2; rim.position.y = top;
   // Flüssigkeit (Kugelkappe + Oberfläche), dreht sich gegen das Kippen, damit sie «unten» bleibt
-  const liqM = new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.45, roughness: 0.2, transparent: true, opacity: 0.92 });
-  const surfM = new T.MeshStandardMaterial({ color: col.clone().lerp(new T.Color(0xffffff), 0.35), emissive: col, emissiveIntensity: 0.5, roughness: 0.15 });
+  const liqM = new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.1, roughness: 0.45, transparent: true, opacity: 0.92 });
+  const surfM = new T.MeshStandardMaterial({ color: col.clone().lerp(new T.Color(0xffffff), 0.35), emissive: col, emissiveIntensity: 0.12, roughness: 0.4 });
   ctl.own(liqM, surfM);
   const lr = rb * 0.86, fill = 0.68, th0 = Math.PI * (1 - fill);
   const capG = new T.SphereGeometry(lr, 24, 16, 0, Math.PI * 2, th0, Math.PI - th0); ctl.own(capG);
@@ -796,7 +796,7 @@ function s3BottleLive(el, o, c) {
 function s3Potion() {
   const st = $('#pt-stage');
   if (!st || typeof s3Mount !== 'function') return;
-  s3Mount(st, s3PotionScene, { bloom: { strength: 0.5, radius: 0.5, threshold: 0.86 }, shadows: true }).then((ctl) => {
+  s3Mount(st, s3PotionScene, { bloom: { strength: 0.3, radius: 0.4, threshold: 0.93 }, shadows: true }).then((ctl) => {
     if (!ctl) return;
     G.s.s3 = ctl;
     ctl.track('.pt-glass', (el) => s3BottleModel(ctl, el), { z: 200, update: s3BottleLive });
@@ -894,19 +894,26 @@ function s3RainScene(ctl) {
   // Atlantis: wenn die Stadt versinkt, kippen Säulen um, der Giebel stürzt, Häuser zerfallen – dann liegen die Ruinen da
   let crumble = 0, crumbleT0 = 0;
   ctl.rainState = () => ({ crumble, city: city.visible, ruins: ruins.visible, atl: s.atl });
-  ctl.frame((dt) => {
-    const a = s.atl || 0;
-    if (a <= 0) { crumbleT0 = 0; if (crumble) { crumble = 0; city.visible = true; ruins.visible = false; cols.forEach((c) => { c.rotation.z = 0; c.position.y = -(ty - u); c.scale.set(1, 1, 1); }); roof.rotation.z = 0; roof.position.y = -(ty - u - colH - u); tower.rotation.z = 0; } return; }
-    if (!crumbleT0) crumbleT0 = performance.now();
-    crumble = Math.min(1, (performance.now() - crumbleT0) / 2400); // nach Uhrzeit (auch auf langsamen Geräten gleich lang)
-    const k = Math.min(1, crumble / 0.6), e = k * k;
-    cols.forEach((c) => { const d = c.userData; if (d.fall) { c.rotation.z = d.dir * e * 1.45; c.position.y = -(ty - u) - e * 6; } if (d.half) c.scale.y = 1 - e * 0.55; });
+  // Zerfall zeigen (0 = Stadt heil, 1 = Ruinen); rückwärts gespielt baut sich die Stadt wieder auf
+  const show = (c) => {
+    crumble = c;
+    const k = Math.min(1, c / 0.6), e = k * k;
+    cols.forEach((col) => { const d = col.userData; col.rotation.z = d.fall ? d.dir * e * 1.45 : 0; col.position.y = -(ty - u) - (d.fall ? e * 6 : 0); col.scale.y = d.half ? 1 - e * 0.55 : 1; });
     roof.rotation.z = e * 0.35; roof.position.y = -(ty - u - colH - u) - e * colH * 0.9;
     tower.rotation.z = -e * 0.18; tower.scale.y = 1 - e * 0.35;
-    if (crumble > 0.55 && !ruins.visible) { ruins.visible = true; city.visible = false; }
-    if (ruins.visible) ruins.scale.y = 0.85 + 0.15 * Math.min(1, (crumble - 0.55) / 0.45);
+    ruins.visible = c > 0.55; city.visible = !ruins.visible;
+    if (ruins.visible) ruins.scale.y = 0.85 + 0.15 * Math.min(1, (c - 0.55) / 0.45);
+  };
+  ctl.frame(() => {
+    const now = performance.now();
+    if (s.rebuildT0 && now - s.rebuildT0 < S3_REBUILD_MS) { crumbleT0 = 0; show(1 - (now - s.rebuildT0) / S3_REBUILD_MS); return; } // „Nochmal“: Stadt baut sich wieder auf
+    const a = s.atl || 0;
+    if (a <= 0) { crumbleT0 = 0; if (crumble) show(0); return; }
+    if (!crumbleT0) crumbleT0 = now;
+    show(Math.min(1, (now - crumbleT0) / 2400)); // nach Uhrzeit (auch auf langsamen Geräten gleich lang)
   });
 }
+const S3_REBUILD_MS = 2200;
 function s3Rain() {
   const st = $('#rain-stage');
   if (!st || typeof s3Mount !== 'function') return;

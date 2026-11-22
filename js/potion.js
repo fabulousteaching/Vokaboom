@@ -119,9 +119,12 @@ function potionRound() {
 function potionFitRecipe() {
   const r = $('#pt-recipe');
   if (!r) return;
+  const ul = r.querySelector('ul');
+  const over = () => r.scrollHeight > r.clientHeight + 1 || (ul && ul.scrollHeight > ul.clientHeight + 1);
   let fs = 1.4;
   r.style.setProperty('--rfs', `${fs}rem`);
-  while (fs > 0.72 && r.scrollHeight > r.clientHeight + 1) { fs -= 0.06; r.style.setProperty('--rfs', `${fs.toFixed(2)}rem`); }
+  while (fs > 0.62 && over()) { fs -= 0.05; r.style.setProperty('--rfs', `${fs.toFixed(2)}rem`); }
+  if (!r.dataset.fitLater) { r.dataset.fitLater = '1'; document.fonts?.ready.then(() => { if (r.isConnected) potionFitRecipe(); }); } // einmal nach dem Laden der Schrift nachmessen
 }
 /** Das nächste Wort auf dem Zettel leuchtet (Reihenfolge als Hilfe – ob richtig, zeigt sich erst am Schluss) */
 function potionCur() {
