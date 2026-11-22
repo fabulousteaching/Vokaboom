@@ -194,3 +194,58 @@
 .fi-catchlist ul { list-style: none; padding: 0; margin: .3rem 0 0; display: flex; flex-wrap: wrap; gap: .3rem; max-height: 140px; overflow: auto; }
 .fi-catchlist li { padding: .25rem .6rem; border-radius: 99px; background: var(--paper-2); font-size: .9rem; }
 @media (max-width: 560px) { .fi-stage { border-radius: 18px; } .fi-word { font-size: .88rem; } .fi-sun { width: 44px; height: 44px; } }
+
+/* =================== 🌉 Brückenbau =================== */
+.game-bridge .game-area { display: grid; gap: .5rem; }
+.br-hud { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .4rem .9rem; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); font-weight: 700; }
+.br-theme { color: var(--ink-2); font-weight: 600; }
+.br-stage { position: relative; overflow: hidden; border-radius: 26px; height: clamp(280px, calc(100dvh - 380px), 520px); box-shadow: 0 24px 50px -28px rgba(20, 30, 60, .7); }
+.br-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.br-avatar { position: absolute; z-index: 2; }
+.br-avatar .av-svg { display: block; width: 100%; height: auto; }
+.br-avatar.walk .av-svg { animation: br-walk .32s ease-in-out infinite; }
+@keyframes br-walk { 50% { transform: translateY(-3px) rotate(2deg); } }
+.br-avatar.jump { animation: fi-cheer .7s ease 2; }
+.br-plank { transition: transform .2s; }
+.br-plank.wobble { animation: br-wobble .5s ease; transform-box: fill-box; transform-origin: center; }
+@keyframes br-wobble { 25% { translate: 0 3px; } 50% { translate: 0 -2px; } 75% { translate: 0 2px; } }
+.br-plank.step rect { fill: #FFE08A; }
+.br-flag { transform-box: fill-box; transform-origin: left center; animation: br-flag 1.2s ease-in-out infinite; }
+@keyframes br-flag { 50% { transform: skewY(6deg) scaleX(.92); } }
+.br-goal.open .br-flag { fill: #22C55E; }
+.br-water { animation: br-water 3s ease-in-out infinite alternate; }
+@keyframes br-water { to { transform: translateX(-14px); } }
+.br-lava { animation: br-water 2.4s ease-in-out infinite alternate; filter: drop-shadow(0 -6px 14px rgba(255, 140, 30, .7)); }
+.br-ember { animation: br-ember 3s ease-in infinite; }
+@keyframes br-ember { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-160px); opacity: 0; } }
+.br-flake { animation: br-snow linear infinite; }
+@keyframes br-snow { from { transform: translateY(-40px); } to { transform: translateY(420px); } }
+.br-birds { animation: br-birds 18s linear infinite; }
+@keyframes br-birds { from { transform: translate(-60px, 60px); } to { transform: translate(110vw, 20px); } }
+.br-fx { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.br-dust { position: absolute; width: 7px; height: 7px; margin: -3px; border-radius: 50%; background: rgba(255, 255, 255, .85); animation: fi-drop .6s ease-out forwards; }
+.br-panel { display: grid; gap: .6rem; justify-items: center; padding: .9rem 1rem 1.1rem; border-radius: 22px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--shadow-card); }
+.br-panel.in { animation: ws-pop .35s cubic-bezier(.2, 1.4, .4, 1); }
+.br-q { display: grid; justify-items: center; gap: .1rem; margin: 0; text-align: center; }
+.br-q small { color: var(--ink-2); font-weight: 600; }
+.br-q strong { font: 800 clamp(1.5rem, 4.5vw, 2.2rem) var(--font-display, 'Bricolage Grotesque', system-ui); }
+.br-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; width: min(100%, 620px); }
+.br-opt { min-height: 54px; padding: .5rem .8rem; border-radius: 16px; border: 2px solid var(--line); background: var(--paper-2); font: 700 1.1rem inherit; color: var(--ink); }
+.br-opt:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-wash); }
+.br-opt.right { border-color: #22C55E; background: #DCFCE7; }
+.br-opt.wrong { border-color: var(--red); background: var(--red-wash); animation: shake .35s; }
+.br-form { display: flex; gap: .5rem; width: min(100%, 520px); }
+.br-form input { flex: 1; min-width: 0; height: 54px; font-size: 1.2rem; text-align: center; font-weight: 700; border-radius: 16px; }
+.br-note { margin: 0; font-weight: 700; color: #166534; }
+.br-note.bad { color: var(--red); }
+.br-end { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(10, 20, 40, .35); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.br-end[hidden] { display: none; }
+.br-endbox { display: grid; gap: .4rem; justify-items: center; text-align: center; padding: 1.2rem 1.5rem; border-radius: 24px; background: var(--paper); box-shadow: var(--shadow-pop); max-width: 92%; animation: rise .3s ease; }
+.br-endbox h2 { margin: 0; }
+.br-stars { font-size: 2.2rem; letter-spacing: .2rem; }
+@media (max-width: 560px) { .br-opts { grid-template-columns: 1fr 1fr; } .br-opt { font-size: 1rem; min-height: 48px; } .br-stage { border-radius: 18px; } }
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-bridge .game-area { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; }
+  .game-bridge .br-hud { grid-column: 1 / -1; }
+  .br-stage { height: calc(100dvh - 160px); }
+}
