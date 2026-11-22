@@ -12,6 +12,7 @@ function startMode(mode, opts = {}) {
   }
   if (mode === 'speak') startSpeak(set, opts.ids);
   if (mode === 'dictation') startDictation(set, opts.ids);
+  if (mode === 'write') startWrite(set, opts.ids);
   if (mode === 'test') startTest(set, opts.ids);
   go(mode);
 }
@@ -391,6 +392,7 @@ if (typeof world3dActions === 'object') Object.assign(actions, world3dActions); 
 if (typeof menuActions === 'object') Object.assign(actions, menuActions); // Menü für Lehrpersonen (js/menu.js)
 if (typeof libraryActions === 'object') Object.assign(actions, libraryActions); // Bibliothek (js/library.js)
 if (typeof reviewActions === 'object') Object.assign(actions, reviewActions); // Wiederholen (js/review.js)
+if (typeof writeActions === 'object') Object.assign(actions, writeActions); // Schreiben (js/write.js)
 // weitere Spiele (js/rain.js, snake.js, fishing.js, bridge.js, detective.js) – const-Variablen hängen nicht an window
 if (typeof rainActions === 'object') Object.assign(actions, rainActions);
 if (typeof snakeActions === 'object') Object.assign(actions, snakeActions);
@@ -484,7 +486,7 @@ async function checkForUpdate() {
     const key = 'vokaboom.reloadedFor';
     let tried = '';
     try { tried = sessionStorage.getItem(key) || ''; sessionStorage.setItem(key, live); } catch { /* */ }
-    const busy = ['test', 'dictation', 'speak'].includes(ui.view) || !!ui.modal;
+    const busy = ['test', 'dictation', 'speak', 'write'].includes(ui.view) || !!ui.modal;
     if (tried === live || busy) { toast('Es gibt eine neue Version von Vokaboom. Lade die Seite neu, um sie zu bekommen.'); return; }
     location.reload();
   } catch { /* offline */ }

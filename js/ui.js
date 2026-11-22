@@ -137,6 +137,7 @@ function render() {
     case 'live': renderLive(); break;
     case 'speak': renderSpeak(); break;
     case 'dictation': renderDictation(); break;
+    case 'write': renderWrite(); break;
     case 'test': renderTest(); break;
     case 'pics': v.innerHTML = viewPics(set); loadReview(set); break;
     case 'classes': renderClasses(); break;
@@ -487,6 +488,7 @@ function progressInfo(set) {
     games: (() => { const n = Object.keys(p.games || {}).length + (p.match ? 1 : 0); return n ? `${n} ${n === 1 ? 'Spiel' : 'Spiele'} gespielt` : 'Noch nicht gespielt'; })(),
     speak: p.speak ? `${p.speak.correct} von ${p.speak.total} gleich richtig` : 'Noch nicht geübt',
     dictation: p.dictation ? `${p.dictation.correct} von ${p.dictation.total} gleich richtig` : 'Noch nicht geübt',
+    write: p.write ? `${p.write.correct} von ${p.write.total} gleich richtig` : 'Noch nicht geübt',
     test: p.test ? `Bestes Ergebnis ${p.test.best} %` : 'Noch kein Test',
   };
 }
@@ -522,15 +524,17 @@ function viewSet(set) {
     </header>
 
     ${voicePrepHTML(set)}
-    <div class="section-head set-ueben"><h2>Üben</h2><p class="hint">${isKid() ? 'Beim Üben verdienst du Münzen – damit kannst du unten spielen.' : 'Der Lernweg in vier Schritten.'}</p></div>
+    <div class="section-head set-ueben"><h2>Üben</h2><p class="hint">${isKid() ? 'Beim Üben verdienst du Münzen – damit kannst du unten spielen.' : 'Der Lernweg in fünf Schritten.'}</p></div>
     <ol class="path" aria-label="Lernweg">
       ${step(1, 'Lernkarten', 'Karten umdrehen und merken.', info.cards,
         `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>`, !!p.cards, 'stack')}
-      ${step(2, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,
+      ${step(2, 'Schreiben', `Deutsch → ${L} oder ${L} → Deutsch schreiben.`, info.write,
+        `<button class="btn primary" data-action="mode" data-mode="write">Schreiben üben</button>`, !!p.write, 'pencil2')}
+      ${step(3, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,
         `<button class="btn primary" data-action="mode" data-mode="speak">Aussprache üben</button>`, !!p.speak, 'mic')}
-      ${step(3, 'Hören & Schreiben', 'Hör das Wort und schreib es auf.', info.dictation,
+      ${step(4, 'Hören & Schreiben', 'Hör das Wort und schreib es auf.', info.dictation,
         `<button class="btn primary" data-action="mode" data-mode="dictation">Diktat üben</button>`, !!p.dictation, 'speaker')}
-      ${step(4, 'Test', 'Zeig, was du kannst.', info.test,
+      ${step(5, 'Test', 'Zeig, was du kannst.', info.test,
         `<button class="btn primary" data-action="mode" data-mode="test">Test starten</button>`, !!p.test, 'pencil2')}
     </ol>
     ${gamesOn(set).length ? `<section class="set-games" aria-labelledby="games-title">
