@@ -362,7 +362,7 @@ function rainPop(d, status) {
   const s = G.s;
   d.gone = true;
   s.drops = s.drops.filter((x) => x !== d);
-  markResult(s.pk, d.w, true);
+  markResult(s.pk, d.w, true, status); // Tippfehler = „fast“
   const cx = d.x, cy = d.y + d.size * 0.85;
   const pts = status === 'correct' ? 10 + Math.min(20, s.combo * 2) : 5;
   if (status === 'correct') { s.combo++; s.hits++; } else { s.almost++; s.combo = 0; }

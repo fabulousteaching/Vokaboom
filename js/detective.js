@@ -73,7 +73,7 @@ function detPick(i) {
     const pts = s.tries === 1 ? 3 : 1;
     s.score += pts; if (s.tries === 1) s.first++;
     s.results.push(s.tries === 1 ? 'ok' : 'late');
-    markResult(s.pk, s.cur, s.tries === 1);
+    markResult(s.pk, s.cur, s.tries === 1, s.tries === 1 ? 'correct' : 'almost'); // zweiter Versuch = „fast“
     el.classList.add('yes');
     el.insertAdjacentHTML('beforeend', `<span class="det-solved">GELÖST</span><span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
     sfx.good();

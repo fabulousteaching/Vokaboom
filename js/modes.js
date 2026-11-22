@@ -464,7 +464,8 @@ function memMatched(set, a, b) {
   match.found++;
   match.open = [];
   if (match.players === 2) { match.pts[match.turn]++; updateMemScore(); } // Paar gefunden: Punkt, gleiche Person nochmal
-  // Memory ist ein Spiel: zählt nicht für die Auswertung
+  // Memory ist ein Spiel: zählt nicht für die Auswertung, aber (allein gespielt) für die Vergessenskurve
+  if (match.players !== 2 && w && typeof gameSrs === 'function') gameSrs(w, 'correct');
   sfx.good();
   if (w && db.settings.autoSpeak) speak(w.foreign, set.lang);
   const pf = $('.match-mode .progress-fill'), pl = $('.match-mode .progress-label span');

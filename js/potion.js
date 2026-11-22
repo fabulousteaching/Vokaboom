@@ -127,7 +127,7 @@ async function potionPick(i) {
   } else {
     sfx.bad();
     s.mistakes++;
-    s.need.filter((w) => !s.got.includes(w)).forEach((w) => markResult(s.pk, w, false));
+    s.need.filter((w) => !s.got.includes(w)).forEach((w) => markResult(s.pk, w, false, false)); // unklar, welches Wort fehlte: zählt nicht fürs Wiederholen
     potionSmoke(x1 + r0.width / 2, y1, `${gameForm(b.w)} = ${b.w.german}`);
     const av = $('#pt-avatar'); av?.classList.add('cough', 'soot'); setTimeout(() => av?.classList.remove('cough'), 900); setTimeout(() => av?.classList.remove('soot'), 2600);
   }

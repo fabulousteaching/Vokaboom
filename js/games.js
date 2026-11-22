@@ -75,12 +75,27 @@ function pickNext(pk) {
   pk.last = item;
   return item;
 }
-function markResult(pk, item, ok) {
+/**
+ * Spiele zählen für die Vergessenskurve (Wiederholen, js/review.js) – nicht für die Auswertung der Lehrperson.
+ * result: 'correct' | 'almost' | 'wrong'
+ */
+function gameSrs(w, result) {
+  const set = typeof currentSet === 'function' ? currentSet() : null;
+  if (!set || !w?.id || typeof srsUpdate !== 'function' || !set.words.some((x) => x.id === w.id)) return;
+  set.progress = set.progress || {};
+  const words = set.progress.words = set.progress.words || {};
+  const s = words[w.id] = words[w.id] || { n: 0, bad: 0, almost: 0 };
+  srsUpdate(s, 'game', result);
+  set.updated = Date.now();
+  saveDB();
+}
+function markResult(pk, item, ok, srs) {
   if (!pk || item == null) return;
   pk.wrong = pk.wrong.filter((x) => x.item !== item);
   pk.right = pk.right.filter((x) => x !== item);
   if (ok) pk.right.push(item);
   else pk.wrong.push({ item, due: pk.turn + 2 + Math.floor(Math.random() * 3) });
+  if (srs !== false) gameSrs(item, srs || (ok ? 'correct' : 'wrong')); // Spiele zählen für die Vergessenskurve
 }
 function gameRecord(set, id, score) {
   const p = set.progress = set.progress || {};
@@ -995,6 +1010,7 @@ function wsCheck(set, cells) {
   $$('.ws-cell.sel').forEach((e) => e.classList.remove('sel'));
   if (i < 0) { if (cells.length > 1) sfx.flip(); return; }
   s.found.add(i);
+  gameSrs(s.puzzle.placed[i], 'correct'); // Vergessenskurve
   cells.forEach(({ r, c }) => $(`.ws-cell[data-r="${r}"][data-c="${c}"]`)?.classList.add('found', `f${i % 6}`));
   const li = $(`#ws-list li[data-i="${i}"]`);
   if (li) li.classList.add('done', 'flip');
@@ -1109,7 +1125,7 @@ function duelTap(el) {
   if (s.busy || s.lock[p]) return;
   if (el.dataset.ok === '1') {
     s.busy = true;
-    markResult(s.pk, s.w, !s.lock[1 - p]); // falls das andere Kind falsch lag: später nochmal
+    markResult(s.pk, s.w, !s.lock[1 - p], false); // falls das andere Kind falsch lag: später nochmal (Duell: zwei Kinder, zählt nicht fürs Wiederholen)
     s.score[p]++;
     el.classList.add('good');
     sfx.good();
@@ -1123,7 +1139,7 @@ function duelTap(el) {
     $$(`.duel-opt[data-p="${p}"]`).forEach((b) => { b.disabled = true; });
     if (s.lock[0] && s.lock[1]) {
       s.busy = true;
-      markResult(s.pk, s.w, false);
+      markResult(s.pk, s.w, false, false);
       $$('.duel-opt[data-ok="1"]').forEach((b) => b.classList.add('good'));
       gLater(() => { s.round++; duelRound(currentSet()); }, 1500);
     }

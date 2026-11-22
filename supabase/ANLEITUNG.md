@@ -157,7 +157,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 - **Zaubertrank** – mit dem Avatar die richtigen Zutaten in den Kessel werfen; jeder fertige Trank hat einen anderen lustigen Effekt.
 - **Hör-Detektiv** – Wort anhören und die passende Karte finden; 10 Fälle, zuletzt ähnlich klingende Wörter und ohne Bilder.
 
-Oben links führt ein Zurück-Pfeil immer eine Ebene höher. Spiele zählen nicht für die Auswertung. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
+Oben links führt ein Zurück-Pfeil immer eine Ebene höher. Spiele zählen nicht für die Auswertung, aber für das Wiederholen nach der Vergessenskurve. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
 
 **Für die Kinder** (Bereich in der eigenen Portion, unter den Übungen):
 - **Vokabeln zeigen: Mit Bildern / Nur Wörter.** Bei „Nur Wörter“ zeigen Lernkarten, Übungen, Spiele und Test keine Bilder. In der eigenen Kartenübersicht bleiben die Bilder sichtbar.
@@ -196,7 +196,7 @@ Vokaboom merkt sich bei jedem Wort, wann es wieder dran ist (Lernkartei mit 5 F�
 **Fach 1:** nach 1 Tag · **2:** nach 3 Tagen · **3:** nach 1 Woche · **4:** nach 2 Wochen · **5:** nach 1 Monat („sicher“).
 Richtig → ein Fach weiter. Falsch → zurück ins 1. Fach (morgen wieder). Fast richtig (Tippfehler) → Fach bleibt, morgen nochmals.
 
-- Die Übungen zählen mit (Aussprechen, Hören & Schreiben, Test, Wiederholen) – die Spiele nicht. Bei den Lernkarten schätzen sich die Kinder selbst ein – dort kommen Wörter nur neu in den Kasten, sie rücken nicht vor.
+- Alle Übungen und Spiele zählen mit (Aussprechen, Hören & Schreiben, Test, Wiederholen, Wörterregen, Angeln, Memory …). Ausnahme: Duell zu zweit (zwei Kinder an einem Gerät). Für die Auswertung der Lehrperson zählen die Spiele weiterhin nicht. Bei den Lernkarten schätzen sich die Kinder selbst ein – dort kommen Wörter nur neu in den Kasten, sie rücken nicht vor.
 - Auf der Startseite erscheint **„Heute wiederholen: 12 Wörter“** mit dem Knopf **Los geht's**. Eine Runde hat höchstens 20 Wörter aus allen Portionen gemischt. Am Schluss sehen die Kinder, welche Wörter morgen nochmals kommen und wie viele schon sicher sitzen. Richtige Antworten geben Münzen für den Avatar.
 - **Eintippen oder Auswählen:** **Menü → Klassenübersicht** (bei jeder Klasse „🧠 Wiederholen“) oder Klasse → **Portionen** → **Wiederholen**. Eintippen: Deutsch sehen, Wort in der Fremdsprache schreiben (automatisch geprüft, Tippfehler zählen als „fast“). Auswählen: das richtige Wort aus 4. Ohne Einstellung wählt Vokaboom nach dem Klassennamen: „3a“, „4b“ → Auswählen, sonst Eintippen.
 - **Auswertung:** Klasse → **Auswertung** → Spalte **🧠 Wiederholen**: wie viele Wörter heute fällig sind, wie viele sicher sitzen und wann das Kind zuletzt wiederholt hat. Rot = fällige Wörter und seit mehr als 4 Tagen nicht wiederholt.
