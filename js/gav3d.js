@@ -38,7 +38,7 @@ function gavSound(kind) {
       g.gain.setValueAtTime(0.0001, start); g.gain.exponentialRampToValueAtTime(gain, start + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
       o.connect(g).connect(out); o.start(start); o.stop(start + dur + 0.05);
     };
-    if (kind === 'whoosh') noise(t0, 0.6, 'bandpass', 400, 2400, 0.25, 1.2);
+    if (kind === 'whoosh') noise(t0, 0.45, 'bandpass', 500, 1600, 0.1, 1.2);
     else if (kind === 'splash') { // grosses Platschen: Aufprall, Rauschen, Nachtropfen
       osc(t0, 0.25, 'sine', 180, 45, 0.5);
       noise(t0, 0.9, 'lowpass', 5000, 500, 0.55);
@@ -46,9 +46,9 @@ function gavSound(kind) {
       for (let i = 0; i < 7; i++) { const st = t0 + 0.35 + Math.random() * 0.9; osc(st, 0.07, 'sine', 900 + Math.random() * 900, 1800 + Math.random() * 900, 0.06); }
     } else if (kind === 'plop') { osc(t0, 0.12, 'sine', 600, 220, 0.18); noise(t0, 0.25, 'lowpass', 3000, 400, 0.12); }
     else if (kind === 'bubbles') { for (let i = 0; i < 10; i++) { const st = t0 + i * 0.07 + Math.random() * 0.05; osc(st, 0.09, 'sine', 300 + Math.random() * 400, 700 + Math.random() * 600, 0.07); } }
-    else if (kind === 'pour') { noise(t0, 0.9, 'bandpass', 1200, 600, 0.18, 2); for (let i = 0; i < 5; i++) osc(t0 + 0.15 + i * 0.13, 0.08, 'sine', 500 + i * 60, 900, 0.05); }
-    else if (kind === 'magic') { [784, 988, 1175, 1568].forEach((f, i) => osc(t0 + i * 0.08, 0.5, 'triangle', f, f * 1.01, 0.07)); noise(t0, 0.8, 'highpass', 4000, 8000, 0.08); }
-    else if (kind === 'fizzle') { noise(t0, 1.1, 'bandpass', 3000, 300, 0.22, 1.5); osc(t0, 0.6, 'sawtooth', 220, 60, 0.07); }
+    else if (kind === 'pour') { for (let i = 0; i < 7; i++) osc(t0 + i * 0.12, 0.09, 'sine', 380 + (i % 3) * 90, 760 + (i % 2) * 120, 0.06); } // Gluckern, ohne Rauschen
+    else if (kind === 'magic') { [784, 988, 1175, 1568, 2093].forEach((f, i) => osc(t0 + i * 0.08, 0.6, 'triangle', f, f * 1.01, 0.07)); }
+    else if (kind === 'fizzle') { osc(t0, 0.7, 'sawtooth', 220, 60, 0.07); osc(t0 + 0.1, 0.5, 'square', 160, 70, 0.04); }
   } catch { /* kein Audio */ }
 }
 

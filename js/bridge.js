@@ -64,7 +64,7 @@ function bridgeBegin(set, theme, n, stage) {
     if (typeof gavMount === 'function') gavMount($('#br-avatar'), { rotY: 0.45 }).then((c) => { if (c && G.id === 'bridge') { G.s.av3 = c; c.setAnim('idle'); } });
   };
   const s0 = G.s;
-  if (typeof b3Mount === 'function') b3Mount(G.s.el).then((c) => { if (G.s !== s0 || G.id !== 'bridge') { c?.dispose(); return; } if (c) s0.b3 = c; else flat(); });
+  if (typeof b3Mount === 'function') b3Mount(G.s.el).then((c) => { if (G.s !== s0 || G.id !== 'bridge') { c?.dispose(); return; } if (c) { s0.b3 = c; const pn = $('#br-panel'); if (pn) s0.el.appendChild(pn); } else flat(); });
   else flat();
 }
 /** kurze Bewegung des 3D-Avatars, danach wieder ruhig stehen */

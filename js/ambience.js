@@ -71,17 +71,18 @@ function ambStart(kind) {
   const ac = ambCtx();
   if (!ac || !kind) return;
   AMB.ctx = ac; AMB.kind = kind;
-  AMB.out = ac.createGain(); AMB.out.gain.setValueAtTime(0.0001, ac.currentTime); AMB.out.gain.exponentialRampToValueAtTime(0.5, ac.currentTime + 1.5);
+  AMB.out = ac.createGain(); AMB.out.gain.setValueAtTime(0.0001, ac.currentTime); AMB.out.gain.exponentialRampToValueAtTime(0.35, ac.currentTime + 1.5);
   AMB.out.connect(ac.destination);
+  // Kein Rauschen mehr (Wasser/Wind/Grollen als Dauerrauschen wirkte störend): nur vereinzelte, leise Geräusche
   switch (kind) {
-    case 'lake': ambBed(ac, { f: 500, gain: 0.16, lfo: 0.2, depth: 0.7 }); ambEvery(2500, 7000, ambBird); ambEvery(1500, 4000, ambPlop); break;
-    case 'mountain': ambBed(ac, { type: 'bandpass', f: 700, q: 0.6, gain: 0.14, lfo: 0.08, depth: 0.8, fLfo: 300 }); ambBed(ac, { f: 450, gain: 0.08, lfo: 0.25 }); ambEvery(3500, 9000, ambBird); break;
-    case 'sea': ambBed(ac, { f: 800, gain: 0.25, lfo: 0.11, depth: 0.95, fLfo: 500 }); ambEvery(5000, 12000, ambGull); break;
-    case 'jungle': ambBed(ac, { f: 1200, gain: 0.1, lfo: 0.3, depth: 0.3 }); ambEvery(1200, 3500, ambJungleBird); ambEvery(2500, 6000, ambBird); break;
-    case 'canyon': ambBed(ac, { type: 'bandpass', f: 500, q: 1.2, gain: 0.18, lfo: 0.06, depth: 0.9, fLfo: 350 }); ambEvery(7000, 14000, ambHawk); break;
-    case 'ice': ambBed(ac, { type: 'bandpass', f: 1100, q: 1.5, gain: 0.16, lfo: 0.07, depth: 0.9, fLfo: 700 }); ambBed(ac, { type: 'highpass', f: 3000, gain: 0.03, lfo: 0.2 }); break;
-    case 'lava': ambBed(ac, { f: 160, gain: 0.3, lfo: 0.09, depth: 0.6 }); ambEvery(600, 1800, ambCrackle); ambEvery(5000, 11000, ambRumble); break;
-    case 'lab': ambBed(ac, { f: 260, gain: 0.08, lfo: 0.4, depth: 0.5 }); ambEvery(350, 1100, ambBubble); ambEvery(500, 1500, ambCrackle); break;
+    case 'lake': ambEvery(4000, 9000, ambBird); ambEvery(3000, 7000, ambPlop); break;
+    case 'mountain': ambEvery(5000, 11000, ambBird); break;
+    case 'sea': ambEvery(7000, 14000, ambGull); break;
+    case 'jungle': ambEvery(2500, 6000, ambJungleBird); ambEvery(4000, 9000, ambBird); break;
+    case 'canyon': ambEvery(9000, 16000, ambHawk); break;
+    case 'ice': break;
+    case 'lava': break;
+    case 'lab': ambEvery(900, 2400, ambBubble); break;
   }
 }
 function ambStop(now = false) {
@@ -105,7 +106,7 @@ function sfxx(name) {
     else if (name === 'clink') { ambTone(ac, t, 0.25, 'sine', 2900 + Math.random() * 300, 2950, 0.07, d); ambTone(ac, t + 0.05, 0.3, 'sine', 4300, 4320, 0.04, d); }
     else if (name === 'crackle') ambCrackle(ac);
     else if (name === 'thud') { ambTone(ac, t, 0.18, 'sine', 120, 55, 0.3, d); ambHit(ac, t, 0.12, 'lowpass', 700, 0.3, 1, d); }
-    else if (name === 'whoosh') ambHit(ac, t, 0.45, 'bandpass', 1400, 0.3, 0.8, d);
+    else if (name === 'whoosh') ambTone(ac, t, 0.35, 'sine', 300, 700, 0.06, d);
     else if (name === 'chime') [1319, 1568, 2093].forEach((f, i) => ambTone(ac, t + i * 0.07, 0.6, 'sine', f, f, 0.05, d));
   } catch { /* egal */ }
 }

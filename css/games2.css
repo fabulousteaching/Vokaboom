@@ -783,3 +783,18 @@
 .br-q small { color: var(--brand-ink); font-weight: 700; }
 .br-q strong { color: var(--ink); }
 .rain-lvl, .br-theme { color: var(--ink); }
+
+/* Brückenbau 3D: grosses Spielfeld, Frage und Antworten im Bild */
+.br-stage.b3d { height: max(420px, calc(100dvh - 170px)); }
+.br-stage.b3d .br-panel { position: absolute; z-index: 6; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(calc(100% - 24px), 760px); margin: 0;
+  background: rgba(255, 255, 255, .82); border: 1px solid rgba(255, 255, 255, .7); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .55); color: #1E2140; }
+.br-stage.b3d .br-q small { color: #4338CA; }
+.br-stage.b3d .br-q strong { color: #1E2140; }
+.br-stage.b3d .br-opt { background: rgba(255, 255, 255, .95); color: #1E2140; border-color: #CBD5E1; }
+.br-stage.b3d .br-opt.right { background: #DCFCE7; border-color: #22C55E; color: #14532D; }
+.br-stage.b3d .br-opt.wrong { background: #FFE4E6; border-color: #F43F5E; color: #881337; }
+.br-stage.b3d .br-form input { background: #fff; color: #1E2140; }
+.br-stage.b3d .br-note { color: #14532D; } .br-stage.b3d .br-note.bad { color: #9F1239; }
+@media (min-width: 760px) { .br-stage.b3d .br-opts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.br-stage.b3d .br-end { z-index: 8; }
