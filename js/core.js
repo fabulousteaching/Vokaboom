@@ -1370,6 +1370,83 @@ async function idbPut(k, v) {
   try { d.transaction('clips', 'readwrite').objectStore('clips').put(v, k); } catch { /* voll oder privat */ }
 }
 
+/**
+ * KI-Aufnahme aufbereiten: Störgeräusche vor und nach dem Wort weg (Klick, Hauch, Rauschen), weich ein- und
+ * ausblenden (kein Knacken), Gleichanteil weg, Lautstärke angleichen. Mehrfach anwenden schadet nicht.
+ */
+function cleanVoice(f32, sr) {
+  const n = f32.length;
+  if (!n || !sr) return f32;
+  // Gleichanteil (DC) entfernen
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += f32[i];
+  mean /= n;
+  const x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = f32[i] - mean;
+  // Energie in 10-ms-Stücken
+  const F = Math.max(1, Math.round(sr * 0.01)), nf = Math.ceil(n / F), rms = new Float32Array(nf);
+  let peak = 0;
+  for (let f = 0; f < nf; f++) {
+    let e = 0; const a = f * F, b = Math.min(n, a + F);
+    for (let i = a; i < b; i++) e += x[i] * x[i];
+    rms[f] = Math.sqrt(e / Math.max(1, b - a));
+    if (rms[f] > peak) peak = rms[f];
+  }
+  if (peak < 1e-4) return x;
+  const thr = Math.max(0.004, peak * 0.035);
+  // zusammenhängende Abschnitte mit Klang (Lücken bis 90 ms gehören dazu, z. B. bei „ice cream“)
+  const segs = [];
+  let cur = null;
+  for (let f = 0; f < nf; f++) {
+    if (rms[f] >= thr) {
+      if (cur && f - cur.b <= 9) { cur.b = f; cur.e = Math.max(cur.e, rms[f]); cur.sum += rms[f]; }
+      else { cur = { a: f, b: f, e: rms[f], sum: rms[f] }; segs.push(cur); }
+    }
+  }
+  if (!segs.length) return x;
+  // Störungen am Rand: sehr kurz (≤ 60 ms) oder viel leiser als das Wort, und durch Stille abgesetzt
+  const main = segs.reduce((m, g) => (g.sum > m.sum ? g : m), segs[0]);
+  const keep = segs.filter((g) => g === main || ((g.b - g.a + 1) > 6 && g.e > main.e * 0.18));
+  let first = keep[0].a, last = keep[keep.length - 1].b;
+  // leise Anlaute und Auslaute („s“, „f“, „th“) direkt am Wort behalten: bis zur Hälfte der Schwelle weitergehen
+  while (first > 0 && rms[first - 1] >= thr * 0.45) first--;
+  while (last < nf - 1 && rms[last + 1] >= thr * 0.45) last++;
+  const pre = Math.round(sr * 0.03), post = Math.round(sr * 0.07);
+  const a = Math.max(0, first * F - pre), b = Math.min(n, (last + 1) * F + post);
+  const y = x.slice(a, b);
+  // weich ein- und ausblenden
+  const fin = Math.min(y.length >> 2, Math.round(sr * 0.012)), fout = Math.min(y.length >> 2, Math.round(sr * 0.045));
+  for (let i = 0; i < fin; i++) y[i] *= Math.sin((i / fin) * Math.PI / 2) ** 2;
+  for (let i = 0; i < fout; i++) y[y.length - 1 - i] *= Math.sin((i / fout) * Math.PI / 2) ** 2;
+  // Lautstärke angleichen (Spitze bei ~0.9)
+  let mx = 0;
+  for (let i = 0; i < y.length; i++) mx = Math.max(mx, Math.abs(y[i]));
+  if (mx > 0.02) { const g = Math.min(3, 0.9 / mx); for (let i = 0; i < y.length; i++) y[i] *= g; }
+  // kurze Stille vorne und hinten (damit nichts abgeschnitten klingt, z. B. beim ersten Abspielen auf dem iPad)
+  const pad = Math.round(sr * 0.04), out = new Float32Array(y.length + pad * 2);
+  out.set(y, pad);
+  return out;
+}
+/** Gespeicherte WAV-Aufnahme (16 Bit, mono) lesen, aufbereiten und wieder als WAV liefern */
+async function cleanClipBlob(blob) {
+  try {
+    const buf = await blob.arrayBuffer();
+    const v = new DataView(buf);
+    if (buf.byteLength < 48 || v.getUint32(0, false) !== 0x52494646) return blob; // „RIFF“
+    let o = 12, sr = 24000, bits = 16, ch = 1, data = -1, len = 0;
+    while (o + 8 <= buf.byteLength) {
+      const id = v.getUint32(o, false), size = v.getUint32(o + 4, true);
+      if (id === 0x666d7420) { ch = v.getUint16(o + 10, true); sr = v.getUint32(o + 12, true); bits = v.getUint16(o + 22, true); }
+      if (id === 0x64617461) { data = o + 8; len = Math.min(size, buf.byteLength - data); break; }
+      o += 8 + size + (size & 1);
+    }
+    if (data < 0 || bits !== 16 || ch !== 1) return blob;
+    const n = len >> 1, f = new Float32Array(n);
+    for (let i = 0; i < n; i++) f[i] = v.getInt16(data + i * 2, true) / 32768;
+    return wavBlob(cleanVoice(f, sr), sr);
+  } catch { return blob; }
+}
+
 /** Float32-Audio → WAV (16 Bit, mono) */
 function wavBlob(f32, sr) {
   const n = f32.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
@@ -1419,7 +1496,7 @@ function kokoroStart() {
     }
     else if (m.type === 'audio' && kokoro.busy && kokoro.busy.id === m.id) {
       const job = kokoro.busy; kokoro.busy = null;
-      const blob = wavBlob(m.audio, m.sr);
+      const blob = wavBlob(cleanVoice(m.audio, m.sr), m.sr); // ohne Klick und Nebengeräusche
       job.done.forEach((d) => d.resolve(blob));
       kokoroPump();
     } else if (m.type === 'error') {
@@ -1520,11 +1597,11 @@ function findClip(text, voice, set) {
   if (clipLoading.has(key)) return clipLoading.get(key);
   const p = (async () => {
     const local = await idbGet(key);
-    if (local) return memPut(key, local);
+    if (local) return memPut(key, await cleanClipBlob(local)); // auch ältere Aufnahmen aufbereiten
     const owner = audioOwnerFor(voice, h, set);
     if (owner) {
       const b = await fetchRemoteClip(owner, voice, h);
-      if (b) { idbPut(key, b); return memPut(key, b); }
+      if (b) { idbPut(key, b); return memPut(key, await cleanClipBlob(b)); }
     }
     return null;
   })().finally(() => clipLoading.delete(key));
