@@ -16,6 +16,7 @@ const GAMES = [
   { id: 'rain', name: 'Wörterregen', art: '🌧️', text: 'Tippe das Wort, bevor der Regentropfen ins Wasser fällt.', min: 3 },
   { id: 'fish', name: 'Angeln', art: '🎣', text: 'Dein Avatar angelt: Fang den Fisch mit dem richtigen Wort – sonst landest du im Wasser!', min: 3 },
   { id: 'bridge', name: 'Brückenbau', art: '🌉', text: 'Jedes richtige Wort ist ein Brett – bau die Brücke, damit dein Avatar hinüberkommt.', min: 4 },
+  { id: 'potion', name: 'Zaubertrank', art: '🧪', text: 'Mix mit deinem Avatar Zaubertränke aus den richtigen Wörtern – jedes Mal passiert etwas anderes!', min: 4 },
   { id: 'snake', name: 'Wortschlange', art: '🐍', text: 'Friss die richtigen Buchstaben oder Wörter und werde immer länger.', min: 3 },
   { id: 'runner', name: 'Welten-Lauf', art: '🏃', text: 'Renn mit deinem Avatar durch fünf Welten und lauf durch das richtige Wort.', min: 3 },
 ];
@@ -140,7 +141,7 @@ function renderGame() {
   stopGame();
   G.id = ui.game;
   G.s = {};
-  const fn = { balloon: startBalloon, blitz: startBlitz, scramble: startScramble, search: startSearch, rocket: startRocket, duel: startDuel, runner: startRunnerGame, rain: startRain, snake: startSnakeGame, fish: startFishing, bridge: startBridge }[ui.game];
+  const fn = { balloon: startBalloon, blitz: startBlitz, scramble: startScramble, search: startSearch, rocket: startRocket, duel: startDuel, runner: startRunnerGame, rain: startRain, snake: startSnakeGame, fish: startFishing, bridge: startBridge, potion: startPotion }[ui.game];
   if (!fn) { go('games'); return; }
   fn(set);
 }

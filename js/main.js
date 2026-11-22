@@ -397,6 +397,7 @@ if (typeof snakeActions === 'object') Object.assign(actions, snakeActions);
 if (typeof fishActions === 'object') Object.assign(actions, fishActions);
 if (typeof bridgeActions === 'object') Object.assign(actions, bridgeActions);
 if (typeof detActions === 'object') Object.assign(actions, detActions);
+if (typeof potionActions === 'object') Object.assign(actions, potionActions);
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
