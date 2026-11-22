@@ -8,6 +8,7 @@
 const FIT_SEL = [
   '.fi-ask strong', '.br-q strong', '.ws-de', '.bwc-word', '.g-de.big', '.g-word-de', '.rn-q', '.pt-msgbox strong',
   '.det-de', '.rain-levelup', '.blitz-card', '.task-q', '.game-q', '.q-big',
+  '.mz3-q', '.ship-task', '.pb-task', // Teilmal
 ].join(', ');
 
 function fitOne(el) {
