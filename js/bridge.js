@@ -57,9 +57,14 @@ function bridgeBegin(set, theme, n, stage) {
   const top = $('.br-hud'), bar = $('.topbar');
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   bridgeAsk();
-  if (typeof s3Bridge === 'function') s3Bridge();
-  // 3D-Avatar (wenn möglich): schaut zur Schlucht und feuert an
-  if (typeof gavMount === 'function') gavMount($('#br-avatar'), { rotY: 0.45 }).then((c) => { if (c && G.id === 'bridge') { G.s.av3 = c; c.setAnim('idle'); } });
+  // 3D-Brücke mit Blick von hinten (js/bridge3d.js); ohne 3D: 2D-Brücke
+  const flat = () => {
+    if (typeof s3Bridge === 'function') s3Bridge();
+    if (typeof gavMount === 'function') gavMount($('#br-avatar'), { rotY: 0.45 }).then((c) => { if (c && G.id === 'bridge') { G.s.av3 = c; c.setAnim('idle'); } });
+  };
+  const s0 = G.s;
+  if (typeof b3Mount === 'function') b3Mount(G.s.el).then((c) => { if (G.s !== s0 || G.id !== 'bridge') { c?.dispose(); return; } if (c) s0.b3 = c; else flat(); });
+  else flat();
 }
 /** kurze Bewegung des 3D-Avatars, danach wieder ruhig stehen */
 function brAnim(name, ms = 1100, after = 'idle') {
@@ -177,7 +182,7 @@ async function bridgeAnswer(ok, note = '') {
     sfx.good();
     if (note && panel) panel.insertAdjacentHTML('beforeend', `<p class="br-note">${esc(note)}</p>`);
     brAnim(s.placed % 3 === 2 ? 'cheer' : s.placed % 3 === 1 ? 'clap' : 'present', 1000);
-    await bridgeDropPlank(s.placed);
+    if (s.b3?.alive) await s.b3.place(s.placed); else await bridgeDropPlank(s.placed);
     s.placed++;
     $('#br-count').textContent = `${s.placed} / ${s.n} Bretter`;
     if (s.placed >= s.n) { bridgeWalk(); return; }
@@ -187,7 +192,7 @@ async function bridgeAnswer(ok, note = '') {
     if (panel) panel.insertAdjacentHTML('beforeend', `<p class="br-note bad">Richtig ist: <b lang="${s.lang}">${esc(gameForm(s.cur))}</b></p>`);
     brAnim('oops', 700, 'shy');
     setTimeout(() => brAnim('shy', 1200), 700);
-    await bridgeFallPlank(s.placed);
+    if (s.b3?.alive) await s.b3.fail(s.placed); else await bridgeFallPlank(s.placed);
   }
   gLater(() => bridgeAsk(), ok ? 250 : 900);
 }
@@ -236,9 +241,10 @@ async function bridgeWalk() {
   const panel = $('#br-panel');
   if (panel) panel.innerHTML = '<p class="br-q"><strong>Geschafft! 🎉</strong><small>Die Brücke steht – los geht\'s!</small></p>';
   sfx.win();
-  const path = [{ x: s.L * 0.42, y: s.top }, ...Array.from({ length: s.n }, (_, i) => s.slot(i)), { x: s.W - s.R * 0.55, y: s.top }];
+  const path = s.b3?.alive ? [] : [{ x: s.L * 0.42, y: s.top }, ...Array.from({ length: s.n }, (_, i) => s.slot(i)), { x: s.W - s.R * 0.55, y: s.top }];
+  if (s.b3?.alive) { await s.b3.finish(); if (G.id !== 'bridge') return; }
   const a3 = s.av3?.alive ? s.av3 : null;
-  if (a3) { clearTimeout(s.animT); a3.rotY = Math.PI / 2; a3.setAnim('run'); a3.fig.setRate(0.55); } else av.classList.add('walk');
+  if (a3) { clearTimeout(s.animT); a3.rotY = Math.PI / 2; a3.setAnim('run'); a3.fig.setRate(0.55); } else if (!s.b3) av.classList.add('walk');
   for (let k = 1; k < path.length; k++) {
     const a = path[k - 1], b = path[k];
     const pl = $(`.br-plank[data-i="${k - 1}"]`);
@@ -251,7 +257,7 @@ async function bridgeWalk() {
     if (G.id !== 'bridge') return;
   }
   if (a3) { a3.fig.setRate(1); a3.rotY = 0.2; a3.setAnim('cheer'); setTimeout(() => a3.alive && a3.setAnim('dance'), 1600); }
-  else { av.classList.remove('walk'); av.classList.add('jump'); }
+  else if (!s.b3) { av.classList.remove('walk'); av.classList.add('jump'); }
   $('.br-goal')?.classList.add('open');
   if (typeof confetti === 'function') confetti();
   const stars = s.wrong === 0 ? 3 : s.wrong <= 2 ? 2 : 1;

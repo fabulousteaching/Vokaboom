@@ -731,3 +731,8 @@
 .det-folder .det-bigstamp { left: auto; top: auto; right: 4%; top: 7%; transform: rotate(-12deg); font-size: clamp(1.1rem, 3.4vw, 1.9rem); border-width: 4px; padding: .1rem .8rem; }
 @keyframes det-ink { from { opacity: 0; filter: blur(2px); transform: rotate(-12deg) scale(1.2); } }
 .det-stamper { left: auto; top: 7%; right: 4%; margin: -110px 0 0 0; }
+
+/* Brückenbau 3D (js/bridge3d.js): Blick von hinten */
+.b3-canvas { position: absolute; left: 0; top: 0; z-index: 0; display: block; }
+.br-stage.b3d .br-svg, .br-stage.b3d .br-avatar { visibility: hidden; }
+.br-stage.b3d { height: clamp(280px, calc(100dvh - 420px), 900px); background: #9cc6ff; }
