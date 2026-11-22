@@ -103,9 +103,15 @@ function fishBegin(set, level) {
   G.s.stage = stage;
   fishLayout();
   // 3D-Avatar (wenn möglich), hält die Angel
-  if (typeof s3Fishing === 'function') s3Fishing();
+  // echte 3D-Szene (js/fish3d.js); ohne 3D: Bühnenbild (js/scene3d.js) bzw. 2D
+  const s0 = G.s;
+  const flat = () => {
+    if (typeof s3Fishing === 'function') s3Fishing();
+    if (typeof gavMount === 'function') gavMount($('#fi-avatar'), { rotY: 0.6 }).then((c) => { if (c && G.id === 'fish') { G.s.av3 = c; c.setAnim('hold'); } });
+  };
+  if (typeof f3Mount === 'function') f3Mount(stage).then((c) => { if (G.s !== s0 || G.id !== 'fish') { c?.dispose(); return; } if (c) { s0.f3 = c; s0.av3 = c.av; c.av.setAnim('hold'); } else flat(); });
+  else flat();
   if (typeof ambStart === 'function') ambStart(['lake', 'mountain', 'sea'][level - 1] || 'lake');
-  if (typeof gavMount === 'function') gavMount($('#fi-avatar'), { rotY: 0.6 }).then((c) => { if (c && G.id === 'fish') { G.s.av3 = c; c.setAnim('hold'); } });
   const onResize = () => fishLayout();
   window.addEventListener('resize', onResize);
   G.fishCleanup = () => window.removeEventListener('resize', onResize);
@@ -152,13 +158,16 @@ function fishRound() {
   s.cur = w;
   const ask = $('#fi-ask');
   if (ask) { ask.innerHTML = `<small>Fang das Wort für</small><strong lang="de">${esc(w.german || '?')}</strong>`; ask.classList.remove('in'); void ask.offsetWidth; ask.classList.add('in'); }
-  // neuer Schwarm: die alten Fische tauchen sofort ab (blubbern weg), damit sie sich nicht mit den neuen kreuzen
-  s.fish.forEach((f) => {
-    f.el.classList.add('vanish');
-    for (let i = 0; i < 3; i++) gLater(() => fishBubble(f.x + f.bw / 2 + (Math.random() - 0.5) * 20, f.y + f.bh / 2), i * 70);
-    setTimeout(() => f.el.remove(), 380);
-  });
-  s.fish = [];
+  // neuer Schwarm: die alten Fische schwimmen schnell zum nächsten Rand hinaus (ohne Wort-Schild);
+  // die neuen kommen erst, wenn die alten draussen sind – so kreuzen sie sich nicht
+  const old = s.fish.filter((f) => !f.leaving);
+  old.forEach((f) => { f.leaving = true; f.enter = false; f.dir = s.f3 || f.x + f.bw / 2 > s.W / 2 ? 1 : -1; f.v = 900; f.el.classList.add('leaving'); });
+  s.busy = true;
+  gLater(() => fishSchool(w), old.length ? 650 : 0);
+}
+function fishSchool(w) {
+  const s = G.s;
+  if (s.done || s.cur !== w) return;
   const key = (x) => gameForm(x).toLowerCase();
   const others = shuffle(s.words.filter((x) => x !== w && key(x) !== key(w))).slice(0, s.L.n - 1);
   const items = shuffle([{ w, ok: true }, ...others.map((x) => ({ w: x, ok: false }))]);
@@ -168,7 +177,7 @@ function fishRound() {
     const text = gameForm(it.w), [c1, c2] = FISH_COLORS[(k + s.caught.length) % FISH_COLORS.length];
     const kind = FISH_KINDS[(k * 3 + s.caught.length + s.lives) % FISH_KINDS.length];
     const bw = Math.max(92, Math.min(190, 40 + text.length * 10.5)), bh = kind === 'puffer' ? 58 : kind === 'long' ? 44 : kind === 'angel' ? 52 : 50;
-    const dir = Math.random() < 0.5 ? 1 : -1;
+    const dir = s.f3 ? -1 : Math.random() < 0.5 ? 1 : -1; // in 3D kommen alle von rechts (links steht der Avatar)
     const el = document.createElement('button');
     el.type = 'button'; el.className = 'fi-fish'; el.dataset.i = String(s.fish.length);
     el.setAttribute('aria-label', text); el.lang = s.lang;
@@ -195,7 +204,7 @@ function fishStep(dt) {
       if (f.x < minX && f.dir < 0) f.dir = 1;
       if (f.x > maxX && f.dir > 0) f.dir = -1;
     }
-    f.el.style.transform = `translate3d(${f.x.toFixed(1)}px, ${f.y.toFixed(1)}px, 0)`;
+    if (!s.f3) f.el.style.transform = `translate3d(${f.x.toFixed(1)}px, ${f.y.toFixed(1)}px, 0)`;
     f.el.classList.toggle('flip', f.dir > 0); // Kopf zeigt in Schwimmrichtung (Fisch-Grafik schaut nach links)
   }
   const gone = s.fish.filter((f) => f.leaving && (f.x < -f.bw - 40 || f.x > s.W + 40));
@@ -213,6 +222,7 @@ function fishStep(dt) {
 /** Rute, Schnur und Schwimmer */
 function fishDrawLine() {
   const s = G.s, rod = $('#fi-rod'), line = $('#fi-line'), bob = $('#fi-bob');
+  if (s.f3) return; // in 3D zeichnet js/fish3d.js Rute und Schnur
   if (!rod || !s.hand) return;
   const pull = s.pull || 0; // Rute biegt sich, wenn ein Fisch zieht
   const tip = { x: s.tip.x + pull * 26, y: s.tip.y + pull * 46 };
@@ -265,7 +275,7 @@ async function fishCatch(f) {
   await fishTween(720, (k) => {
     const e = fishEase(k);
     f.x = start.x + (bucket.x - start.x) * e; f.y = start.y + (bucket.y - start.y) * e - Math.sin(k * Math.PI) * 120;
-    f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0) rotate(${(f.dir > 0 ? 1 : -1) * k * 360}deg) scale(${1 - k * 0.55})`;
+    if (!s.f3) f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0) rotate(${(f.dir > 0 ? 1 : -1) * k * 360}deg) scale(${1 - k * 0.55})`;
     s.hook = { x: f.x + f.bw / 2, y: f.y + 10 };
   });
   f.el.remove();
@@ -290,7 +300,7 @@ async function fishFail(f) {
   await fishTween(750, (k) => {
     s.pull = Math.min(1, k * 1.4) * (0.8 + Math.sin(k * 30) * 0.2);
     f.x += f.dir * 2.5; f.y += Math.sin(k * 20) * 1.5;
-    f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0)`;
+    if (!s.f3) f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0)`;
     s.hook = { x: f.x + (f.dir > 0 ? f.bw - 6 : 6), y: f.y + f.bh / 2 };
     if (a3) a3.lean = -k * k * 0.55 + Math.sin(k * 26) * 0.05 * k; else if (av) av.style.transform = `rotate(${k * 22}deg)`;
   });
@@ -373,6 +383,7 @@ function fishParts(dt) {
 function fishBigSplash(x) {
   const s = G.s, fx = $('#fi-fx'), y = s.waterY;
   gavSound('splash');
+  if (s.f3) { s.f3.splash(x, true); s.stage?.classList.remove('quake'); void s.stage?.offsetWidth; s.stage?.classList.add('quake'); return; }
   if (!fx) return;
   for (let i = 0; i < 3; i++) {
     const ring = document.createElement('span');
@@ -393,6 +404,7 @@ function fishBigSplash(x) {
   s.stage?.classList.remove('quake'); void s.stage?.offsetWidth; s.stage?.classList.add('quake');
 }
 function fishSplash(x, y, n, big) {
+  if (G.s.f3) { G.s.f3.splash(x, !!big); return; }
   const fx = $('#fi-fx');
   if (!fx) return;
   const ring = document.createElement('span');
@@ -408,6 +420,7 @@ function fishSplash(x, y, n, big) {
   }
 }
 function fishSparkles(x, y) {
+  if (G.s.f3) [x, y] = G.s.f3.screen(x, y);
   const fx = $('#fi-fx');
   if (!fx) return;
   for (let i = 0; i < 10; i++) {
@@ -420,6 +433,7 @@ function fishSparkles(x, y) {
   }
 }
 function fishBubble(x, y) {
+  if (G.s.f3) { G.s.f3.bubble(x, y); return; }
   const s = G.s, box = $('#fi-bubbles');
   if (!box || !s.W) return;
   const b = document.createElement('i');
@@ -430,6 +444,7 @@ function fishBubble(x, y) {
   box.appendChild(b); setTimeout(() => b.remove(), 3200);
 }
 function fishFloat(x, y, text, kind) {
+  if (G.s.f3) [x, y] = G.s.f3.screen(x, y);
   const fx = $('#fi-fx');
   if (!fx) return;
   const el = document.createElement('div');

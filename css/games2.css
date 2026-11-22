@@ -821,3 +821,20 @@
 .br-stage.b3d .br-form { display: flex; gap: .5rem; }
 .br-stage.b3d .br-form input { flex: 1; background: rgba(255, 255, 255, .7); border: 2px solid rgba(255, 255, 255, .8); }
 @media (max-width: 760px) { .br-stage.b3d .br-note { bottom: 136px; } }
+
+/* Angeln 3D (js/fish3d.js): ganze Szene in 3D, Fische als Wort-Schilder darüber */
+.f3-canvas { position: absolute; left: 0; top: 0; z-index: 0; display: block; }
+.fi-stage.f3d .fi-sky, .fi-stage.f3d .fi-hills, .fi-stage.f3d .fi-water, .fi-stage.f3d .fi-plants, .fi-stage.f3d .fi-dock,
+.fi-stage.f3d .fi-front, .fi-stage.f3d .fi-lines, .fi-stage.f3d .fi-avatar { visibility: hidden; }
+.fi-stage.f3d .fi-avatar .gav-canvas { display: none; }
+.fi-stage.f3d .fi-fish svg { visibility: hidden; }
+.fi-stage.f3d .fi-fish { filter: none; transition: opacity .25s; }
+.fi-stage.f3d .fi-word { left: 0; right: 0; font-size: 1.05rem; text-shadow: 0 1px 3px rgba(0, 0, 0, .85), 0 0 8px rgba(0, 0, 0, .45); }
+.fi-stage.f3d .fi-fish .fi-body-wrap::before { content: ''; position: absolute; left: 50%; top: 50%; width: calc(100% - 30px); height: 30px; transform: translate(-50%, -50%); border-radius: 99px;
+  background: rgba(10, 40, 70, .28); backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px); }
+.fi-stage.f3d .fi-fish.right .fi-body-wrap::before { background: rgba(255, 224, 102, .45); box-shadow: 0 0 16px #FFE066; }
+
+/* Angeln: wegschwimmende Fische ohne Schild, nicht antippbar; Steg ohne Stelzen (schwimmt) */
+.fi-fish.leaving { pointer-events: none; }
+.fi-fish.leaving .fi-word, .fi-fish.leaving .fi-body-wrap::before { opacity: 0; transition: opacity .15s; }
+.fi-dock::before, .fi-dock::after { display: none; }
