@@ -583,37 +583,90 @@ function s3PotionScene(ctl) {
     const f = ctl.mesh(flameG); add(ctl.at(f, x, floorY - 2 - 48 * sc, -399)); f.scale.setScalar(sc);
     ctl.frame((dt, t) => { f.scale.set(sc * (1 + Math.sin(t * 13 + x) * 0.08), sc * (1 + Math.sin(t * 17 + x) * 0.15), sc); });
   }
-  // Kessel (Voxel) mit leuchtendem Trank und Feuer
+  // Kessel: glatter, runder Metallkessel (leicht von oben, man sieht hinein), leuchtender Trank, Blasen, Dampf, Feuer
   const cauldron = $('#pt-cauldron');
   if (cauldron) {
-    const r = rel(cauldron), cu = r.w / 52;
-    const pot = ctl.mesh(ctl.geo(`pot${Math.round(cu * 10)}`, (B) => {
-      B.ell(0, 20, 0, 24, 21, 12, (x, y) => (y > 36 ? 0x5c5c74 : rnShade(0x30303e, (y % 7 === 0 ? 0.05 : 0) - (y < 8 ? 0.08 : 0))), { mat: 3, keep: (x, y) => y <= 37 });
-      B.tube('x', -25, 25, 0, 37, 2.4, 0x5c5c74, { mat: 3 });
-      for (const lx of [-14, 14]) B.box(lx - 2, -6, -2, lx + 2, 2, 2, 0x1c1c27, 3);
-      for (const hx of [-26, 26]) B.tube('z', -2, 2, hx, 30, 2.6, 0x1c1c27, { mat: 3 });
-      // Runen vorne
-      for (const [x, y] of [[-10, 18], [0, 14], [10, 18]]) B.ell(x, y, 11.5, 1.6, 1.6, 0.8, 0x7cffb2, { mat: 2 });
-    }, { u: cu, iter: 2, field: 1.1 }));
-    const px = r.x + r.w / 2, py = r.y + r.h * 0.92;
-    add(ctl.at(pot, px, py, -60));
-    // Trank-Oberfläche: eigenes Material (Farbe folgt --brew)
-    const brewM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.55, roughness: 0.3 });
-    const brewG = new T.CylinderGeometry(22 * cu, 22 * cu, 3 * cu, 36);
-    const brew = new T.Mesh(brewG, brewM); ctl.own(brewG, brewM);
-    brew.rotation.x = 0.85; add(ctl.at(brew, px, py - 35 * cu, -60));
-    const runes = []; pot.traverse(() => {});
+    const r = rel(cauldron);
+    const R = r.w * 0.43, Hp = r.w * 0.6;
+    const px = r.x + r.w / 2, base = r.y + r.h * 0.74;
+    const cg = new T.Group();
+    ctl.at(cg, px, base, 120);
+    cg.rotation.x = 0.42;
+    add(cg);
+    const metal = new T.MeshStandardMaterial({ color: 0x2b2b38, metalness: 0.75, roughness: 0.32 });
+    const metal2 = new T.MeshStandardMaterial({ color: 0x4a4a5e, metalness: 0.85, roughness: 0.25 });
+    const inner = new T.MeshStandardMaterial({ color: 0x15151d, metalness: 0.3, roughness: 0.7, side: T.BackSide });
+    ctl.own(metal, metal2, inner);
+    const prof = [[0.001, 0.05], [0.45, 0.0], [0.78, 0.08], [0.97, 0.3], [1.0, 0.48], [0.95, 0.68], [0.84, 0.84], [0.8, 0.9]].map(([x, y]) => new T.Vector2(x * R, y * Hp));
+    const potG = new T.LatheGeometry(prof, 48); ctl.own(potG);
+    const pot = new T.Mesh(potG, metal); cg.add(pot);
+    const inG = new T.CylinderGeometry(R * 0.79, R * 0.7, Hp * 0.2, 48, 1, true); ctl.own(inG);
+    const inM = new T.Mesh(inG, inner); inM.position.y = Hp * 0.8; cg.add(inM);
+    const rimG = new T.TorusGeometry(R * 0.82, R * 0.07, 14, 56); ctl.own(rimG);
+    const rim = new T.Mesh(rimG, metal2); rim.rotation.x = Math.PI / 2; rim.position.y = Hp * 0.9; cg.add(rim);
+    // Zierband mit Runen
+    const bandG = new T.TorusGeometry(R * 0.985, R * 0.025, 8, 56); ctl.own(bandG);
+    const band = new T.Mesh(bandG, metal2); band.rotation.x = Math.PI / 2; band.position.y = Hp * 0.5; cg.add(band);
+    const runeM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.9 }); ctl.own(runeM);
+    const runeG = new T.OctahedronGeometry(R * 0.06); ctl.own(runeG);
+    for (let k = -2; k <= 2; k++) { const a = k * 0.42, m = new T.Mesh(runeG, runeM); m.position.set(Math.sin(a) * R * 0.99, Hp * 0.36, Math.cos(a) * R * 0.99); m.scale.y = 1.5; cg.add(m); }
+    // Henkel und Füsse
+    const handG = new T.TorusGeometry(R * 0.14, R * 0.035, 10, 24); ctl.own(handG);
+    for (const sx of [-1, 1]) { const h = new T.Mesh(handG, metal2); h.position.set(sx * R * 1.0, Hp * 0.72, 0); h.rotation.y = Math.PI / 2; cg.add(h); }
+    const legG = new T.CylinderGeometry(R * 0.06, R * 0.09, Hp * 0.16, 10); ctl.own(legG);
+    for (let k = 0; k < 3; k++) { const a = k * Math.PI * 2 / 3 + 0.5, l = new T.Mesh(legG, metal); l.position.set(Math.sin(a) * R * 0.55, -Hp * 0.04, Math.cos(a) * R * 0.55); cg.add(l); }
+    // Trank
+    const brewM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.6, roughness: 0.15, metalness: 0.1 });
+    const brewG = new T.CircleGeometry(R * 0.78, 48); ctl.own(brewM, brewG);
+    const brew = new T.Mesh(brewG, brewM); brew.rotation.x = -Math.PI / 2; brew.position.y = Hp * 0.84; cg.add(brew);
+    const glow = new T.PointLight(0x7cffb2, 2.2, R * 6, 1.2); glow.position.set(0, Hp * 1.15, R * 0.3); cg.add(glow);
+    // Blasen auf dem Trank
+    const bubM = new T.MeshStandardMaterial({ color: 0x7cffb2, emissive: 0x7cffb2, emissiveIntensity: 0.5, transparent: true, opacity: 0.9, roughness: 0.1 });
+    const bubG = new T.SphereGeometry(1, 14, 10); ctl.own(bubM, bubG);
+    const bubs = Array.from({ length: 9 }, () => { const m = new T.Mesh(bubG, bubM); m.userData = { t: Math.random() * 2, life: 0.8 + Math.random() * 1.2 }; cg.add(m); return m; });
+    // Dampf (weiche Wölkchen)
+    const sc = document.createElement('canvas'); sc.width = sc.height = 64;
+    const sx2 = sc.getContext('2d'), sg = sx2.createRadialGradient(32, 32, 2, 32, 32, 32); sg.addColorStop(0, 'rgba(255,255,255,.9)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    sx2.fillStyle = sg; sx2.fillRect(0, 0, 64, 64);
+    const stex = new T.CanvasTexture(sc); ctl.own(stex);
+    const steam = Array.from({ length: 7 }, (_, i) => { const m = new T.Sprite(new T.SpriteMaterial({ map: stex, color: 0x7cffb2, transparent: true, opacity: 0, depthWrite: false })); ctl.own(m.material); m.userData = { t: i / 7 * 3 }; ctl.add(m); return m; });
+    // Feuer: Holzscheite und Flammen
+    const fire = new T.Group(); ctl.at(fire, px, base + R * 0.45, 300); add(fire);
+    const logM = new T.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 }); const logG = new T.CylinderGeometry(R * 0.08, R * 0.08, R * 1.1, 8); ctl.own(logM, logG);
+    for (const a of [0.5, -0.5]) { const l = new T.Mesh(logG, logM); l.rotation.z = Math.PI / 2 + a * 0.3; l.rotation.y = a; fire.add(l); }
+    const flames = [];
+    const flG = new T.ConeGeometry(R * 0.17, R * 0.62, 12); ctl.own(flG);
+    [[0xff5a1f, 1.2, 0], [0xffa21f, 0.95, -0.3], [0xffa21f, 0.9, 0.3], [0xfff0a0, 0.6, 0]].forEach(([c, s, x], i) => {
+      const m = new T.Mesh(flG, new T.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9 })); ctl.own(m.material);
+      m.position.set(x * R, R * 0.22 * s, i === 3 ? R * 0.1 : 0); m.scale.setScalar(s); m.userData = { s, ph: i * 1.7 }; fire.add(m); flames.push(m);
+    });
+    const fl = new T.PointLight(0xff9a3a, 1.6, R * 5, 1.4); fl.position.set(0, R * 0.3, R * 0.6); fire.add(fl);
     let lastCol = '';
     ctl.frame((dt, t) => {
       const c = getComputedStyle(cauldron).getPropertyValue('--brew').trim();
-      if (c && c !== lastCol) { lastCol = c; try { brewM.color.set(c); brewM.emissive.set(c); } catch { /* color-mix: alte Farbe lassen */ } }
-      brew.position.y = -(py - 35 * cu) + Math.sin(t * 3) * cu * 0.4;
-      brewM.emissiveIntensity = cauldron.classList.contains('glow') ? 1.1 + Math.sin(t * 8) * 0.2 : cauldron.classList.contains('fail') ? 0.05 : 0.45 + Math.sin(t * 2) * 0.08;
-      pot.rotation.z = cauldron.classList.contains('brewing') || cauldron.classList.contains('fx-dance') ? Math.sin(t * 30) * 0.03 : 0;
+      if (c && c !== lastCol) { lastCol = c; try { const cc = new T.Color(c); brewM.color.copy(cc); brewM.emissive.copy(cc); bubM.color.copy(cc); bubM.emissive.copy(cc); glow.color.copy(cc); steam.forEach((m) => m.material.color.copy(cc)); } catch { /* color-mix: alte Farbe lassen */ } }
+      const isGlow = cauldron.classList.contains('glow'), isFail = cauldron.classList.contains('fail'), busy = cauldron.classList.contains('brewing');
+      brewM.emissiveIntensity = isGlow ? 1.2 + Math.sin(t * 8) * 0.25 : isFail ? 0.05 : 0.5 + Math.sin(t * 2) * 0.1;
+      glow.intensity = isGlow ? 5 : isFail ? 0.2 : 2 + Math.sin(t * 2) * 0.3;
+      runeM.emissiveIntensity = isGlow ? 2 : isFail ? 0.1 : 0.8 + Math.sin(t * 2.5) * 0.3;
+      brew.position.y = Hp * 0.84 + Math.sin(t * 3) * Hp * 0.006;
+      cg.rotation.z = busy || cauldron.classList.contains('fx-dance') ? Math.sin(t * 30) * 0.03 : 0;
+      const sp = busy ? 2.2 : 1;
+      bubs.forEach((m) => {
+        const d = m.userData; d.t += dt * sp;
+        if (d.t > d.life) { d.t = 0; d.life = 0.6 + Math.random() * 1.2; const a = Math.random() * 6.3, rr = Math.random() * R * 0.62; m.position.set(Math.cos(a) * rr, Hp * 0.84, Math.sin(a) * rr); d.size = R * (0.04 + Math.random() * 0.07); }
+        const k = d.t / d.life; m.scale.setScalar((d.size || 1) * Math.sin(Math.min(1, k * 1.15) * Math.PI) + 0.001);
+      });
+      steam.forEach((m) => {
+        const d = m.userData; d.t += dt * (busy ? 1.6 : 0.8); if (d.t > 3) d.t = 0;
+        const k = d.t / 3;
+        m.position.set(px + Math.sin(d.t * 2 + m.id) * R * 0.3, -(base - Hp * 0.95 - k * Hp * 1.1), 130);
+        m.scale.setScalar(R * (0.4 + k * 0.9)); m.material.opacity = isFail ? 0.5 * Math.sin(k * Math.PI) : 0.28 * Math.sin(k * Math.PI);
+        if (isFail) m.material.color.set(0x777766);
+      });
+      flames.forEach((m) => { const d = m.userData; m.scale.set(d.s * (1 + Math.sin(t * 13 + d.ph) * 0.08), d.s * (1 + Math.sin(t * 17 + d.ph) * 0.2), d.s); });
+      fl.intensity = 1.4 + Math.sin(t * 15) * 0.3;
     });
-    const fire = ctl.geo('fire', (B) => { for (let k = -1; k <= 1; k++) B.ell(k * 6, 4, 0, 2.6, 5 + (k === 0 ? 2 : 0), 2.6, (x, y) => (y < 3 ? 0xff5a1f : y < 7 ? 0xffa21f : 0xfff0a0), { mat: 2 }); B.box(-10, -1, -3, 10, 0, 3, 0x3a2414); }, { u: cu, iter: 2 });
-    const fm = ctl.mesh(fire); add(ctl.at(fm, px, py + 6 * cu, -50));
-    ctl.frame((dt, t) => { fm.scale.set(1 + Math.sin(t * 11) * 0.05, 1 + Math.sin(t * 14) * 0.12, 1); });
   }
 }
 function s3BottleModel(ctl, el) {

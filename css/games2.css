@@ -713,3 +713,21 @@
 @keyframes det-stamper { 0% { transform: translateY(-260px) rotate(-8deg); opacity: 0; } 25% { opacity: 1; } 33% { transform: translateY(0) rotate(-12deg); } 45% { transform: translateY(12px) rotate(-12deg) scaleY(.92); } 70% { transform: translateY(-30px) rotate(-10deg); opacity: 1; } 100% { transform: translateY(-300px) rotate(-6deg); opacity: 0; } }
 .det-folder .det-bigstamp.ok, .det-folder .det-bigstamp.no { animation: det-ink .3s ease-out both; }
 @keyframes det-ink { from { opacity: 0; filter: blur(2px); transform: translate(-50%, -50%) rotate(-12deg) scale(1.15); } }
+
+/* Zaubertrank: Regal links (ganze Höhe), Zettel oben rechts, Kessel unten rechts */
+.pt-stage { grid-template-columns: minmax(160px, .8fr) minmax(0, 1.3fr); grid-template-rows: auto 1fr; }
+.pt-shelf { grid-column: 1; grid-row: 1 / 3; align-self: center; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; padding: 14px 14px 10px; }
+.pt-recipe { grid-column: 2; grid-row: 1; justify-self: end; margin-right: 4px; }
+.pt-lab { grid-column: 2; grid-row: 2; }
+.pt-window { right: auto; left: 48%; }
+@media (max-width: 700px) {
+  .pt-stage { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+  .pt-recipe { grid-column: 1; grid-row: 1; justify-self: center; margin: 0; }
+  .pt-shelf { grid-column: 1; grid-row: 2; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pt-lab { grid-column: 1; grid-row: 3; }
+}
+
+/* Hör-Detektiv: Stempel in die Ecke (nicht auf die Schrift) */
+.det-folder .det-bigstamp { left: auto; top: auto; right: 4%; top: 7%; transform: rotate(-12deg); font-size: clamp(1.1rem, 3.4vw, 1.9rem); border-width: 4px; padding: .1rem .8rem; }
+@keyframes det-ink { from { opacity: 0; filter: blur(2px); transform: rotate(-12deg) scale(1.2); } }
+.det-stamper { left: auto; top: 7%; right: 4%; margin: -110px 0 0 0; }

@@ -10,21 +10,7 @@
 const DET_CASES = 10;
 
 const DET_MODE_KEY = 'vokaboom.detMode';
-function startDetective(set) {
-  const L = LANGS[langOf(set)].name;
-  let last = 'de';
-  try { last = localStorage.getItem(DET_MODE_KEY) || 'de'; } catch { /* egal */ }
-  $('#view').innerHTML = gameShell('Hör-Detektiv', `<div class="test-card setup choose-card">
-    <h2>Welche Karten möchtest du?</h2>
-    <p class="muted">Du hörst ein Wort auf ${L} und suchst die passende Karte.</p>
-    <div class="choose-grid">
-      <button class="choose-tile ${last === 'de' ? 'last' : ''}" data-action="det-start" data-mode="de"><span class="choose-demo big-emoji" aria-hidden="true">🇩🇪</span>
-        <strong>Deutsche Wörter</strong><small>Auf den Karten steht das deutsche Wort (am Anfang mit Bild).</small></button>
-      <button class="choose-tile ${last === 'fx' ? 'last' : ''}" data-action="det-start" data-mode="fx"><span class="choose-demo big-emoji" aria-hidden="true">${langOf(set) === 'fr' ? '🇫🇷' : '🇬🇧'}</span>
-        <strong>Wörter auf ${L}</strong><small>Auf den Karten steht das Wort auf ${L} – welches hast du gehört?</small></button>
-    </div>
-  </div>`);
-}
+function startDetective(set) { detBegin(set, 'de'); }
 function detBegin(set, mode) {
   stopGame();
   G.id = 'det';
