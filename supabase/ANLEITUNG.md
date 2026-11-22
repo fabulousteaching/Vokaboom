@@ -152,9 +152,10 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 **Vokabelspiele** (Schritt 2 jeder Portion): Memory (allein oder zu zweit), Ballon-Platzen (2 Stufen), Blitzrunde (2 Stufen), Buchstabensalat, Wortsuchsel (deutsche Wörter als Hinweis, antippen zeigt die Übersetzung; wahlweise auch rückwärts), Weck nicht den Drachen, Duell zu zweit, Welten-Lauf und neu:
 - **Wörterregen** – Regentropfen mit deutschen Wörtern fallen in die Stadt; vor dem Spiel wählen die Kinder **Antippen** (Wort aus Knöpfen wählen) oder **Eintippen** (Wort schreiben). Es beginnt mit Nieseln und wird im selben Spiel stärker: nach 8 gelösten Wörtern Regen, nach 18 Gewitter. Das Wasser steigt langsam (25 verpasste Tropfen).
 - **Wortschlange** – Stufe 1: die Buchstaben der Reihe nach fressen, das Wort entsteht in der Schlange; Stufe 2: das richtige Wort fressen.
-- **Angeln** – der eigene Avatar angelt den Fisch mit dem richtigen Wort; ein falscher Fisch zieht ihn ins Wasser (Teich, See, Meer).
-- **Brückenbau** – jedes richtige Wort ist ein Brett; 10–20 Bretter je nach Lernstand, jedes Mal eine andere Landschaft.
-- **Zaubertrank** – mit dem Avatar die richtigen Zutaten in den Kessel werfen; jeder fertige Trank hat einen anderen lustigen Effekt.
+- **Angeln** – der eigene Avatar angelt den Fisch mit dem richtigen Wort; ein falscher Fisch zieht ihn ins Wasser (Teich, See, Meer). Verschiedene Fischarten.
+- **Brückenbau** – jedes richtige Wort ist ein Brett, am Schluss läuft der Avatar hinüber; 10–20 Bretter je nach Lernstand, jedes Mal eine andere Landschaft.
+- **Zaubertrank** – der Avatar giesst die gewählten Fläschchen in den Kessel. Ob es die richtigen waren, zeigt sich erst am Schluss: Ein richtiger Trank leuchtet und hat einen lustigen Effekt, ein falscher misslingt (grauer Schlamm, Rauch), und die richtigen Zutaten werden gezeigt.
+- Angeln, Brückenbau und Zaubertrank zeigen den **3D-Avatar** des Kindes (aus dem 3D-Shop), auf älteren Geräten ohne 3D den gewohnten Avatar.
 - **Hör-Detektiv** – Wort anhören und die passende Karte finden; 10 Fälle, zuletzt ähnlich klingende Wörter und ohne Bilder.
 
 Oben links führt ein Zurück-Pfeil immer eine Ebene höher. Spiele zählen nicht für die Auswertung, aber für das Wiederholen nach der Vergessenskurve. Vorgelesen wird nie automatisch, nur auf Knopfdruck.

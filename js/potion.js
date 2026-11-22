@@ -1,7 +1,8 @@
 /* Vokaboom – Zaubertrank mit dem eigenen Avatar
  * Auf dem Rezept stehen die Zutaten auf Deutsch, im Regal Fläschchen mit den Wörtern in der Fremdsprache.
- * Die richtigen Fläschchen antippen → sie fliegen in den Kessel. Ist der Trank fertig, passiert jedes Mal etwas
- * anderes Lustiges. 6 Tränke pro Spiel; 2–4 Zutaten je nach Lernstand.
+ * Fläschchen antippen → der Avatar giesst sie in den Kessel. Ob es die richtigen waren, zeigt sich erst am Schluss:
+ * Stimmt der Trank, leuchtet er und es passiert etwas Lustiges. Stimmt er nicht, misslingt er sichtbar (grauer Schlamm,
+ * Rauch, Russ im Gesicht) und die richtigen Zutaten werden gezeigt. 6 Tränke pro Spiel; 2–4 Zutaten je nach Lernstand.
  */
 'use strict';
 
@@ -23,6 +24,7 @@ const POTION_EFFECTS = [
 ];
 const POTION_COLORS = ['#7CFFB2', '#FF8AD8', '#8AB6FF', '#FFD36E', '#C69BFF', '#6EF3FF', '#FF9E6E'];
 const POTION_ROUNDS = 6;
+const POTION_HUES = [0, 35, 200, 280, 140, 320, 50, 180];
 
 function ptTween(ms, fn) {
   return new Promise((res) => {
@@ -38,12 +40,20 @@ function startPotion(set) {
   const sk = runnerSkill(set);
   const k = sk.stage <= 1 ? 2 : sk.stage <= 3 ? 3 : 4;
   const words = gameWords(set);
-  Object.assign(G.s, { set, lang: langOf(set), words, pk: makePicker(words), k: Math.min(k, Math.max(1, words.length - 2)), round: 0, mistakes: 0, done: false, busy: false, got: [], effects: [], usedFx: [] });
+  Object.assign(G.s, { set, lang: langOf(set), words, pk: makePicker(words), k: Math.min(k, Math.max(1, words.length - 2)), round: 0, mistakes: 0, good: 0, done: false, busy: false, got: [], added: [], effects: [], usedFx: [] });
   const av = avatarSVG(fishAvatar(), { bg: false, label: 'Dein Avatar' });
   $('#view').innerHTML = gameShell('Zaubertrank', `
     <div class="pt-hud"><span id="pt-round">Trank 1 von ${POTION_ROUNDS}</span><span id="pt-book" title="Zauberbuch">📖 0</span></div>
     <div class="pt-stage" id="pt-stage">
-      <div class="pt-wall"><div class="pt-window"><i></i><i></i><i></i><span class="pt-moon"></span></div><div class="pt-candles"><span></span><span></span></div></div>
+      <div class="pt-wall">
+        <div class="pt-bricks"></div>
+        <div class="pt-window"><i></i><i></i><i></i><span class="pt-moon"></span></div>
+        <div class="pt-herbs" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pt-books" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><b>🔮</b></div>
+        <div class="pt-candles"><span></span><span></span></div>
+        <div class="pt-floor"></div><div class="pt-circle"></div>
+        <div class="pt-motes">${Array.from({ length: 14 }, (_, i) => `<i style="left:${(i * 37) % 100}%;--d:${(i % 7) * 0.9}s;--t:${6 + (i % 5)}s"></i>`).join('')}</div>
+      </div>
       <div class="pt-shelf" id="pt-shelf"></div>
       <div class="pt-recipe" id="pt-recipe"></div>
       <div class="pt-lab">
@@ -53,6 +63,7 @@ function startPotion(set) {
           <svg viewBox="0 0 200 170" aria-hidden="true"><defs><radialGradient id="pt-brew" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="var(--brew, #7CFFB2)"/><stop offset="1" stop-color="var(--brew2, #2E9E6B)"/></radialGradient>
             <linearGradient id="pt-pot" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2B2B3A"/><stop offset=".45" stop-color="#4A4A5E"/><stop offset="1" stop-color="#1C1C27"/></linearGradient></defs>
             <ellipse cx="100" cy="58" rx="80" ry="18" fill="url(#pt-brew)" class="pt-surface"/>
+            <g class="pt-runes" fill="var(--brew, #7CFFB2)" opacity=".75"><text x="58" y="122" font-size="16">✦</text><text x="92" y="132" font-size="18">☽</text><text x="128" y="122" font-size="16">✧</text></g>
             <path d="M22 58 Q14 150 100 156 Q186 150 178 58 Q100 82 22 58Z" fill="url(#pt-pot)"/>
             <ellipse cx="100" cy="58" rx="84" ry="16" fill="none" stroke="#5C5C74" stroke-width="8"/>
             <rect x="40" y="150" width="14" height="16" rx="4" fill="#1C1C27"/><rect x="146" y="150" width="14" height="16" rx="4" fill="#1C1C27"/>
@@ -68,6 +79,16 @@ function startPotion(set) {
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   gEvery(() => potionBubble(), 380);
   potionRound();
+  // 3D-Avatar (wenn möglich) neben dem Kessel
+  if (typeof gavMount === 'function') gavMount($('#pt-avatar'), { rotY: 0.55 }).then((c) => { if (c && G.id === 'potion') { G.s.av3 = c; c.setAnim('idle'); } });
+}
+/** kurze Bewegung des 3D-Avatars */
+function ptAnim(name, ms = 0, after = 'idle') {
+  const a = G.s.av3;
+  if (!a?.alive) return;
+  a.setAnim(name);
+  clearTimeout(G.s.animT);
+  if (ms) G.s.animT = setTimeout(() => a.alive && a.setAnim(after), ms);
 }
 
 /* ---------- Runde ---------- */
@@ -80,13 +101,13 @@ function potionRound() {
   for (let i = 0; i < 12 && need.length < s.k; i++) { const w = pickNext(s.pk); if (!need.includes(w) && !need.some((x) => gameForm(x).toLowerCase() === gameForm(w).toLowerCase())) need.push(w); }
   const key = (x) => gameForm(x).toLowerCase();
   const others = shuffle(s.words.filter((w) => !need.includes(w) && !need.some((n) => key(n) === key(w)))).slice(0, Math.min(4, Math.max(2, 7 - need.length)));
-  s.need = need; s.got = []; s.bottles = shuffle([...need.map((w) => ({ w, ok: true })), ...others.map((w) => ({ w, ok: false }))]);
+  s.need = need; s.got = []; s.added = []; s.bottles = shuffle([...need.map((w) => ({ w, ok: true })), ...others.map((w) => ({ w, ok: false }))]);
   s.color = POTION_COLORS[s.round % POTION_COLORS.length];
   potionBrew('#7CFFB2', '#2E9E6B');
-  $('#pt-recipe').innerHTML = `<h3>Rezept ${s.round}</h3><ul>${need.map((w, i) => `<li data-i="${i}" lang="de">${esc(w.german || '?')}</li>`).join('')}</ul>`;
+  $('#pt-recipe').innerHTML = `<h3>Rezept ${s.round}</h3><ul>${need.map((w, i) => `<li data-i="${i}" lang="de">${esc(w.german || '?')}</li>`).join('')}</ul>
+    <p class="pt-kettle" id="pt-kettle">Im Kessel: <span>${need.map(() => '<i></i>').join('')}</span></p>`;
   $('#pt-recipe').classList.remove('in'); void $('#pt-recipe').offsetWidth; $('#pt-recipe').classList.add('in');
-  const hues = [0, 35, 200, 280, 140, 320, 50, 180];
-  $('#pt-shelf').innerHTML = s.bottles.map((b, i) => `<button class="pt-bottle" data-action="pt-bottle" data-i="${i}" lang="${s.lang}" style="--h:${hues[i % hues.length]};--d:${i * 0.06}s">
+  $('#pt-shelf').innerHTML = s.bottles.map((b, i) => `<button class="pt-bottle" data-action="pt-bottle" data-i="${i}" lang="${s.lang}" style="--h:${POTION_HUES[i % POTION_HUES.length]};--d:${i * 0.06}s">
       <span class="pt-glass" aria-hidden="true"><i></i></span><span class="pt-label">${esc(gameForm(b.w))}</span></button>`).join('');
   s.busy = false;
 }
@@ -96,42 +117,122 @@ function potionBrew(c1, c2) {
 }
 async function potionPick(i) {
   const s = G.s, b = s.bottles?.[i], el = $$('.pt-bottle')[i];
-  if (!b || !el || s.busy || s.done || el.classList.contains('used')) return;
+  if (!b || !el || s.busy || s.done || el.classList.contains('used') || s.added.length >= s.need.length) return;
   s.busy = true;
   el.classList.add('used');
-  // Fläschchen fliegt im Bogen in den Kessel
+  s.added.push(b);
+  const hue = POTION_HUES[i % POTION_HUES.length], col = `hsl(${hue} 85% 60%)`;
+  // Fläschchen fliegt über den Kessel, kippt und wird ausgegossen – richtig oder falsch zeigt sich erst am Schluss
   const st = $('#pt-stage').getBoundingClientRect(), r0 = el.getBoundingClientRect(), cv = $('#pt-cauldron').getBoundingClientRect();
   const fly = el.cloneNode(true);
   fly.classList.add('flying'); fly.removeAttribute('data-action');
   fly.style.left = `${r0.left - st.left}px`; fly.style.top = `${r0.top - st.top}px`; fly.style.width = `${r0.width}px`;
   $('#pt-fx').appendChild(fly);
-  const x0 = r0.left - st.left, y0 = r0.top - st.top, x1 = cv.left - st.left + cv.width / 2 - r0.width / 2, y1 = cv.top - st.top + cv.height * 0.18;
+  const x0 = r0.left - st.left, y0 = r0.top - st.top;
+  const x1 = cv.left - st.left + cv.width * 0.5 - r0.width * 0.62, y1 = cv.top - st.top - r0.height * 1.25;
+  ptAnim('present');
   tone([660], 0.05, 'sine', 0.05);
-  await ptTween(560, (k) => {
+  await ptTween(520, (k) => {
     const e = k * k * (3 - 2 * k);
-    fly.style.transform = `translate(${(x1 - x0) * e}px, ${(y1 - y0) * e - Math.sin(k * Math.PI) * 90}px) rotate(${k * 300}deg) scale(${1 - k * 0.5})`;
+    fly.style.transform = `translate(${(x1 - x0) * e}px, ${(y1 - y0) * e - Math.sin(k * Math.PI) * 70}px) rotate(${-k * 12}deg)`;
   });
-  fly.remove();
   if (G.id !== 'potion') return;
-  potionSplash(x1 + r0.width / 2, y1 + 10, b.ok ? s.color : '#9BE564');
-  const idx = s.need.indexOf(b.w);
-  if (b.ok && idx >= 0 && !s.got.includes(b.w)) {
-    sfx.good();
-    markResult(s.pk, b.w, true);
-    s.got.push(b.w);
-    $(`#pt-recipe li[data-i="${idx}"]`)?.classList.add('done');
-    const f = s.got.length / s.need.length;
-    potionBrew(s.color, `color-mix(in srgb, ${s.color} ${Math.round(50 + f * 30)}%, #1a1a2e)`);
-    $('#pt-avatar')?.classList.add('stir'); setTimeout(() => $('#pt-avatar')?.classList.remove('stir'), 700);
-    if (s.got.length >= s.need.length) { await potionDone(); return; }
-  } else {
-    sfx.bad();
-    s.mistakes++;
-    s.need.filter((w) => !s.got.includes(w)).forEach((w) => markResult(s.pk, w, false, false)); // unklar, welches Wort fehlte: zählt nicht fürs Wiederholen
-    potionSmoke(x1 + r0.width / 2, y1, `${gameForm(b.w)} = ${b.w.german}`);
-    const av = $('#pt-avatar'); av?.classList.add('cough', 'soot'); setTimeout(() => av?.classList.remove('cough'), 900); setTimeout(() => av?.classList.remove('soot'), 2600);
-  }
+  // kippen …
+  await ptTween(260, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${-12 + k * 140}deg)`; });
+  // … ausgiessen: farbiger Strahl, Spritzer, der Trank nimmt die Farbe an
+  const sx = x1 + r0.width * 0.62, sy = y1 + r0.height * 0.55, surf = cv.top - st.top + cv.height * 0.32;
+  const stream = document.createElement('i');
+  stream.className = 'pt-stream'; stream.style.left = `${sx}px`; stream.style.top = `${sy}px`; stream.style.height = `${Math.max(10, surf - sy)}px`; stream.style.background = `linear-gradient(${col}, color-mix(in srgb, ${col} 70%, #fff))`;
+  $('#pt-fx').appendChild(stream);
+  if (typeof gavSound === 'function') gavSound('pour');
+  ptAnim('hold');
+  potionStir(true);
+  for (let n = 0; n < 4; n++) gLater(() => potionSplash(sx, surf, col, 6), n * 140);
+  await ptTween(650, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${128 + Math.sin(k * 18) * 6}deg)`; });
+  stream.classList.add('end'); setTimeout(() => stream.remove(), 300);
+  fly.style.transition = 'opacity .25s'; fly.style.opacity = '0'; setTimeout(() => fly.remove(), 260);
+  // Farbe mischen
+  const cols = s.added.map((x) => POTION_HUES[s.bottles.indexOf(x) % POTION_HUES.length]);
+  const avg = Math.round(cols.reduce((a2, h) => a2 + h, 0) / cols.length);
+  potionBrew(`hsl(${avg} 80% 62%)`, `hsl(${avg} 70% 30%)`);
+  potionBubbleBurst(5);
+  potionStir(false);
+  $$('#pt-kettle i')[s.added.length - 1]?.setAttribute('style', `background:${col};box-shadow:0 0 8px ${col}`);
+  if (G.id !== 'potion') return;
+  if (s.added.length >= s.need.length) { await potionReveal(); return; }
+  ptAnim('idle');
   s.busy = false;
+}
+function potionStir(on) {
+  $('#pt-avatar')?.classList.toggle('stir', on);
+}
+function potionBubbleBurst(n) { for (let i = 0; i < n; i++) gLater(() => potionBubble(), i * 60); }
+
+/* ---------- Auflösung erst am Schluss ---------- */
+async function potionReveal() {
+  const s = G.s, cauldron = $('#pt-cauldron');
+  // Umrühren und Spannung: der Kessel blubbert immer stärker
+  ptAnim('think');
+  potionStir(true);
+  cauldron?.classList.add('brewing');
+  for (let i = 0; i < 4; i++) gLater(() => { potionBubbleBurst(4); tone([220 + i * 70], 0.09, 'sine', 0.05); }, i * 260);
+  await ptTween(1300, () => {});
+  potionStir(false); cauldron?.classList.remove('brewing');
+  if (G.id !== 'potion') return;
+  const okSet = s.added.filter((b) => b.ok).map((b) => b.w);
+  const allOk = s.need.every((w) => okSet.includes(w));
+  // fürs Wiederholen: gefundene Zutaten richtig, vergessene falsch
+  s.need.forEach((w) => markResult(s.pk, w, okSet.includes(w)));
+  const items = $$('#pt-recipe li');
+  s.need.forEach((w, i) => {
+    const li = items[i];
+    if (!li) return;
+    li.classList.add(okSet.includes(w) ? 'done' : 'miss');
+    li.insertAdjacentHTML('beforeend', ` <b class="pt-sol" lang="${s.lang}">= ${esc(gameForm(w))}</b>`);
+  });
+  if (allOk) { s.good++; await potionDone(); return; }
+  await potionFail();
+}
+/** Trank misslungen: grauer Schlamm, Rauch, Russ – danach die richtigen Zutaten zeigen */
+async function potionFail() {
+  const s = G.s, cauldron = $('#pt-cauldron'), av = $('#pt-avatar');
+  s.mistakes++;
+  sfx.bad();
+  if (typeof gavSound === 'function') gavSound('fizzle');
+  potionBrew('#7A7F5A', '#2E3020');
+  cauldron?.classList.add('fail');
+  const cv = cauldron.getBoundingClientRect(), st = $('#pt-stage').getBoundingClientRect();
+  const cx = cv.left - st.left + cv.width / 2, cy = cv.top - st.top + cv.height * 0.3;
+  potionSmoke(cx, cy, '', 14);
+  for (let i = 0; i < 3; i++) gLater(() => potionSplash(cx, cy, '#4B4A3A', 10), i * 180);
+  ptAnim('oops', 900, 'shy');
+  av?.classList.add('cough', 'soot'); setTimeout(() => av?.classList.remove('cough'), 900);
+  const msg = $('#pt-msg');
+  msg.hidden = false;
+  msg.innerHTML = `<div class="pt-msgbox bad"><span class="pt-msg-icon">🤢</span><strong>Pfui – der Trank ist misslungen!</strong><small>So wäre es richtig gewesen:</small></div>`;
+  // falsche Fläschchen rot mit Bedeutung, richtige leuchten
+  $$('.pt-bottle').forEach((el, i) => {
+    const b = s.bottles[i];
+    el.classList.remove('used');
+    el.disabled = true;
+    if (b.ok) el.classList.add('sol');
+    else if (s.added.includes(b)) { el.classList.add('wrongpick'); el.insertAdjacentHTML('beforeend', `<small class="pt-mean" lang="de">= ${esc(b.w.german)}</small>`); }
+    else el.classList.add('dim');
+  });
+  await ptTween(900, () => {});
+  if (G.id !== 'potion') return;
+  msg.innerHTML += `<button class="btn primary pt-next" data-action="pt-next">${icon('right')} ${s.round >= POTION_ROUNDS ? 'Zum Zauberbuch' : 'Nächster Trank'}</button>`;
+  msg.classList.add('wait');
+}
+function potionNext() {
+  const s = G.s, msg = $('#pt-msg'), av = $('#pt-avatar');
+  if (!msg || msg.hidden) return;
+  msg.hidden = true; msg.classList.remove('wait');
+  $('#pt-cauldron')?.classList.remove('fail');
+  av?.classList.remove('soot');
+  ptAnim('idle');
+  if (s.round >= POTION_ROUNDS) { potionEnd(); return; }
+  potionRound();
 }
 function potionBubble() {
   const box = $('#pt-bubbles');
@@ -142,10 +243,10 @@ function potionBubble() {
   b.style.width = b.style.height = `${r}px`;
   box.appendChild(b); setTimeout(() => b.remove(), 1600);
 }
-function potionSplash(x, y, color) {
+function potionSplash(x, y, color, n = 14) {
   const fx = $('#pt-fx');
   if (!fx) return;
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < n; i++) {
     const d = document.createElement('i');
     d.className = 'pt-drop';
     const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = 60 + Math.random() * 90;
@@ -154,15 +255,16 @@ function potionSplash(x, y, color) {
     fx.appendChild(d); setTimeout(() => d.remove(), 900);
   }
 }
-function potionSmoke(x, y, text) {
+function potionSmoke(x, y, text, n = 6) {
   const fx = $('#pt-fx');
   if (!fx) return;
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < n; i++) {
     const d = document.createElement('i');
     d.className = 'pt-smoke';
     d.style.left = `${x + (Math.random() - 0.5) * 50}px`; d.style.top = `${y}px`; d.style.animationDelay = `${i * 0.06}s`;
     fx.appendChild(d); setTimeout(() => d.remove(), 1600);
   }
+  if (!text) return;
   const t = document.createElement('div');
   t.className = 'pt-float bad'; t.textContent = `Puff! ${text}`;
   t.style.left = `${x}px`; t.style.top = `${y - 30}px`;
@@ -174,8 +276,15 @@ function potionSmoke(x, y, text) {
 async function potionDone() {
   const s = G.s, av = $('#pt-avatar'), cauldron = $('#pt-cauldron'), fx = $('#pt-fx'), stage = $('#pt-stage');
   sfx.win();
+  if (typeof gavSound === 'function') gavSound('magic');
   cauldron.classList.add('glow');
-  await ptTween(700, () => {});
+  ptAnim('cheer');
+  $('#pt-recipe')?.classList.add('right');
+  const msg0 = $('#pt-msg');
+  msg0.hidden = false;
+  msg0.innerHTML = '<div class="pt-msgbox good"><span class="pt-msg-icon">✨</span><strong>Richtig! Der Trank wirkt …</strong></div>';
+  await ptTween(1100, () => {});
+  $('#pt-recipe')?.classList.remove('right');
   // Effekt wählen, der in diesem Spiel noch nicht kam
   let pool = POTION_EFFECTS.filter((e) => !s.usedFx.includes(e.id));
   if (!pool.length) { s.usedFx = []; pool = POTION_EFFECTS; }
@@ -203,6 +312,10 @@ async function potionDone() {
   if (e.id === 'cat') { const c = document.createElement('i'); c.className = 'pt-cat'; c.textContent = '🐈'; fx.appendChild(c); setTimeout(() => c.remove(), 3000); }
   if (e.id === 'invisible') { const b = document.createElement('i'); b.className = 'pt-boo'; b.textContent = 'Buh!'; fx.appendChild(b); setTimeout(() => b.remove(), 3000); }
   if (e.id === 'dance') cauldron.classList.add('fx-dance');
+  const a3 = s.av3?.alive ? s.av3 : null;
+  if (a3) {
+    ptAnim({ float: 'jump', tiny: 'shy', rainbow: 'dance', ducks: 'laugh', disco: 'dance', invisible: 'think', bubble: 'wave', spin: 'spin', food: 'clap', cat: 'laugh', tall: 'flex', fireworks: 'cheer', dance: 'dance', snow: 'shy' }[e.id] || 'cheer', 3000);
+  }
   if (typeof tone === 'function') tone([523, 659, 784, 1047, 1319], 0.12, 'triangle', 0.08);
   await ptTween(3000, () => {});
   if (G.id !== 'potion') return;
@@ -219,7 +332,7 @@ function potionEnd() {
   const msg = $('#pt-msg');
   msg.hidden = false;
   msg.innerHTML = `<div class="pt-endbox"><div class="pt-msg-icon">📖</div><h2>${record ? 'Neuer Rekord!' : 'Zauberbuch voll!'}</h2>
-    <p class="lead">${POTION_ROUNDS} Tränke gebraut${s.mistakes ? ` · ${s.mistakes} Puff-Wolken` : ' · keine einzige Puff-Wolke!'}</p>
+    <p class="lead">${s.good} von ${POTION_ROUNDS} Tränken gelungen${s.mistakes ? '' : ' – alle perfekt!'}</p>
     <ul class="pt-booklist">${s.effects.map((e) => `<li>${e.icon} ${esc(e.name)}</li>`).join('')}</ul>
     <div class="row center"><button class="btn primary" data-action="game-again">${icon('shuffle')} Nochmal brauen</button><button class="btn ghost" data-action="games">Anderes Spiel</button></div></div>`;
   if (typeof confetti === 'function') confetti();
@@ -227,4 +340,5 @@ function potionEnd() {
 
 const potionActions = {
   'pt-bottle': (el) => potionPick(+el.dataset.i),
+  'pt-next': () => potionNext(),
 };
