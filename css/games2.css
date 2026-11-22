@@ -100,14 +100,14 @@
 .ws-joy.on i { transition: none; }
 .ws-hint { color: var(--ink-3); font-size: .85rem; }
 @media (pointer: coarse) { .ws-joy { display: block; } }
-@media (max-width: 560px) and (orientation: portrait) { .ws-stage { aspect-ratio: auto; height: clamp(260px, calc(100dvh - 380px), 560px); max-height: none; } }
+@media (orientation: portrait) { .ws-stage { aspect-ratio: auto; height: clamp(260px, calc(100dvh - 360px), 1100px); max-height: none; } }
 
 /* =================== 🎣 Angeln =================== */
 .game-fish .game-area { display: grid; gap: .5rem; }
 .fi-hud { display: flex; align-items: center; gap: 1rem; padding: .4rem .9rem; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); font-weight: 700; }
 .fi-catch { margin-left: auto; }
 .fi-stage {
-  --water-y: 40%; position: relative; overflow: hidden; border-radius: 26px; height: clamp(360px, calc(100dvh - 210px), 640px);
+  --water-y: 40%; position: relative; overflow: hidden; border-radius: 26px; height: clamp(360px, calc(100dvh - 210px), 1100px);
   background: linear-gradient(var(--sky1), var(--sky2)); box-shadow: 0 24px 50px -28px rgba(10, 40, 80, .7); user-select: none; -webkit-user-select: none; touch-action: manipulation;
 }
 .fi-sky { position: absolute; inset: 0 0 auto 0; height: var(--water-y); }
@@ -199,7 +199,7 @@
 .game-bridge .game-area { display: grid; gap: .5rem; }
 .br-hud { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .4rem .9rem; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); font-weight: 700; }
 .br-theme { color: var(--ink-2); font-weight: 600; }
-.br-stage { position: relative; overflow: hidden; border-radius: 26px; height: clamp(280px, calc(100dvh - 380px), 520px); box-shadow: 0 24px 50px -28px rgba(20, 30, 60, .7); }
+.br-stage { position: relative; overflow: hidden; border-radius: 26px; height: clamp(240px, calc(100dvh - 470px), 900px); box-shadow: 0 24px 50px -28px rgba(20, 30, 60, .7); }
 .br-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .br-avatar { position: absolute; z-index: 2; }
 .br-avatar .av-svg { display: block; width: 100%; height: auto; }
@@ -254,7 +254,7 @@
 .game-potion .game-area { display: grid; gap: .5rem; }
 .pt-hud { display: flex; justify-content: space-between; padding: .4rem .9rem; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); font-weight: 700; }
 .pt-stage {
-  position: relative; overflow: hidden; border-radius: 26px; height: clamp(420px, calc(100dvh - 200px), 660px);
+  position: relative; overflow: hidden; border-radius: 26px; height: clamp(420px, calc(100dvh - 200px), 1100px);
   background: radial-gradient(ellipse at 50% 85%, #6B3FA0 0, #3A1F66 45%, #1C0F38 100%); box-shadow: 0 24px 50px -28px rgba(30, 10, 60, .8);
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-template-rows: auto 1fr; gap: 10px; padding: 14px; user-select: none; -webkit-user-select: none;
 }
@@ -373,7 +373,7 @@
 
 /* =================== 🎧 Hör-Detektiv =================== */
 .det-file {
-  position: relative; display: grid; gap: 1rem; padding: 1.1rem; border-radius: 24px; min-height: clamp(420px, calc(100dvh - 200px), 720px);
+  position: relative; display: grid; gap: 1rem; padding: 1.1rem; border-radius: 24px; min-height: clamp(420px, calc(100dvh - 200px), 1100px);
   background: linear-gradient(#F4E3BE, #E9D0A0); box-shadow: 0 20px 44px -26px rgba(80, 50, 10, .7), inset 0 0 0 2px rgba(120, 80, 30, .25);
   align-content: start;
 }
@@ -423,3 +423,40 @@
 .det-rank { font-size: 3rem; line-height: 1; }
 @media (max-width: 560px) { .det-cards.n6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .det-card { min-height: 100px; } .det-pic { width: min(84px, 60%); } }
 @media (orientation: landscape) and (max-height: 600px) { .det-cards, .det-cards.n6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } .det-cards.n4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } .det-card { min-height: 92px; } }
+
+/* =================== Grosse Bildschirme (Tablet, Computer): Platz nutzen =================== */
+@media (min-height: 900px) {
+  .det-cards { flex: 1; }
+  .det-card { min-height: 170px; }
+  .det-pic { width: min(150px, 60%); }
+  .det-de { font-size: 1.35rem; }
+  .det-play { padding: 1rem 2rem; font-size: 1.35rem; }
+  .br-opt { min-height: 64px; font-size: 1.25rem; }
+  .pt-glass { width: 54px; height: 70px; } .pt-glass::before { left: 19px; width: 16px; height: 16px; }
+  .pt-label { font-size: 1.05rem; }
+}
+@media (min-width: 760px) and (min-height: 700px) {
+  /* Blitzrunde: grössere Karte */
+  .blitz-card { font-size: clamp(3rem, 6vw, 4.6rem); padding: 2.4rem 3.6rem; min-width: min(80%, 520px); border-radius: 32px; }
+  .blitz-buttons .btn { min-height: 76px; font-size: 1.3rem; }
+  /* Weck nicht den Drachen: breiter, Drache grösser */
+  .game-rocket .test-card.rocket-card { width: min(100%, 980px); }
+  .rocket-card .dg-stage { width: min(100%, 640px, calc((100dvh - 520px) * 1.46)); }
+  .rocket-card .dg { width: min(100%, 600px, calc((100dvh - 580px) * 1.46)); }
+  .rocket-card .rk-body { width: 100%; }
+  .rocket-card .dg-svg { width: 100%; height: auto; }
+  .rocket-card .rk-keys { max-width: 880px; gap: 8px; }
+  .rocket-card .rk-key { height: 58px; font-size: 1.4rem; border-radius: 12px; }
+  .rocket-card .rk-l { height: 56px; font-size: 1.9rem; width: 46px; }
+  /* Buchstabensalat breiter */
+  .game-scramble .test-card { width: min(100%, 980px); }
+}
+/* Wortsuchsel hochkant: Gitter nicht höher als der Platz, damit die gesuchten Wörter sichtbar bleiben */
+@media (orientation: portrait) and (min-width: 600px) {
+  .ws-grid { width: min(100%, calc(100dvh - 520px)); margin: 0 auto; }
+  .search-wrap { justify-items: center; }
+}
+@media (orientation: landscape) and (min-height: 561px) {
+  .search-wrap { grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+  .ws-grid { width: min(62vw, calc(100dvh - 190px)); }
+}

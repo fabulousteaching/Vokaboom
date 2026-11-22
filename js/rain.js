@@ -100,7 +100,7 @@ function rainResize() {
   if (!stage) return;
   // Bei offener Bildschirmtastatur (Handy) die Bühne kleiner machen, damit das Eingabefeld sichtbar bleibt
   const vv = window.visualViewport, vh = vv ? vv.height : innerHeight;
-  const h = Math.round(Math.max(260, Math.min(560, vh - 210)));
+  const h = Math.round(Math.max(260, Math.min(1000, vh - 210))); // möglichst viel vom Bildschirm
   stage.style.height = `${h}px`;
   const W = stage.clientWidth, H = h, dpr = Math.min(2, window.devicePixelRatio || 1);
   s.W = W; s.H = H; s.dpr = dpr;
