@@ -161,22 +161,42 @@ function openGames() {
   if (!set) return;
   go('games');
 }
+/* ---------- Spielen kostet Münzen (wie in Teilmal): Kinder verdienen sie beim Üben ---------- */
+const GAME_COST = 1;
+const gamesFree = () => !isKid(); // Lehrpersonen und Gäste: gratis zum Ausprobieren
+const gameCoins = () => (typeof AV === 'object' && AV.state ? AV.state.coins || 0 : 0);
+const canPlayGame = () => gamesFree() || gameCoins() >= GAME_COST;
+/** Münze bezahlen, bevor ein Spiel beginnt. Liefert true, wenn gespielt werden darf. */
+async function gamePay(id) {
+  if (gamesFree()) return true;
+  if (gameCoins() < GAME_COST) { toast(`Dir fehlt eine Münze. Üben bringt Münzen! (${GAME_BY_ID[id]?.name || 'Spiel'} kostet ${GAME_COST})`, 'bad'); return false; }
+  let r = 'local';
+  if (typeof w3PayGame === 'function') { try { r = await w3PayGame(GAME_COST, `spiel ${id}`); } catch { r = 'local'; } }
+  if (r === 'poor') { toast('Dir fehlt eine Münze. Üben bringt Münzen!', 'bad'); return false; }
+  if (r === 'local' && AV.state) { AV.state.coins = Math.max(0, (AV.state.coins || 0) - GAME_COST); try { avSave?.(); } catch { /* egal */ } }
+  if (typeof avCoinUI === 'function') avCoinUI();
+  return true;
+}
+/** Spiel-Kacheln (Portion-Seite und Spiele-Übersicht) mit Preis */
+function gameTilesHTML(set) {
+  const n = gameWords(set).length, list = gamesOn(set), best = set.progress?.games || {}, free = gamesFree(), can = canPlayGame();
+  if (!list.length) return '<p class="empty">Für diese Portion sind keine Spiele eingeschaltet.</p>';
+  return `<div class="game-grid">${list.map((g) => {
+    const ok = n >= g.min;
+    return `<button class="game-tile ${!can ? 'locked' : ''}" data-action="game-open" data-game="${g.id}" ${ok ? '' : 'disabled'}>
+      <span class="game-art" aria-hidden="true">${g.art}</span>
+      <strong>${esc(g.name)}</strong>
+      <small>${ok ? esc(g.text) : `Dafür braucht es mindestens ${g.min} Vokabeln.`}</small>
+      <span class="game-foot">${best[g.id]?.best ? `<span class="game-best">Rekord ${best[g.id].best}</span>` : '<span></span>'}${free ? '' : `<span class="game-cost" title="Kostet ${GAME_COST} Münze">${typeof AV_COIN_SVG === 'string' ? AV_COIN_SVG : '🪙'}${GAME_COST}</span>`}</span>
+    </button>`;
+  }).join('')}</div>`;
+}
 function renderGames() {
   const set = currentSet();
-  const n = gameWords(set).length;
-  const list = gamesOn(set);
-  const best = set.progress?.games || {};
   $('#view').innerHTML = `<section class="mode games-hub">
     <div class="mode-bar"><h1 class="mode-title">Vokabelspiele</h1></div>
-    ${list.length ? `<div class="game-grid">${list.map((g) => {
-      const ok = n >= g.min;
-      return `<button class="game-tile" data-action="game-open" data-game="${g.id}" ${ok ? '' : 'disabled'}>
-        <span class="game-art" aria-hidden="true">${g.art}</span>
-        <strong>${esc(g.name)}</strong>
-        <small>${ok ? esc(g.text) : `Dafür braucht es mindestens ${g.min} Vokabeln.`}</small>
-        ${best[g.id]?.best ? `<span class="game-best">Rekord ${best[g.id].best}</span>` : ''}
-      </button>`;
-    }).join('')}</div>` : '<p class="empty">Für diese Portion sind keine Spiele eingeschaltet.</p>'}
+    <p class="hint">${gamesFree() ? 'Für Lehrpersonen gratis zum Ausprobieren.' : `Jedes Spiel kostet ${GAME_COST} Münze. Münzen verdienst du beim Üben.`}</p>
+    ${gameTilesHTML(set)}
   </section>`;
 }
 function openGame(id) {
@@ -1300,7 +1320,7 @@ const gameActions = {
   'rn-lives': (el) => { db.settings.runLives = +el.dataset.n; saveDB(); renderGame(); },
   'rn-go': () => runnerBegin(currentSet()),
   games: () => { stopGame(); openGames(); },
-  'game-open': (el) => openGame(el.dataset.game),
+  'game-open': async (el) => { if (el.dataset.busy) return; el.dataset.busy = '1'; try { if (await gamePay(el.dataset.game)) openGame(el.dataset.game); } finally { delete el.dataset.busy; } },
   'ws-tip': (el) => { el.closest('li')?.classList.toggle('flip'); },
   'ws-back': (el) => { db.settings.wsBack = el.dataset.on === '1'; saveDB(); stopGame(); renderGame(); },
   'kids-pics': (el) => {

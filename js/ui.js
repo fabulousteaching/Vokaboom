@@ -522,18 +522,21 @@ function viewSet(set) {
     </header>
 
     ${voicePrepHTML(set)}
+    <div class="section-head set-ueben"><h2>Üben</h2><p class="hint">${isKid() ? 'Beim Üben verdienst du Münzen – damit kannst du unten spielen.' : 'Der Lernweg in vier Schritten.'}</p></div>
     <ol class="path" aria-label="Lernweg">
       ${step(1, 'Lernkarten', 'Karten umdrehen und merken.', info.cards,
         `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>`, !!p.cards, 'stack')}
-      ${step(2, 'Vokabelspiele', gamesOn(set).length ? gamesOn(set).map((g) => g.art).join(' ') + ' Spielend festigen.' : 'Für diese Portion ausgeschaltet.', info.games,
-        gamesOn(set).length ? `<button class="btn primary" data-action="games">Spiele öffnen</button>` : '', !!(p.games || p.match), 'sparkle')}
-      ${step(3, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,
+      ${step(2, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,
         `<button class="btn primary" data-action="mode" data-mode="speak">Aussprache üben</button>`, !!p.speak, 'mic')}
-      ${step(4, 'Hören & Schreiben', 'Hör das Wort und schreib es auf.', info.dictation,
+      ${step(3, 'Hören & Schreiben', 'Hör das Wort und schreib es auf.', info.dictation,
         `<button class="btn primary" data-action="mode" data-mode="dictation">Diktat üben</button>`, !!p.dictation, 'speaker')}
-      ${step(5, 'Test', 'Zeig, was du kannst.', info.test,
+      ${step(4, 'Test', 'Zeig, was du kannst.', info.test,
         `<button class="btn primary" data-action="mode" data-mode="test">Test starten</button>`, !!p.test, 'pencil2')}
     </ol>
+    ${gamesOn(set).length ? `<section class="set-games" aria-labelledby="games-title">
+      <div class="section-head"><h2 id="games-title">Spielen</h2><p class="hint">${gamesFree() ? 'Für Lehrpersonen gratis zum Ausprobieren.' : `Jedes Spiel kostet ${GAME_COST} Münze. Münzen verdienst du beim Üben.`}</p></div>
+      ${gameTilesHTML(set)}
+    </section>` : ''}
     ${typeof liveStartHTML === 'function' ? liveStartHTML(set) : ''}
     ${locked ? '' : gamesSettingsHTML(set)}
 

@@ -855,3 +855,15 @@
 .pt-msgbox { max-width: min(90%, 520px); }
 .rn-q { flex-wrap: nowrap !important; white-space: nowrap; overflow: hidden; max-width: 100%; }
 .blitz-card { white-space: nowrap; overflow: hidden; max-width: min(92%, 760px); }
+
+/* Portion-Seite: oben Üben (Lernweg), darunter Spielen – Spiele kosten Münzen */
+.set-games { margin-top: 1.4rem; }
+.set-games .section-head { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin-bottom: .7rem; }
+.set-games .section-head h2 { margin: 0; }
+.set-games .section-head .hint, .games-hub .hint { margin: 0; color: var(--ink-2); }
+.game-foot { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: .2rem; }
+.game-cost { display: inline-flex; align-items: center; gap: .2rem; font-weight: 800; color: #8a5a00; background: #FFF3C4; border-radius: 99px; padding: .1rem .5rem; }
+.game-cost svg { width: 16px; height: 16px; }
+.game-tile.locked { opacity: .6; }
+
+.set-ueben { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin: .6rem 0 .7rem; } .set-ueben h2 { margin: 0; } .set-ueben .hint { margin: 0; color: var(--ink-2); }
