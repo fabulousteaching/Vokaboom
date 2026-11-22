@@ -795,3 +795,28 @@ function s3Potion() {
     ctl.track('.pt-glass', (el) => s3BottleModel(ctl, el), { z: 200, update: s3BottleLive });
   });
 }
+
+/** Katzen-Trank: eine 3D-Katze (aus dem Avatar-Baukasten) springt aus dem Kessel, läuft durch die Küche, setzt sich und miaut */
+function s3PotionCat() {
+  const ctl = G.s.s3, T = ctl?.T;
+  if (!ctl?.alive || typeof vxPetGroup !== 'function') return false;
+  const g = vxPetGroup(T, { id: 'cat', c: 0xf2a65a });
+  if (!g) return false;
+  const bb = new T.Box3().setFromObject(g), h = Math.max(0.01, bb.max.y - bb.min.y);
+  g.scale.multiplyScalar(85 / h);
+  const holder = new T.Group(); holder.add(g); ctl.scene.add(holder);
+  const st = $('#pt-stage').getBoundingClientRect(), cr = $('#pt-cauldron').getBoundingClientRect(), ar = $('#pt-avatar').getBoundingClientRect();
+  const sx = cr.left - st.left + cr.width / 2, sy = cr.top - st.top + cr.height * 0.2, floor = cr.top - st.top + cr.height * 0.98;
+  const lx = sx - cr.width * 0.75, ex = Math.max(60, ar.left - st.left - 50);
+  let t = 0, meowed = false;
+  const meow = () => { try { const ac = audioCtx; if (!ac || !db.settings.sound) return; const o = ac.createOscillator(), gn = ac.createGain(), t0 = ac.currentTime; o.type = 'triangle'; o.frequency.setValueAtTime(700, t0); o.frequency.linearRampToValueAtTime(1100, t0 + 0.15); o.frequency.linearRampToValueAtTime(600, t0 + 0.45); gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(0.08, t0 + 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5); o.connect(gn).connect(ac.destination); o.start(t0); o.stop(t0 + 0.55); } catch { /* egal */ } };
+  ctl.frame((dt) => {
+    if (!holder.parent) return;
+    t += dt;
+    if (t < 0.7) { const k = t / 0.7; holder.position.set(sx + (lx - sx) * k, -(sy + (floor - sy) * k - Math.sin(k * Math.PI) * 140), 420); holder.rotation.set(0, -Math.PI / 2, -k * Math.PI * 2); }
+    else if (t < 2.1) { const k = (t - 0.7) / 1.4; holder.rotation.set(0, -Math.PI / 2, 0); holder.position.set(lx + (ex - lx) * k, -floor + Math.abs(Math.sin(k * Math.PI * 6)) * 8, 420); }
+    else if (t < 3.3) { const k = Math.min(1, (t - 2.1) / 0.3); holder.rotation.set(0, -Math.PI / 2 * (1 - k), 0); holder.position.set(ex, -floor, 420); if (!meowed && t > 2.3) { meowed = true; meow(); } }
+    else { const k = Math.min(1, (t - 3.3) / 0.4); holder.scale.setScalar(1 - k); if (k >= 1) ctl.scene.remove(holder); }
+  });
+  return true;
+}

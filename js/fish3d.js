@@ -55,7 +55,7 @@ async function f3Mount(stage) {
   const caC = document.createElement('canvas'); caC.width = caC.height = 256;
   { const g = caC.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3; for (let i = 0; i < 46; i++) { g.beginPath(); const x = Math.random() * 256, y = Math.random() * 256, r = 14 + Math.random() * 26; for (let a = 0; a <= 6.4; a += 0.5) g.lineTo(x + Math.cos(a) * r * (0.7 + Math.sin(a * 3 + i) * 0.3), y + Math.sin(a) * r * (0.7 + Math.cos(a * 2 + i) * 0.3)); g.stroke(); } }
   const caT = new T.CanvasTexture(caC); caT.wrapS = caT.wrapT = T.RepeatWrapping; caT.repeat.set(5, 5); own.push(caT);
-  const floorM = new T.MeshStandardMaterial({ color: lv === 3 ? 0xd8c690 : 0x9c8b62, roughness: 0.95, emissive: 0x9ad8ff, emissiveMap: caT, emissiveIntensity: 0.18 }); own.push(floorM);
+  const floorM = new T.MeshStandardMaterial({ color: lv === 3 ? 0xd8c690 : 0x9c8b62, roughness: 0.95, emissive: 0x000000 }); // (kein Lichtmuster-Schimmern) own.push(floorM);
   const floor = new T.Mesh(new T.PlaneGeometry(60, 40), floorM); own.push(floor.geometry);
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, -2.6, -12); floor.receiveShadow = true; scene.add(floor);
   const rockG = vox((B) => { B.ell(0, 0, 0, 8, 5, 6, rwMix(0x8a8f96, 0x4f8a5a, 0.3, 2, 4), { keep: (x, y) => y >= 0 }); B.ell(6, 0, 2, 4, 3, 3, 0x9aa1a8, { keep: (x, y) => y >= 0 }); }, { u: 0.08, iter: 2 });
@@ -66,7 +66,7 @@ async function f3Mount(stage) {
   const nC = document.createElement('canvas'); nC.width = nC.height = 128;
   { const g = nC.getContext('2d'), id = g.createImageData(128, 128); for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) { const a = Math.sin(x * 0.2 + Math.sin(y * 0.15) * 2) * 0.5 + Math.sin(y * 0.27 + x * 0.05) * 0.5; const b = Math.cos(y * 0.21 + Math.sin(x * 0.12) * 2) * 0.5 + Math.cos(x * 0.31 - y * 0.07) * 0.5; const o = (y * 128 + x) * 4; id.data[o] = 128 + a * 40; id.data[o + 1] = 128 + b * 40; id.data[o + 2] = 255; id.data[o + 3] = 255; } g.putImageData(id, 0, 0); }
   const nT = new T.CanvasTexture(nC); nT.wrapS = nT.wrapT = T.RepeatWrapping; nT.repeat.set(6, 4); own.push(nT);
-  const waterM = new T.MeshStandardMaterial({ color: new T.Color(L.water[0]).lerp(new T.Color(L.water[1]), 0.35), transparent: true, opacity: 0.5, roughness: 0.22, metalness: 0.05, envMapIntensity: 0.6, normalMap: nT, normalScale: new T.Vector2(0.35, 0.35), depthWrite: false });
+  const waterM = new T.MeshStandardMaterial({ color: new T.Color(L.water[0]).lerp(new T.Color(L.water[1]), 0.35), transparent: true, opacity: 0.5, roughness: 0.22, metalness: 0.05, envMapIntensity: 0.6, depthWrite: false }); // ruhige Oberfläche ohne Glitzern
   const water = new T.Mesh(new T.PlaneGeometry(80, 60, 80, 40), waterM); own.push(water.geometry, waterM);
   water.rotation.x = -Math.PI / 2; water.position.set(0, 0, -18); water.renderOrder = 2; scene.add(water);
   const wpos = water.geometry.attributes.position, wbase = Float32Array.from(wpos.array);
@@ -164,7 +164,7 @@ async function f3Mount(stage) {
     W = w; H = h; renderer.setSize(w, h, false); cv.style.width = `${w}px`; cv.style.height = `${h}px`;
     cam.aspect = w / h; cam.fov = w / h < 0.9 ? 72 : 50; cam.updateProjectionMatrix(); post?.setSize(w, h);
   }
-  const camBase = new T.Vector3(-4.0, 5.4, 4.8), camLook = new T.Vector3(1.4, -1.4, -6.2);
+  const camBase = new T.Vector3(-4.1, 4.25, 4.5), camLook = new T.Vector3(1.3, -1.05, -6.35);
   let post = null;
   // (kein Leuchten beim Angeln: die spiegelnde Wasserfläche würde blenden)
   const meter = typeof fxMeter === 'function' ? fxMeter(() => { post?.dispose(); post = null; renderer.shadowMap.enabled = false; renderer.setPixelRatio(1); W = 0; fit(); }) : () => {};
@@ -179,7 +179,7 @@ async function f3Mount(stage) {
     for (let i = 0; i < wpos.count; i++) { const x = wbase[i * 3], y = wbase[i * 3 + 1]; wpos.array[i * 3 + 2] = Math.sin(x * 0.6 + t * 1.4) * 0.04 + Math.sin(y * 0.8 - t * 1.1) * 0.035; }
     wpos.needsUpdate = true;
     nT.offset.set(t * 0.012, t * 0.008); caT.offset.set(Math.sin(t * 0.2) * 0.05, t * 0.01);
-    floorM.emissiveIntensity = 0.16 + Math.sin(t * 1.3) * 0.04;
+    
     weeds.forEach((m, i) => { m.rotation.z = Math.sin(t * 1.2 + i) * 0.1; });
     reeds.forEach((m, i) => { m.rotation.z = Math.sin(t * 1.1 + i) * 0.05; });
     clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 40) c.position.x = -40; });

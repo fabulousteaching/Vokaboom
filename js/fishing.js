@@ -177,7 +177,7 @@ function fishSchool(w) {
     const text = gameForm(it.w), [c1, c2] = FISH_COLORS[(k + s.caught.length) % FISH_COLORS.length];
     const kind = FISH_KINDS[(k * 3 + s.caught.length + s.lives) % FISH_KINDS.length];
     const bw = Math.max(92, Math.min(190, 40 + text.length * 10.5)), bh = kind === 'puffer' ? 58 : kind === 'long' ? 44 : kind === 'angel' ? 52 : 50;
-    const dir = s.f3 ? -1 : Math.random() < 0.5 ? 1 : -1; // in 3D kommen alle von rechts (links steht der Avatar)
+    const dir = s.f3 && k === 0 ? -1 : Math.random() < 0.5 ? 1 : -1; // verschiedene Seiten (in 3D die vorderste Bahn von rechts: links vorne steht der Avatar)
     const el = document.createElement('button');
     el.type = 'button'; el.className = 'fi-fish'; el.dataset.i = String(s.fish.length);
     el.setAttribute('aria-label', text); el.lang = s.lang;
@@ -187,7 +187,9 @@ function fishSchool(w) {
     school.appendChild(el);
     const y = s.swimTop + span * k + span / 2 - bh / 2 + (Math.random() - 0.5) * Math.max(0, span - bh) * 0.6;
     const x = dir > 0 ? -bw - 40 - k * 30 : s.W + 6 + k * 30;
-    s.fish.push({ el, w: it.w, ok: it.ok, x, y, y0: y, dir, v: s.L.v * s.speed * (0.8 + Math.random() * 0.45), ph: Math.random() * 6, bw: bw + 34, bh, enter: true });
+    // jeder Fisch schwimmt zuerst an einen eigenen Platz (verteilt über den See), dann hin und her
+    const tx = s.swimLeft + (items.length > 1 ? (k / (items.length - 1)) : 0.5) * Math.max(10, s.W - bw - 44 - s.swimLeft);
+    s.fish.push({ el, w: it.w, ok: it.ok, x, y, y0: y, dir, v: s.L.v * s.speed * (0.8 + Math.random() * 0.45), ph: Math.random() * 6, bw: bw + 34, bh, enter: true, tx: tx + (Math.random() - 0.5) * 40 });
   });
   s.busy = false;
 }
@@ -199,7 +201,7 @@ function fishStep(dt) {
     f.x += f.dir * f.v * dt * (f.enter ? 3.2 : 1); // schnell hereinschwimmen
     f.y = f.y0 + Math.sin(s.t * 1.6 + f.ph) * 6;
     const minX = s.swimLeft, maxX = s.W - f.bw - 10;
-    if (f.enter && f.x > minX && f.x < maxX) f.enter = false;
+    if (f.enter && (f.tx != null ? (f.dir > 0 ? f.x >= f.tx : f.x <= f.tx) : (f.x > minX && f.x < maxX))) { f.enter = false; if (Math.random() < 0.5) f.dir = -f.dir; }
     if (!f.enter && !f.leaving) {
       if (f.x < minX && f.dir < 0) f.dir = 1;
       if (f.x > maxX && f.dir > 0) f.dir = -1;

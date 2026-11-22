@@ -49,9 +49,9 @@ async function b3Mount(stage) {
   const cliff = (dir) => vox((B) => {
     const X = 85, Z = 22, Hh = 30;
     for (let x = -X; x <= X; x++) {
-      const jag = Math.max(0, Math.round(Math.sin(x * 0.9) * 0.8 + Math.sin(x * 0.27) * 1.4 + Math.sin(x * 0.07) * 1.5));
+      const jag = dir > 0 ? 0 : Math.max(0, Math.round(Math.sin(x * 0.9) * 0.8 + Math.sin(x * 0.27) * 1.4 + Math.sin(x * 0.07) * 1.5)); // vorne (Start): gerade Kante
       for (let z = jag; z <= Z; z++) for (let y = -2; y <= 0; y++) B.put(x, y, dir * z, topC(x, y, z, -y));
-      for (let y = -Hh; y <= -3; y++) { const inset = Math.round(Math.sin(y * 0.45 + x * 0.8) * 0.8 + Math.sin(y * 0.13) * 1.2 + 1); for (let z = jag + inset; z <= jag + inset + 2; z++) B.put(x, y, dir * z, topC(x, y, z, 9)); }
+      for (let y = -Hh; y <= -3; y++) { const inset = dir > 0 ? Math.round(Math.max(0, Math.sin(y * 0.3 + x * 0.5)) * 0.6) : Math.round(Math.sin(y * 0.45 + x * 0.8) * 0.8 + Math.sin(y * 0.13) * 1.2 + 1); for (let z = jag + inset; z <= jag + inset + 2; z++) B.put(x, y, dir * z, topC(x, y, z, 9)); }
     }
   }, { u: 0.4, iter: 1, field: 1 });
   const near = mesh(cliff(1)); near.position.set(0, -0.4, 0.15); scene.add(near);
@@ -89,15 +89,24 @@ async function b3Mount(stage) {
   const extras = [];
   if (s.theme === 'jungle') {
     // Wasserfall an der hinteren Felswand, mit Gischt unten
+    // Wasser-Streifen mit weichen Rändern (Alpha) – fliesst nach unten
     const wfC = document.createElement('canvas'); wfC.width = 64; wfC.height = 256;
-    { const g = wfC.getContext('2d'); const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, '#bfe9ff'); gr.addColorStop(0.5, '#ffffff'); gr.addColorStop(1, '#9ed8f5'); g.fillStyle = gr; g.fillRect(0, 0, 64, 256); for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(60,140,200,${0.1 + Math.random() * 0.25})`; g.fillRect(Math.random() * 64, Math.random() * 256, 2 + Math.random() * 4, 10 + Math.random() * 40); } }
-    const wfT = new T.CanvasTexture(wfC); wfT.wrapT = T.RepeatWrapping; wfT.repeat.set(1, 2); own.push(wfT);
+    { const g = wfC.getContext('2d'); g.clearRect(0, 0, 64, 256);
+      for (let i = 0; i < 90; i++) { const x0 = 6 + Math.random() * 52, a = 0.35 + Math.random() * 0.5; g.fillStyle = `rgba(${200 + Math.random() * 55},${235 + Math.random() * 20},255,${a})`; g.fillRect(x0, Math.random() * 256, 2 + Math.random() * 5, 30 + Math.random() * 90); }
+      const edge = g.createLinearGradient(0, 0, 64, 0); edge.addColorStop(0, 'rgba(0,0,0,1)'); edge.addColorStop(0.18, 'rgba(0,0,0,0)'); edge.addColorStop(0.82, 'rgba(0,0,0,0)'); edge.addColorStop(1, 'rgba(0,0,0,1)');
+      g.globalCompositeOperation = 'destination-out'; g.fillStyle = edge; g.fillRect(0, 0, 64, 256); g.globalCompositeOperation = 'source-over'; }
+    const wfT = new T.CanvasTexture(wfC); wfT.wrapT = T.RepeatWrapping; wfT.repeat.set(1, 2.5); own.push(wfT);
+    const wfT2 = wfT.clone(); wfT2.repeat.set(1.2, 1.6); wfT2.needsUpdate = true; own.push(wfT2);
     for (const x of [-7.5, 9]) {
-      const wf = new T.Mesh(new T.PlaneGeometry(2.4, 11.5), new T.MeshStandardMaterial({ map: wfT, transparent: true, opacity: 0.9, emissive: 0x335577, emissiveIntensity: 0.3 }));
-      own.push(wf.geometry, wf.material); wf.position.set(x, -5.8, -L - 0.1); scene.add(wf);
-      const mist = typeof fxGlow === 'function' ? fxGlow(T, 0xffffff, 5, 0.5) : null; if (mist) { mist.position.set(x, -11, -L + 0.5); scene.add(mist); }
+      for (const [tex, w, z, op] of [[wfT, 2.6, -L - 0.05, 0.95], [wfT2, 3.2, -L + 0.1, 0.55]]) {
+        const g = new T.PlaneGeometry(w, 11.6, 1, 8);
+        const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); p.setX(i, p.getX(i) * (1 + (5.8 - y) * 0.035)); p.setZ(i, (5.8 - y) * 0.06); } // unten breiter, leicht nach vorne
+        const wf = new T.Mesh(g, new T.MeshBasicMaterial({ map: tex, transparent: true, opacity: op, depthWrite: false, color: 0xdff4ff }));
+        own.push(g, wf.material); wf.position.set(x, -5.8, z); scene.add(wf);
+      }
+      for (let k = 0; k < 3; k++) { const mist = typeof fxGlow === 'function' ? fxGlow(T, 0xffffff, 4 + k * 1.5, 0.45 - k * 0.1) : null; if (mist) { mist.position.set(x + (k - 1) * 0.8, -11 + k * 0.4, -L + 0.6); scene.add(mist); } }
     }
-    extras.push((dt) => { wfT.offset.y -= dt * 0.9; });
+    extras.push((dt) => { wfT.offset.y += dt * 0.9; wfT2.offset.y += dt * 1.3; }); // nach unten
     // Tempel-Ruine in der Ferne
     const temple = mesh(vox((B) => { for (let k = 0; k < 6; k++) B.box(-12 + k * 2, k * 3, -12 + k * 2, 12 - k * 2, k * 3 + 2, 12 - k * 2, rwMix(0x8a8f7a, 0x4f8a5a, 0.4, 2, k)); B.box(-2, 18, -2, 2, 22, 2, 0x6b705c); }, { u: 0.5, iter: 1 }), false);
     temple.position.set(13, 0, -L - 7.5); temple.scale.setScalar(0.42); temple.rotation.y = -0.4; scene.add(temple);
@@ -149,11 +158,11 @@ async function b3Mount(stage) {
   // Pfosten und Handlauf-Seile
   const postG = vox((B) => { B.box(-1, 0, -1, 1, 11, 1, rnVar(P.post, 0.06)); B.ell(0, 11, 0, 1.6, 1.3, 1.6, rnShade(P.post, 0.1)); }, { u: 0.1, iter: 1 });
   const posts = [];
-  for (const z of [0.15, -L - 0.15]) for (const x of [-B3.W / 2 - 0.15, B3.W / 2 + 0.15]) { const m = mesh(postG); m.position.set(x, 0, z); scene.add(m); posts.push(m); }
+  for (const z of [0.5, -L - 0.55]) for (const x of [-B3.W / 2 - 0.15, B3.W / 2 + 0.15]) { const m = mesh(postG); m.position.set(x, 0, z); scene.add(m); posts.push(m); }
   const ropeM = new T.MeshStandardMaterial({ color: P.rope, roughness: 0.9 }); own.push(ropeM);
   const sag = (z) => TH.sag * 9 * Math.sin(Math.PI * Math.min(1, Math.max(0, -z / L)));
   if (TH.ropes) for (const x of [-B3.W / 2 - 0.15, B3.W / 2 + 0.15]) {
-    const pts = Array.from({ length: 30 }, (_, i) => { const z = 0.15 - (L + 0.3) * i / 29; return new T.Vector3(x, 1.05 - sag(z) * 0.8, z); });
+    const pts = Array.from({ length: 30 }, (_, i) => { const z = 0.5 - (L + 1.05) * i / 29; return new T.Vector3(x, 1.05 - sag(z) * 0.8, z); });
     const rg = new T.TubeGeometry(new T.CatmullRomCurve3(pts), 80, 0.035, 6, false); own.push(rg);
     const r = new T.Mesh(rg, ropeM); r.castShadow = true; scene.add(r);
   }

@@ -373,7 +373,7 @@ async function potionDone() {
   if (e.id === 'snow') rain(['❄️', '❅', '❆'], 26);
   if (e.id === 'fireworks') rain(['✨', '🎆', '🎇', '⭐'], 22);
   if (e.id === 'disco') rain(['🎵', '🎶'], 12);
-  if (e.id === 'cat') { const c = document.createElement('i'); c.className = 'pt-cat'; c.textContent = '🐈'; fx.appendChild(c); setTimeout(() => c.remove(), 3000); }
+  if (e.id === 'cat' && !(typeof s3PotionCat === 'function' && s3PotionCat())) { const c = document.createElement('i'); c.className = 'pt-cat'; c.textContent = '🐈'; fx.appendChild(c); setTimeout(() => c.remove(), 3000); }
   if (e.id === 'invisible') { const b = document.createElement('i'); b.className = 'pt-boo'; b.textContent = 'Buh!'; fx.appendChild(b); setTimeout(() => b.remove(), 3000); }
   if (e.id === 'dance') cauldron.classList.add('fx-dance');
   if (typeof tone === 'function') tone([523, 659, 784, 1047, 1319], 0.12, 'triangle', 0.08);
@@ -426,29 +426,29 @@ async function potionFx(e) {
   if (a3) {
     switch (e.id) {
       case 'float': // hebt ab, schwebt mit Funkenspur, landet sanft
-        stop = trail(['✨', '⭐', col]);
+        stop = trail([col, '#FFE066', '#ffffff']);
         await ptTween(3000, (k) => { const up = k < 0.2 ? ease(k / 0.2) : k > 0.8 ? ease((1 - k) / 0.2) : 1; a3.lift = up * room * 0.85 + Math.sin(k * 14) * Math.min(8, room * 0.05); a3.lean = Math.sin(k * 9) * 0.15; });
         break;
       case 'tiny': // Puff! ganz klein, hüpft herum, Puff! wieder gross
-        ptBurst(c.x, c.y, ['💨', '☁️'], 14, 0.6);
+        ptBurst(c.x, c.y, ['#ffffff', '#d8d8e8'], 14, 0.6);
         await ptTween(500, (k) => { a3.scale = 1 - ease(k) * 0.72; });
         await ptTween(1700, (k) => { a3.lift = Math.abs(Math.sin(k * Math.PI * 4)) * 40; });
-        ptBurst(c.x, c.y, ['💨', '☁️'], 14, 0.6);
+        ptBurst(c.x, c.y, ['#ffffff', '#d8d8e8'], 14, 0.6);
         await ptTween(500, (k) => { a3.scale = 0.28 + ease(k) * 0.72 + Math.sin(k * Math.PI) * 0.15; });
         break;
       case 'tall': // Gummiband: lang – breit – lang – normal
         await ptTween(3000, (k) => { const w = Math.sin(k * Math.PI * 3) * (1 - k * 0.6); a3.sy = 1 + w * (w > 0 ? tallMax : 0.4); a3.sx = 1 - w * 0.35; });
         break;
       case 'spin': // Wirbelsturm: dreht sich immer schneller, hebt dabei ab
-        stop = trail(['🌀', '💫', col], 70);
+        stop = trail([col, '#ffffff'], 70);
         await ptTween(2800, (k) => { a3.rotY = 0.55 + ease(k) * Math.PI * 14; a3.lift = Math.sin(k * Math.PI) * Math.min(90, room * 0.6); });
         a3.rotY = 0.55;
         break;
       case 'invisible': // löst sich in Funken auf, «Buh!» und taucht wieder auf
-        ptBurst(c.x, c.y, ['✨', col, '#ffffff'], 36, 0.8);
+        ptBurst(c.x, c.y, [col, '#ffffff'], 36, 0.8);
         await ptTween(600, (k) => { a3.alpha = 1 - k; });
         await ptTween(1500, () => {});
-        ptBurst(c.x, c.y, ['💥', '✨', col], 30, 1.2);
+        ptBurst(c.x, c.y, [col, '#ffffff', '#FFE066'], 30, 1.2);
         await ptTween(400, (k) => { a3.alpha = k; a3.scale = 1 + Math.sin(k * Math.PI) * 0.35; });
         break;
       case 'bubble': // in einer Riesenblase davonschweben
