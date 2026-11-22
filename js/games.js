@@ -13,6 +13,9 @@ const GAMES = [
   { id: 'search', name: 'Wortsuchsel', art: '🔍', text: 'Finde die Wörter im Buchstabengitter.', min: 3 },
   { id: 'rocket', name: 'Weck nicht den Drachen', art: '🐉', text: 'Errate das Wort Buchstabe für Buchstabe. Jeder Fehler weckt den Drachen ein bisschen mehr …', min: 1 },
   { id: 'duel', name: 'Duell zu zweit', art: '⚔️', text: 'Zwei Kinder, ein Gerät: Wer tippt schneller?', min: 4 },
+  { id: 'rain', name: 'Wörterregen', art: '🌧️', text: 'Tippe das Wort, bevor der Regentropfen ins Wasser fällt.', min: 3 },
+  { id: 'fish', name: 'Angeln', art: '🎣', text: 'Dein Avatar angelt: Fang den Fisch mit dem richtigen Wort – sonst landest du im Wasser!', min: 3 },
+  { id: 'snake', name: 'Wortschlange', art: '🐍', text: 'Friss die richtigen Buchstaben oder Wörter und werde immer länger.', min: 3 },
   { id: 'runner', name: 'Welten-Lauf', art: '🏃', text: 'Renn mit deinem Avatar durch fünf Welten und lauf durch das richtige Wort.', min: 3 },
 ];
 const GAME_BY_ID = Object.fromEntries(GAMES.map((g) => [g.id, g]));
@@ -22,6 +25,7 @@ const gamesOn = (set) => GAMES.filter((g) => !(set?.gamesOff || []).includes(g.i
 const G = { id: '', timers: [], raf: 0, keys: null, s: {} };
 function stopGame() {
   if (G.runner) { try { G.runner.dispose(); } catch (e) { console.warn(e); } G.runner = null; }
+  ['rainCleanup', 'wsCleanup', 'fishCleanup', 'bridgeCleanup', 'detCleanup'].forEach((k) => { if (G[k]) { try { G[k](); } catch (e) { console.warn(e); } G[k] = null; } });
   G.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
   G.timers = [];
   cancelAnimationFrame(G.raf);
@@ -135,7 +139,7 @@ function renderGame() {
   stopGame();
   G.id = ui.game;
   G.s = {};
-  const fn = { balloon: startBalloon, blitz: startBlitz, scramble: startScramble, search: startSearch, rocket: startRocket, duel: startDuel, runner: startRunnerGame }[ui.game];
+  const fn = { balloon: startBalloon, blitz: startBlitz, scramble: startScramble, search: startSearch, rocket: startRocket, duel: startDuel, runner: startRunnerGame, rain: startRain, snake: startSnakeGame, fish: startFishing }[ui.game];
   if (!fn) { go('games'); return; }
   fn(set);
 }

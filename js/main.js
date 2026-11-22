@@ -391,6 +391,12 @@ if (typeof world3dActions === 'object') Object.assign(actions, world3dActions); 
 if (typeof menuActions === 'object') Object.assign(actions, menuActions); // Menü für Lehrpersonen (js/menu.js)
 if (typeof libraryActions === 'object') Object.assign(actions, libraryActions); // Bibliothek (js/library.js)
 if (typeof reviewActions === 'object') Object.assign(actions, reviewActions); // Wiederholen (js/review.js)
+// weitere Spiele (js/rain.js, snake.js, fishing.js, bridge.js, detective.js) – const-Variablen hängen nicht an window
+if (typeof rainActions === 'object') Object.assign(actions, rainActions);
+if (typeof snakeActions === 'object') Object.assign(actions, snakeActions);
+if (typeof fishActions === 'object') Object.assign(actions, fishActions);
+if (typeof bridgeActions === 'object') Object.assign(actions, bridgeActions);
+if (typeof detActions === 'object') Object.assign(actions, detActions);
 
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
