@@ -156,7 +156,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 - **Brückenbau** – jedes richtige Wort ist ein Brett, am Schluss läuft der Avatar hinüber; 10–20 Bretter je nach Lernstand, jedes Mal eine andere Landschaft.
 - **Zaubertrank** – der Avatar giesst die gewählten Fläschchen in den Kessel. Ob es die richtigen waren, zeigt sich erst am Schluss: Ein richtiger Trank leuchtet und hat einen lustigen Effekt, ein falscher misslingt (grauer Schlamm, Rauch), und die richtigen Zutaten werden gezeigt.
 - Angeln, Brückenbau und Zaubertrank zeigen den **3D-Avatar** des Kindes (aus dem 3D-Shop), auf älteren Geräten ohne 3D den gewohnten Avatar.
-- **Hör-Detektiv** – Wort anhören und die passende Karte finden; 10 Fälle, zuletzt ähnlich klingende Wörter und ohne Bilder.
+- **Hör-Detektiv** – Wort anhören und die passende Karte finden; 10 Fälle, zuletzt ähnlich klingende Wörter und ohne Bilder. Im Detektivlabor klappt jede Akte auf, wird gestempelt und wandert auf den Stapel.
 
 Oben links führt ein Zurück-Pfeil immer eine Ebene höher. Spiele zählen nicht für die Auswertung, aber für das Wiederholen nach der Vergessenskurve. Vorgelesen wird nie automatisch, nur auf Knopfdruck.
 

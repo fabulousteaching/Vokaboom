@@ -2,6 +2,8 @@
  * Vokaboom spricht ein Wort, das Kind tippt die passende Karte an. 10 Fälle in einer Akte:
  * Fall 1–4: 4 Bildkarten · Fall 5–7: 6 Karten mit ähnlich klingenden Wörtern · Fall 8–10: Wortkarten ohne Bild.
  * Beim ersten Versuch gelöst: 3 Punkte, beim zweiten 1 Punkt.
+ * Design: Detektivlabor (Pinnwand, Schreibtisch, Lampe). Jeder Fall ist eine Akte: sie rutscht herein, klappt auf,
+ * wird gestempelt (GELÖST / UNGELÖST), klappt zu und wandert auf den Stapel der erledigten Akten.
  */
 'use strict';
 
@@ -14,20 +16,29 @@ function startDetective(set) {
   Object.assign(G.s, { set, lang: langOf(set), words, pk: makePicker(words), case: 0, score: 0, first: 0, tries: 0, results: [], done: false, busy: false });
   const canSay = typeof canSpeak === 'function' && canSpeak();
   $('#view').innerHTML = gameShell('Hör-Detektiv', `
-    <div class="det-file">
+    <div class="det-lab det-file">
+      <div class="det-wall" aria-hidden="true">
+        <span class="det-lamp"></span>
+        <span class="det-note n1">🗺️</span><span class="det-note n2">🔍</span><span class="det-note n3">❓</span><span class="det-note n4">👣</span>
+        <svg class="det-strings" viewBox="0 0 100 30" preserveAspectRatio="none"><path d="M12 10 L40 20 L66 8 L88 18" fill="none" stroke="#C62828" stroke-width=".5"/></svg>
+      </div>
       <div class="det-head">
-        <span class="det-stamp">AKTE</span>
+        <span class="det-stamp">LABOR</span>
         <strong id="det-case">Fall 1 von ${DET_CASES}</strong>
         <span class="det-prints" id="det-prints" aria-label="Gelöste Fälle">${'<i></i>'.repeat(DET_CASES)}</span>
         <span class="det-score" id="det-score">0 Punkte</span>
       </div>
       ${canSay ? '' : '<p class="banner bad small">Dieses Gerät kann nicht vorlesen – für den Hör-Detektiv braucht es Ton.</p>'}
-      <div class="det-listen">
-        <button class="det-play" id="det-play" data-action="det-play" aria-label="Wort anhören">${icon('speaker', 'big')}<span>Anhören</span></button>
-        <button class="btn ghost small" data-action="det-play" data-slow="1">${icon('snail')} Langsam</button>
-        <p class="det-hint" id="det-hint">Hör genau hin – welche Karte passt?</p>
+      <div class="det-desk">
+        <div class="det-listen">
+          <button class="det-play" id="det-play" data-action="det-play" aria-label="Wort anhören"><span class="det-reel" aria-hidden="true"></span>${icon('speaker', 'big')}<span>Anhören</span><span class="det-reel" aria-hidden="true"></span></button>
+          <button class="btn ghost small det-slow" data-action="det-play" data-slow="1">${icon('snail')} Langsam</button>
+          <p class="det-hint" id="det-hint">Hör genau hin – welche Karte passt?</p>
+        </div>
+        <div class="det-slot" id="det-slot"></div>
+        <div class="det-pile" id="det-pile" aria-label="Erledigte Akten"><b id="det-pile-n">0</b></div>
+        <span class="det-glass" aria-hidden="true"></span>
       </div>
-      <div class="det-cards" id="det-cards"></div>
       <div class="det-end" id="det-end" hidden></div>
     </div>`);
   const top = $('.det-file'), bar = $('.topbar');
@@ -38,7 +49,7 @@ function startDetective(set) {
 function detCase() {
   const s = G.s;
   if (s.done) return;
-  s.case++; s.tries = 0; s.busy = false;
+  s.case++; s.tries = 0;
   $('#det-case').textContent = `Fall ${s.case} von ${DET_CASES}`;
   const w = pickNext(s.pk);
   s.cur = w;
@@ -51,10 +62,21 @@ function detCase() {
   const cards = shuffle([w, ...others.slice(0, n - 1)]);
   s.cards = cards;
   const withPic = !noPic && cards.every((c) => hasPicture(c, s.lang));
-  $('#det-cards').className = `det-cards n${cards.length} ${withPic ? 'pics' : 'words'}`;
-  $('#det-cards').innerHTML = cards.map((c, i) => `<button class="det-card" data-action="det-pick" data-i="${i}" style="--d:${i * 0.05}s">
-      ${withPic ? `<span class="det-pic">${picHTML(c, s.lang, 'card-pic')}</span>` : ''}<span class="det-de" lang="de">${esc(c.german || '?')}</span>
-      <span class="det-mark" aria-hidden="true"></span></button>`).join('');
+  // neue Akte: rutscht geschlossen herein und klappt auf
+  s.busy = true;
+  const slot = $('#det-slot');
+  slot.innerHTML = `<div class="det-folder enter" id="det-folder">
+      <span class="det-tab">FALL ${s.case}</span>
+      <div class="det-page"><span class="det-clip" aria-hidden="true"></span>
+        <div class="det-cards n${cards.length} ${withPic ? 'pics' : 'words'}" id="det-cards">${cards.map((c, i) => `<button class="det-card" data-action="det-pick" data-i="${i}" style="--d:${0.55 + i * 0.06}s">
+          ${withPic ? `<span class="det-pic">${picHTML(c, s.lang, 'card-pic')}</span>` : ''}<span class="det-de" lang="de">${esc(c.german || '?')}</span>
+          <span class="det-mark" aria-hidden="true"></span></button>`).join('')}</div>
+      </div>
+      <div class="det-cover" aria-hidden="true"><span class="det-cover-t">AKTE</span><span class="det-cover-n">Fall ${s.case}</span><span class="det-secret">STRENG GEHEIM</span><span class="det-cover-print"></span></div>
+    </div>`;
+  const folder = $('#det-folder');
+  gLater(() => { folder.classList.remove('enter'); folder.classList.add('open'); tone([392, 523], 0.06, 'triangle', 0.04); }, 420);
+  gLater(() => { if (G.s === s) s.busy = false; }, 900);
   $('#det-hint').textContent = noPic ? 'Jetzt ohne Bilder: Welches deutsche Wort passt?' : s.case >= 5 ? 'Achtung, die Wörter klingen ähnlich!' : 'Hör genau hin – welche Karte passt?';
   const play = $('#det-play'); play?.classList.add('pulse');
 }
@@ -75,10 +97,10 @@ function detPick(i) {
     s.results.push(s.tries === 1 ? 'ok' : 'late');
     markResult(s.pk, s.cur, s.tries === 1, s.tries === 1 ? 'correct' : 'almost'); // zweiter Versuch = „fast“
     el.classList.add('yes');
-    el.insertAdjacentHTML('beforeend', `<span class="det-solved">GELÖST</span><span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
+    el.insertAdjacentHTML('beforeend', `<span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
     sfx.good();
     detProgress();
-    gLater(() => { if (s.case >= DET_CASES) detEnd(); else detCase(); }, 1500);
+    detClose(true);
   } else {
     el.classList.add('no');
     el.insertAdjacentHTML('beforeend', `<span class="det-word wrong" lang="${s.lang}">${esc(gameForm(c))}</span>`);
@@ -91,10 +113,27 @@ function detPick(i) {
       $$('.det-card')[j]?.classList.add('show');
       $$('.det-card')[j]?.insertAdjacentHTML('beforeend', `<span class="det-word" lang="${s.lang}">${esc(gameForm(s.cur))}</span>`);
       detProgress();
-      gLater(() => { if (s.case >= DET_CASES) detEnd(); else detCase(); }, 2000);
+      detClose(false);
     }
   }
   $('#det-score').textContent = `${s.score} Punkte`;
+}
+/** Akte stempeln, zuklappen und auf den Stapel legen – dann kommt die nächste */
+function detClose(solved) {
+  const s = G.s, folder = $('#det-folder');
+  gLater(() => {
+    if (!folder) return;
+    folder.insertAdjacentHTML('beforeend', `<span class="det-bigstamp ${solved ? 'ok' : 'no'}">${solved ? 'GELÖST' : 'UNGELÖST'}</span>`);
+    tone(solved ? [196] : [120], 0.12, 'square', 0.06);
+  }, solved ? 900 : 1700);
+  gLater(() => { folder?.classList.remove('open'); folder?.classList.add('closing'); tone([330, 262], 0.06, 'triangle', 0.04); }, solved ? 1700 : 2600);
+  gLater(() => { folder?.classList.add('leave'); }, solved ? 2350 : 3250);
+  gLater(() => {
+    const pile = $('#det-pile'), n = $('#det-pile-n');
+    if (pile) { pile.insertAdjacentHTML('afterbegin', `<i class="${solved ? 'ok' : 'no'}" style="--r:${(Math.random() - 0.5) * 10}deg"></i>`); pile.classList.remove('bump'); void pile.offsetWidth; pile.classList.add('bump'); }
+    if (n) n.textContent = String(s.case);
+    if (s.case >= DET_CASES) detEnd(); else detCase();
+  }, solved ? 2900 : 3800);
 }
 function detProgress() {
   const s = G.s;
