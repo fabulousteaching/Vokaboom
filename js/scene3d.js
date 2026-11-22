@@ -576,16 +576,23 @@ function s3PotionScene(ctl) {
     const moon = ctl.mesh(ctl.geo('moon', (B) => B.ell(0, 0, 0, 4, 4, 2, 0xfff3c4, { mat: 2 }), { u: 4, iter: 2, center: true }));
     add(ctl.at(moon, r.x + r.w * 0.68, r.y + r.h * 0.28, -855));
   }
-  // Regal hinter den Fläschchen: Bretter unter jeder Reihe
+  // Holzregal: Seitenwände, Rückwand aus Brettern, Zierleiste oben, Sockel; Regalbretter genau unter den Fläschchen
   const shelf = $('#pt-shelf');
   if (shelf) {
-    const r = rel(shelf), rows = [...new Set($$('.pt-bottle').map((b) => Math.round(rel(b).y + rel(b).h)))].sort((a, b) => a - b);
-    const su = 4, sw = Math.ceil(r.w / su);
+    const r = rel(shelf), su = 4, sw = Math.ceil(r.w / su), sh = Math.ceil(r.h / su);
+    // Böden: Unterkante der Gläser (die Fläschchen stehen darauf, das Namensschild hängt vorne am Brett)
+    const rows = [...new Set($$('.pt-glass').map((g) => Math.round((rel(g).y + rel(g).h - r.y) / su)))].sort((a2, b2) => a2 - b2);
+    const wood = (base) => (x, y, z) => rnShade(base, (s3Rand(Math.floor(x / 2) * 13 + Math.floor(y / 7)) - 0.5) * 0.1 + ((x + Math.floor(y / 9)) % 7 === 0 ? -0.06 : 0));
     const cab = ctl.mesh(ctl.geo(null, (B) => {
-      const sh = Math.ceil(r.h / su);
-      for (let y = 0; y <= sh; y++) for (const x of [0, 1, sw - 1, sw]) B.box(x, -y, -3, x, -y, 3, rnVar(0x5a3a22, 0.06));
-      B.box(2, -sh, -3, sw - 2, -1, -3, (x, y) => rnShade(0x3a2414, (s3Rand(Math.floor(x / 10)) - 0.5) * 0.15));
-      for (const ry of rows) { const y = -Math.round((ry - r.y) / su) - 1; B.box(0, y - 1, -3, sw, y, 4, rnVar(0x7a5030, 0.06)); }
+      // Rückwand: senkrechte Bretter mit Fugen
+      B.box(3, 2 - sh, -4, sw - 3, -3, -4, (x, y) => ((x % 9) === 0 ? 0x24160c : rnShade(0x4a2e18, (s3Rand(Math.floor(x / 9) * 7) - 0.5) * 0.14 + (y % 13 === 0 ? -0.05 : 0))));
+      // Seitenwände
+      for (const x0 of [0, sw - 2]) B.box(x0, 0 - sh, -4, x0 + 2, 0, 4, wood(0x6b4423));
+      // Zierleiste oben und Sockel
+      B.box(-1, 0, -5, sw + 1, 2, 5, wood(0x7a4e2a)); B.box(-2, 2, -5, sw + 2, 3, 6, wood(0x5a3a1e));
+      B.box(-1, -2 - sh, -5, sw + 1, 0 - sh, 5, wood(0x5a3a1e));
+      // Regalbretter mit vorderer Kante (dort hängen die Namensschilder)
+      for (const ry of rows) { const y = 0 - ry; B.box(2, y - 2, -4, sw - 2, y - 1, 4, wood(0x8a5a32)); B.box(2, y - 4, 4, sw - 2, y - 1, 5, wood(0x7a4e2a)); }
     }, { u: su, iter: 1 }));
     add(ctl.at(cab, r.x, r.y, -300));
     cab.receiveShadow = true;

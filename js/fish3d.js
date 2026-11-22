@@ -29,10 +29,10 @@ async function f3Mount(stage) {
   const skyC = document.createElement('canvas'); skyC.width = 4; skyC.height = 256;
   { const g = skyC.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, L.sky[0]); gr.addColorStop(1, L.sky[1]); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); }
   const skyT = new T.CanvasTexture(skyC); skyT.colorSpace = T.SRGBColorSpace; scene.background = skyT; own.push(skyT);
-  scene.fog = new T.Fog(new T.Color(L.sky[1]), 30, 90);
+  scene.fog = new T.Fog(new T.Color(L.sky[1]), 40, 170);
   if (typeof w3Lights === 'function') w3Lights(T, scene, renderer, false);
   const sun = new T.DirectionalLight(0xfff2d8, 1.6); sun.position.set(-8, 14, 6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12, near: 1, far: 40 }); scene.add(sun);
+  Object.assign(sun.shadow.camera, { left: -26, right: 26, top: 30, bottom: -30, near: 1, far: 80 }); sun.shadow.mapSize.set(2048, 2048); sun.target.position.set(0, -2, -10); scene.add(sun, sun.target);
   const cam = new T.PerspectiveCamera(48, 1, 0.1, 300);
 
   /* ---------- Pixel → Welt ---------- */
@@ -56,7 +56,7 @@ async function f3Mount(stage) {
   { const g = caC.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3; for (let i = 0; i < 46; i++) { g.beginPath(); const x = Math.random() * 256, y = Math.random() * 256, r = 14 + Math.random() * 26; for (let a = 0; a <= 6.4; a += 0.5) g.lineTo(x + Math.cos(a) * r * (0.7 + Math.sin(a * 3 + i) * 0.3), y + Math.sin(a) * r * (0.7 + Math.cos(a * 2 + i) * 0.3)); g.stroke(); } }
   const caT = new T.CanvasTexture(caC); caT.wrapS = caT.wrapT = T.RepeatWrapping; caT.repeat.set(5, 5); own.push(caT);
   const floorM = new T.MeshStandardMaterial({ color: lv === 3 ? 0xd8c690 : 0x9c8b62, roughness: 0.95, emissive: 0x000000 }); // (kein Lichtmuster-Schimmern) own.push(floorM);
-  const floor = new T.Mesh(new T.PlaneGeometry(60, 40), floorM); own.push(floor.geometry);
+  const floor = new T.Mesh(new T.PlaneGeometry(320, 260), floorM); own.push(floor.geometry);
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, -2.6, -12); floor.receiveShadow = true; scene.add(floor);
   const rockG = vox((B) => { B.ell(0, 0, 0, 8, 5, 6, rwMix(0x8a8f96, 0x4f8a5a, 0.3, 2, 4), { keep: (x, y) => y >= 0 }); B.ell(6, 0, 2, 4, 3, 3, 0x9aa1a8, { keep: (x, y) => y >= 0 }); }, { u: 0.08, iter: 2 });
   const weedG = vox((B) => { for (let k = 0; k < 3; k++) { const pts = []; for (let i = 0; i <= 8; i++) pts.push([k * 2 + Math.sin(i * 0.9 + k) * 1.5, i * 3, 0]); B.curve(pts, (t) => 1.1 - t * 0.6, lv === 3 ? [0xff6f91, 0xffb02e, 0xb06bff][k] : [0x3fa66a, 0x2f8a5a, 0x5bbf73][k]); } }, { u: 0.07, iter: 1, project: false });
@@ -66,19 +66,25 @@ async function f3Mount(stage) {
   const nC = document.createElement('canvas'); nC.width = nC.height = 128;
   { const g = nC.getContext('2d'), id = g.createImageData(128, 128); for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) { const a = Math.sin(x * 0.2 + Math.sin(y * 0.15) * 2) * 0.5 + Math.sin(y * 0.27 + x * 0.05) * 0.5; const b = Math.cos(y * 0.21 + Math.sin(x * 0.12) * 2) * 0.5 + Math.cos(x * 0.31 - y * 0.07) * 0.5; const o = (y * 128 + x) * 4; id.data[o] = 128 + a * 40; id.data[o + 1] = 128 + b * 40; id.data[o + 2] = 255; id.data[o + 3] = 255; } g.putImageData(id, 0, 0); }
   const nT = new T.CanvasTexture(nC); nT.wrapS = nT.wrapT = T.RepeatWrapping; nT.repeat.set(6, 4); own.push(nT);
-  const waterM = new T.MeshStandardMaterial({ color: new T.Color(L.water[0]).lerp(new T.Color(L.water[1]), 0.35), transparent: true, opacity: 0.5, roughness: 0.22, metalness: 0.05, envMapIntensity: 0.6, depthWrite: false }); // ruhige Oberfläche ohne Glitzern
-  const water = new T.Mesh(new T.PlaneGeometry(80, 60, 80, 40), waterM); own.push(water.geometry, waterM);
+  const waterM = new T.MeshStandardMaterial({ color: new T.Color(L.water[0]).lerp(new T.Color(L.water[1]), 0.35), transparent: true, opacity: 0.5, roughness: 0.6, metalness: 0.05, envMapIntensity: 0.35, depthWrite: false }); // ruhige Oberfläche ohne Glitzern
+  const water = new T.Mesh(new T.PlaneGeometry(320, 260, 160, 130), waterM); own.push(water.geometry, waterM);
   water.rotation.x = -Math.PI / 2; water.position.set(0, 0, -18); water.renderOrder = 2; scene.add(water);
   const wpos = water.geometry.attributes.position, wbase = Float32Array.from(wpos.array);
-  // Tiefe: dunkler werdender Wasserkörper unter der Oberfläche
-  const deepM = new T.MeshBasicMaterial({ color: new T.Color(L.water[1]), transparent: true, opacity: 0.35, depthWrite: false }); own.push(deepM);
-  const deep = new T.Mesh(new T.PlaneGeometry(80, 3), deepM); deep.position.set(0, -1.3, ZN - ZF - 2); scene.add(deep); own.push(deep.geometry);
-  // Ufer hinten: Hügel mit Bäumen / Berge mit Tannen / Insel mit Leuchtturm
-  const shore = vox((B) => s3Band(B, 160, (x) => (lv === 2 ? 10 + Math.abs(((x * 0.9) % 50) - 25) * 0.9 : 6 + Math.sin(x * 0.08) * 3 + Math.sin(x * 0.21) * 1.5),
-    (x, y, z, h) => (lv === 2 && y > 24 ? 0xf4f6ff : y > h - 1 ? (lv === 3 ? 0xe8d39a : 0x7cc47f) : rwPatch(L.hills[1] ? parseInt(L.hills[1].slice(1), 16) : 0x4e9e62, 0.08, 4)(x, y, z))), { u: 0.6, iter: 2 });
-  if (lv !== 3) { const sh = mesh(shore, false); sh.position.set(-48, -0.4, -34); scene.add(sh); }
+  // Ufer hinten in Schichten: Sandstrand, grüne Hügel mit Bäumen, hellere Hügel dahinter, Berge im Dunst
+  if (lv !== 3) {
+    const sand = mesh(vox((B) => { const c = (xx, y, z) => rnShade(0xe6d3a0, (s3Rand(xx * 7 + z * 3) - 0.5) * 0.08 + (z > 0 ? -0.1 : 0)); for (let x = 0; x <= 200; x++) B.box(x, 0, -5, x, 0, 2, c); }, { u: 0.6, iter: 1 }), false);
+    sand.position.set(-60, -0.45, -32); scene.add(sand);
+    const near = vox((B) => s3Band(B, 270, (x) => (lv === 2 ? 9 + Math.sin(x * 0.045) * 4 + Math.sin(x * 0.14) * 1.6 : 5 + Math.sin(x * 0.05) * 3 + Math.sin(x * 0.17) * 1.2),
+      (x, y, z, h) => (y > h - 1 ? (lv === 2 ? 0x6fae6a : 0x86c97a) : rwPatch(lv === 2 ? 0x4f8a55 : 0x5fa864, 0.08, 4)(x, y, z)), 7), { u: 0.45, iter: 2 });
+    const sh = mesh(near, false); sh.position.set(-60, -0.4, -36); scene.add(sh);
+    const far = vox((B) => s3Band(B, 160, (x) => 6 + Math.sin(x * 0.05 + 2) * 3.5 + Math.sin(x * 0.13) * 1.5, (x, y, z, h) => (y > h - 1 ? 0x9cc79a : rwPatch(0x86b48e, 0.05, 4)(x, y, z)), 3), { u: 1.0, iter: 2 });
+    const fh = mesh(far, false); fh.position.set(-80, -0.6, -58); scene.add(fh);
+    const mtn = vox((B) => s3Band(B, 130, (x) => 10 + Math.abs(((x * 1.1 + 20) % 46) - 23) * 0.95 + Math.sin(x * 0.21) * 1.5,
+      (x, y, z, h) => (y > h - (lv === 2 ? 7 : 3) && h > 22 ? 0xf4f7fb : rwPatch(0x8fa3bd, 0.05, 5)(x, y, z)), 3), { u: 1.6, iter: 2 });
+    const mt = mesh(mtn, false); mt.position.set(-104, -0.8, -95); scene.add(mt);
+  }
   const treeG = lv === 2 ? vox((B) => s3Pine(B, 24), { u: 0.14, iter: 2 }) : vox((B) => s3Tree(B, 20), { u: 0.15, iter: 2 });
-  if (lv !== 3) for (let i = 0; i < 9; i++) { const t = mesh(treeG); t.position.set(-16 + i * 4.2 + Math.sin(i) * 1.2, 2.2 + Math.sin(i * 1.7) * 0.6, -31 - (i % 3) * 2); t.scale.setScalar(0.9 + (i % 3) * 0.2); scene.add(t); }
+  if (lv !== 3) for (let i = 0; i < 16; i++) { const t = mesh(treeG, false); const x = -30 + i * 4.1 + Math.sin(i * 2.3) * 1.4; t.position.set(x, 1.6 + Math.sin(x * 0.07) * 1.3 + (i % 2) * 0.4, -35.5 - (i % 3) * 1.6); t.scale.setScalar(0.85 + ((i * 7) % 4) * 0.12); t.rotation.y = i; scene.add(t); }
   if (lv === 3) {
     const isl = mesh(vox((B) => { B.ell(0, 0, 0, 30, 6, 14, (x, y) => (y > 3 ? 0x6fbf6a : 0xe8d39a), { keep: (x, y) => y >= 0 }); B.cyl(14, 0, 3, 30, 3, (x, y) => ((Math.floor(y / 5) % 2) ? 0xffffff : 0xe2483d)); B.cyl(14, 0, 31, 34, 3.6, 0x334155); B.cyl(14, 0, 35, 37, 2.2, 0xfff3a0, { mat: 2 }); }, { u: 0.25, iter: 2 }), false);
     isl.position.set(6, -0.3, -38); scene.add(isl);
@@ -164,7 +170,7 @@ async function f3Mount(stage) {
     W = w; H = h; renderer.setSize(w, h, false); cv.style.width = `${w}px`; cv.style.height = `${h}px`;
     cam.aspect = w / h; cam.fov = w / h < 0.9 ? 72 : 50; cam.updateProjectionMatrix(); post?.setSize(w, h);
   }
-  const camBase = new T.Vector3(-4.1, 4.25, 4.5), camLook = new T.Vector3(1.3, -1.05, -6.35);
+  const camBase = new T.Vector3(-4.1, 3.6, 4.5), camLook = new T.Vector3(1.3, -0.1, -10);
   let post = null;
   // (kein Leuchten beim Angeln: die spiegelnde Wasserfläche würde blenden)
   const meter = typeof fxMeter === 'function' ? fxMeter(() => { post?.dispose(); post = null; renderer.shadowMap.enabled = false; renderer.setPixelRatio(1); W = 0; fit(); }) : () => {};
@@ -211,7 +217,7 @@ async function f3Mount(stage) {
     for (let i = 0; i < 16; i++) { const k = i / 15; const sag = Math.sin(k * Math.PI) * (pull ? 0.1 : 0.45); pa.setXYZ(i, tipW.x + (hk.x - tipW.x) * k, tipW.y + (hk.y - tipW.y) * k - sag, tipW.z + (hk.z - tipW.z) * k); }
     pa.needsUpdate = true;
     // Fische: 3D-Modell und Wort-Schild an die Position der Logik
-    const now2 = new Set();
+    const now2 = new Set(), labs = [];
     for (const f of s.fish || []) {
       if (!f.el?.isConnected) continue;
       now2.add(f.el);
@@ -226,9 +232,20 @@ async function f3Mount(stage) {
       o.visible = !f.el.classList.contains('vanish');
       const sc = toScreen(p);
       const bwp = f.el.offsetWidth, bhp = f.el.offsetHeight;
-      f.el.style.transform = `translate3d(${(sc.x - bwp / 2).toFixed(1)}px, ${(sc.y - bhp / 2 - 4).toFixed(1)}px, 0)`;
+      labs.push({ el: f.el, x: sc.x - bwp / 2, y: sc.y - bhp / 2 - 4, w: bwp, h: bhp });
       f.el.style.opacity = f.y < s.waterY - 10 ? '0' : '';
     }
+    // Schilder, die sich überdecken würden, auseinanderschieben (oben/unten), damit jedes Wort lesbar bleibt
+    for (let it = 0; it < 4; it++) for (let a = 0; a < labs.length; a++) for (let b = a + 1; b < labs.length; b++) {
+      const A = labs[a], B2 = labs[b];
+      if (Math.abs((A.x + A.w / 2) - (B2.x + B2.w / 2)) >= (A.w + B2.w) / 2 + 4) continue;
+      const need = (A.h + B2.h) / 2 + 4, dy = (B2.y + B2.h / 2) - (A.y + A.h / 2);
+      if (Math.abs(dy) >= need) continue;
+      const push = (need - Math.abs(dy)) / 2, sg = dy >= 0 ? 1 : -1;
+      A.y -= push * sg; B2.y += push * sg;
+    }
+    for (const l of labs) { l.y = Math.max(2, Math.min(H - l.h - 2, l.y)); l.el.style.transform = `translate3d(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px, 0)`; }
+    labs.length = 0;
     for (const [el2, o] of fishObjs) if (!now2.has(el2)) { if (el2.classList.contains('vanish') && el2.isConnected) { o.position.y -= dt * 2; o.scale.multiplyScalar(0.94); continue; } scene.remove(o); fishObjs.delete(el2); }
     // Teilchen
     for (const m of parts.slice()) { const d = m.userData; d.life -= dt; if (d.bubble) { m.position.addScaledVector(d.v, dt); if (m.position.y > -0.02) d.life = 0; } else { d.v.y -= 9.8 * dt; m.position.addScaledVector(d.v, dt); if (m.position.y < 0 && d.v.y < 0) d.life = 0; } if (d.life <= 0) { scene.remove(m); parts.splice(parts.indexOf(m), 1); } }

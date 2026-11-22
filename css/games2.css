@@ -871,3 +871,11 @@
 /* Übung Schreiben */
 .wr-mode .mode-bar { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; }
 .wr-show { margin: .4rem 0 .8rem; text-align: center; font: 800 clamp(1.8rem, 6vw, 2.8rem) var(--font-word, var(--font-display)); color: var(--brand-ink); }
+/* Ballon-Platzen: Wort in der Wolke deutlich in Schwarz */
+.bl-word-cloud .bwc-word { color: #111827; font-weight: 900; text-shadow: none; }
+.bl-word-cloud .bwc-hint, .bl-word-cloud small { color: #374151; }
+
+/* Zaubertrank: Fläschchen stehen auf den Regalbrettern, Namensschild vorne an der Brettkante */
+.pt-stage.s3d .pt-shelf { gap: 18px 12px; padding: 18px 16px 14px; }
+.pt-stage.s3d .pt-bottle { gap: 2px; }
+.pt-stage.s3d .pt-label { position: relative; z-index: 2; padding: 1px 8px; border-radius: 4px; font-size: .85rem; background: #F6E9C8; box-shadow: 0 2px 0 rgba(0, 0, 0, .35); transform: translateY(6px); }
