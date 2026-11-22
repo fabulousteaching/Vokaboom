@@ -117,7 +117,7 @@ async function gavMount(host, opts = {}) {
   }
   fit();
   const ctl = {
-    fig, T, alive: true, lean: 0, spinZ: 0, spinX: 0, scale: 1, rotY: feet.rotation.y, hand: opts.hand || 'R',
+    fig, T, alive: true, lean: 0, spinZ: 0, spinX: 0, scale: 1, sx: 1, sy: 1, lift: 0, alpha: 1, rotY: feet.rotation.y, hand: opts.hand || 'R',
     setAnim(n) { if (fig.anim !== n) fig.setAnim(n); },
     /** Hand in Pixeln relativ zum host (für Angelrute, Löffel …) */
     handPx(which = ctl.hand) {
@@ -142,7 +142,9 @@ async function gavMount(host, opts = {}) {
     fit();
     feet.rotation.set(0, ctl.rotY, ctl.lean);
     spin.rotation.set(ctl.spinX, 0, ctl.spinZ);
-    feet.scale.setScalar(ctl.scale);
+    feet.scale.set(ctl.scale * ctl.sx, ctl.scale * ctl.sy, ctl.scale * ctl.sx);
+    feet.position.y = ctl.lift * (cam.top - cam.bottom) / (size.h || 1);
+    cv.style.opacity = ctl.alpha < 1 ? String(ctl.alpha) : '';
     fig.update(dt);
     renderer.render(scene, cam);
     if (first) { first = false; host.classList.add('is3d'); }

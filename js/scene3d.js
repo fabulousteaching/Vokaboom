@@ -572,8 +572,6 @@ function s3PotionScene(ctl) {
     add(ctl.at(cab, r.x, r.y, -300));
   }
   // Kräuterbündel oben, Bücherstapel, Kerzen
-  const herb = (c) => ctl.geo(`herb${c}`, (B) => { B.box(0, 0, -1, 0, -3, 1, 0x5a3a22); for (let k = 0; k < 6; k++) B.bar([0, -3, 0], [Math.sin(k) * 3, -12 - (k % 3) * 2, Math.cos(k) * 2], 0.9, rnShade(c, (k % 3) * 0.06)); }, { u: 3, iter: 1 });
-  [0x4e9e62, 0xc75b8e, 0xe2b53a, 0x4e9e62, 0x8b5cf6].forEach((c, i) => { const m = ctl.mesh(herb(c)); m.userData.ph = i; add(ctl.at(m, W * (0.32 + i * 0.1), 4, -700)); ctl.frame((dt, t) => { m.rotation.z = Math.sin(t * 1.2 + i) * 0.06; }); });
   const books = ctl.mesh(ctl.geo('books', (B) => { [0x8a3a6b, 0x2d6bff, 0x2e9e6b, 0xe2b53a, 0xd7263d, 0x6a35b5].forEach((c, i) => { const h = 10 + (i * 5) % 6; B.box(i * 3, 0, -3, i * 3 + 2, h, 3, (x, y) => (y === h - 1 ? 0xffe9b0 : c)); }); B.box(-1, -2, -4, 19, -1, 4, 0x5a3a22); B.ell(24, 3, 0, 3, 3, 3, 0xc4a0ff, { mat: 1 }); }, { u: 3.2, iter: 1 }));
   add(ctl.at(books, W - 90, floorY - 4, -500));
   const candle = ctl.geo('candle', (B) => { B.cyl(0, 0, 0, 14, 2, 0xf2e6c9); B.box(0, 15, 0, 0, 16, 0, 0x222222); }, { u: 3, iter: 2 });
@@ -641,10 +639,22 @@ function s3PotionScene(ctl) {
       m.position.set(x * R, R * 0.22 * s, i === 3 ? R * 0.1 : 0); m.scale.setScalar(s); m.userData = { s, ph: i * 1.7 }; fire.add(m); flames.push(m);
     });
     const fl = new T.PointLight(0xff9a3a, 1.6, R * 5, 1.4); fl.position.set(0, R * 0.3, R * 0.6); fire.add(fl);
-    let lastCol = '';
+    let lastCol = '', swirl = 0;
+    const brewTarget = new T.Color(0x7cffb2), brewNow = new T.Color(0x7cffb2);
+    // Wirbel-Muster auf dem Trank (dreht sich, beim Eingiessen schnell)
+    const wc = document.createElement('canvas'); wc.width = wc.height = 128;
+    const wx = wc.getContext('2d'); wx.fillStyle = '#fff'; wx.fillRect(0, 0, 128, 128);
+    for (let k = 0; k < 3; k++) { wx.strokeStyle = `rgba(0,0,0,${0.12 + k * 0.04})`; wx.lineWidth = 6; wx.beginPath(); for (let a = 0; a < 9; a += 0.1) { const rr = 6 + a * 6.5; wx.lineTo(64 + Math.cos(a + k * 2.1) * rr, 64 + Math.sin(a + k * 2.1) * rr); } wx.stroke(); }
+    const wtex = new T.CanvasTexture(wc); ctl.own(wtex); brewM.map = wtex; brewM.needsUpdate = true;
     ctl.frame((dt, t) => {
       const c = getComputedStyle(cauldron).getPropertyValue('--brew').trim();
-      if (c && c !== lastCol) { lastCol = c; try { const cc = new T.Color(c); brewM.color.copy(cc); brewM.emissive.copy(cc); bubM.color.copy(cc); bubM.emissive.copy(cc); glow.color.copy(cc); steam.forEach((m) => m.material.color.copy(cc)); } catch { /* color-mix: alte Farbe lassen */ } }
+      if (c && c !== lastCol) { lastCol = c; try { brewTarget.set(c); } catch { /* unbekanntes Format: alte Farbe lassen */ } }
+      brewNow.lerp(brewTarget, Math.min(1, dt * 2.2));
+      brewM.color.copy(brewNow); brewM.emissive.copy(brewNow); bubM.color.copy(brewNow); bubM.emissive.copy(brewNow); glow.color.copy(brewNow);
+      if (!cauldron.classList.contains('fail')) steam.forEach((m) => m.material.color.copy(brewNow));
+      const pouring = cauldron.classList.contains('pouring');
+      swirl += dt * (pouring ? 6 : 0.6);
+      brew.rotation.z = swirl; brew.scale.set(1, 1 + (pouring ? Math.sin(t * 14) * 0.04 : 0), 1);
       const isGlow = cauldron.classList.contains('glow'), isFail = cauldron.classList.contains('fail'), busy = cauldron.classList.contains('brewing');
       brewM.emissiveIntensity = isGlow ? 1.2 + Math.sin(t * 8) * 0.25 : isFail ? 0.05 : 0.5 + Math.sin(t * 2) * 0.1;
       glow.intensity = isGlow ? 5 : isFail ? 0.2 : 2 + Math.sin(t * 2) * 0.3;
@@ -669,21 +679,70 @@ function s3PotionScene(ctl) {
     });
   }
 }
+/** Zauberfläschchen: Glas (durchsichtig), leuchtende Flüssigkeit, die schwappt, Korken, der beim Ausgiessen aufspringt */
+const S3_GLASS = {};
 function s3BottleModel(ctl, el) {
   const T = ctl.T, btn = el.closest('.pt-bottle');
   const hue = parseFloat(getComputedStyle(btn || el).getPropertyValue('--h')) || 0;
-  const col = new T.Color().setHSL(hue / 360, 0.85, 0.6).getHex();
-  const w = el.offsetWidth || 44, u = w / 14;
-  const g = ctl.geo(`bottle|${col}|${Math.round(u * 10)}`, (B) => {
-    B.ell(0, 7, 0, 6.5, 7, 5, (x, y) => (y > 10 ? rnShade(col, 0.15) : col), { mat: 1 });
-    B.ell(-3, 9, 4, 1.4, 2.6, 1, 0xffffff, { mat: 1 });
-    B.cyl(0, 0, 13, 17, 2.2, 0xd6eaf5, { mat: 1 });
-    B.cyl(0, 0, 18, 20, 2.6, 0xc98b4e);
-  }, { u, iter: 2, field: 1 });
-  const m = ctl.mesh(g);
-  m.position.set(0, -el.offsetHeight / 2, 0);
-  const grp = new T.Group(); grp.add(m); grp.userData.base = { w };
+  const col = new T.Color().setHSL(hue / 360, 0.85, 0.56);
+  const w = el.offsetWidth || 44, h = el.offsetHeight || 56;
+  if (S3_GLASS.T !== T) {
+    S3_GLASS.T = T;
+    S3_GLASS.glass = new T.MeshStandardMaterial({ color: 0xe8f4ff, transparent: true, opacity: 0.32, roughness: 0.04, metalness: 0.25, depthWrite: false });
+    S3_GLASS.rim = new T.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.3 });
+    S3_GLASS.cork = new T.MeshStandardMaterial({ color: 0xb07a45, roughness: 0.85 });
+    S3_GLASS.shine = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+  }
+  const rb = w * 0.44, bodyY = -h / 2 + rb, neckR = w * 0.15, top = h / 2 - h * 0.12;
+  // Glas: Bauch + Hals als Drehkörper
+  const prof = [[0.01, -h / 2], [rb * 0.7, -h / 2 + 1], [rb, bodyY - rb * 0.15], [rb * 0.98, bodyY + rb * 0.25], [rb * 0.7, bodyY + rb * 0.78], [neckR, bodyY + rb * 1.02], [neckR, top - 2], [neckR * 1.3, top]].map(([x, y]) => new T.Vector2(x, y));
+  const gG = new T.LatheGeometry(prof, 28); ctl.own(gG);
+  const glass = new T.Mesh(gG, S3_GLASS.glass); glass.renderOrder = 3;
+  const rimG = new T.TorusGeometry(neckR * 1.25, w * 0.035, 8, 20); ctl.own(rimG);
+  const rim = new T.Mesh(rimG, S3_GLASS.rim); rim.rotation.x = Math.PI / 2; rim.position.y = top;
+  // Flüssigkeit (Kugelkappe + Oberfläche), dreht sich gegen das Kippen, damit sie «unten» bleibt
+  const liqM = new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.45, roughness: 0.2, transparent: true, opacity: 0.92 });
+  const surfM = new T.MeshStandardMaterial({ color: col.clone().lerp(new T.Color(0xffffff), 0.35), emissive: col, emissiveIntensity: 0.5, roughness: 0.15 });
+  ctl.own(liqM, surfM);
+  const lr = rb * 0.86, fill = 0.68, th0 = Math.PI * (1 - fill);
+  const capG = new T.SphereGeometry(lr, 24, 16, 0, Math.PI * 2, th0, Math.PI - th0); ctl.own(capG);
+  const surfG = new T.CircleGeometry(lr * Math.sin(th0), 24); ctl.own(surfG);
+  const liquid = new T.Group(); liquid.position.y = bodyY;
+  const cap = new T.Mesh(capG, liqM); liquid.add(cap);
+  const surf = new T.Mesh(surfG, surfM); surf.rotation.x = -Math.PI / 2; surf.position.y = lr * Math.cos(th0); liquid.add(surf);
+  // kleine Blasen in der Flüssigkeit
+  const bubG = new T.SphereGeometry(w * 0.03, 8, 6); ctl.own(bubG);
+  const bubs = Array.from({ length: 3 }, (_, i) => { const m = new T.Mesh(bubG, S3_GLASS.shine); m.userData.ph = i * 2.1; liquid.add(m); return m; });
+  // Korken
+  const corkG = new T.CylinderGeometry(neckR * 1.15, neckR * 0.95, h * 0.16, 14); ctl.own(corkG);
+  const cork = new T.Mesh(corkG, S3_GLASS.cork); cork.position.y = top + h * 0.04;
+  // Glanzstreifen
+  const shG = new T.PlaneGeometry(w * 0.08, rb * 0.9); ctl.own(shG);
+  const sh = new T.Mesh(shG, S3_GLASS.shine); sh.position.set(-rb * 0.5, bodyY + rb * 0.1, rb * 0.9); sh.rotation.z = 0.35;
+  const grp = new T.Group();
+  grp.add(liquid, glass, rim, cork, sh);
+  grp.userData = { base: { w }, liquid, cork, corkY: top + h * 0.04, bubs, lr, ph: Math.random() * 6, popT: null, pourT: null, fill: 1, h };
   return grp;
+}
+/** Fläschchen lebendig: Flüssigkeit schwappt, Korken springt auf, beim Ausgiessen wird es leer */
+function s3BottleLive(el, o, c) {
+  const d = o.userData, t = c.t, fly = el.closest('.flying'), btn = el.closest('.pt-bottle');
+  const used = !fly && btn?.classList.contains('used');
+  // schwappen: gegen die Neigung drehen (bis 0.6), dazu leichtes Wackeln
+  const tilt = o.rotation.z;
+  d.liquid.rotation.z = -Math.max(-0.6, Math.min(0.6, tilt)) + Math.sin(t * 3.2 + d.ph) * (fly ? 0.12 : 0.04);
+  d.bubs.forEach((m, i) => { const k = ((t * 0.5 + m.userData.ph) % 1); m.position.set(Math.sin(i * 2 + t) * d.lr * 0.3, -d.lr * 0.7 + k * d.lr * 0.9, d.lr * 0.5); m.visible = k < 0.9; });
+  // Korken
+  if (fly?.classList.contains('uncorked')) {
+    if (d.popT == null) d.popT = t;
+    const k = t - d.popT;
+    d.cork.position.set(k * 50, d.corkY + k * 160 - 420 * k * k, 0); d.cork.rotation.z = -k * 12; d.cork.visible = k < 0.8;
+  } else { d.popT = null; d.cork.position.set(0, d.corkY, 0); d.cork.rotation.z = 0; d.cork.visible = !used; }
+  // ausgiessen: Flüssigkeit wird weniger
+  if (fly?.classList.contains('pouring')) { if (d.pourT == null) d.pourT = t; d.fill = Math.max(0, 1 - (t - d.pourT) / 0.9); } else if (!fly) { d.pourT = null; d.fill = used ? 0 : 1; }
+  d.liquid.visible = d.fill > 0.03;
+  d.liquid.scale.setScalar(0.25 + 0.75 * d.fill);
+  d.liquid.position.y = -d.h / 2 + d.lr * (0.25 + 0.75 * d.fill) + 1;
 }
 function s3Potion() {
   const st = $('#pt-stage');
@@ -691,6 +750,6 @@ function s3Potion() {
   s3Mount(st, s3PotionScene).then((ctl) => {
     if (!ctl) return;
     G.s.s3 = ctl;
-    ctl.track('.pt-glass', (el) => s3BottleModel(ctl, el), { z: 200 });
+    ctl.track('.pt-glass', (el) => s3BottleModel(ctl, el), { z: 200, update: s3BottleLive });
   });
 }

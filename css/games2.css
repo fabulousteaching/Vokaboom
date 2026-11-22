@@ -736,3 +736,24 @@
 .b3-canvas { position: absolute; left: 0; top: 0; z-index: 0; display: block; }
 .br-stage.b3d .br-svg, .br-stage.b3d .br-avatar { visibility: hidden; }
 .br-stage.b3d { height: clamp(280px, calc(100dvh - 420px), 900px); background: #9cc6ff; }
+
+/* Zaubertrank: Strahl aus der Flaschenöffnung, keine Kräuter mehr */
+.pt-pour { position: absolute; left: 0; top: 0; z-index: 7; pointer-events: none; overflow: visible; }
+.pt-pour path { fill: none; stroke-linecap: round; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .5)); opacity: .95; }
+.pt-pour path.core { stroke: rgba(255, 255, 255, .7); }
+.pt-pour.end { transition: opacity .25s; opacity: 0; }
+.pt-bottle.flying .pt-label { opacity: 0; transition: opacity .2s; }
+.pt-herbs { display: none; }
+
+/* Zauber-Effekte: Teilchen-Explosionen, Wackeln; beim 3D-Avatar übernimmt die Figur die Bewegung */
+.pt-burst { position: absolute; z-index: 9; font-style: normal; font-size: 26px; line-height: 1; pointer-events: none; transform: translate(-50%, -50%); animation: pt-burst 1.5s cubic-bezier(.15, .7, .3, 1) both; }
+.pt-burst.star { width: 14px; height: 14px; background: var(--c); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); filter: drop-shadow(0 0 8px var(--c)); }
+@keyframes pt-burst { 0% { transform: translate(-50%, -50%) scale(.2) rotate(0); opacity: 0; } 12% { opacity: 1; } 100% { transform: translate(calc(-50% + var(--x)), calc(-50% + var(--y) + 80px)) scale(var(--s)) rotate(var(--r)); opacity: 0; } }
+.pt-stage.pt-shake { animation: pt-shake .55s ease; }
+@keyframes pt-shake { 15% { transform: translate(-6px, 3px); } 30% { transform: translate(5px, -4px); } 45% { transform: translate(-4px, 2px); } 60% { transform: translate(3px, -2px); } 80% { transform: translate(-1px, 1px); } }
+.pt-avatar.fx3d { animation: none !important; transform: none !important; }
+.pt-avatar.fx3d.fx-bubble::after { animation: pt-bubble3d 3s ease-in-out; }
+@keyframes pt-bubble3d { 0% { transform: scale(0); } 15% { transform: scale(1); } 50% { transform: translateY(-140px) scale(1.05); } 85% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+.pt-stage .pt-bottle.flying .pt-label, .pt-stage .pt-bottle.flying .pt-mean { opacity: 0 !important; }
+.pt-stage.s3d .pt-glass { width: 56px; height: 72px; }
+@media (max-width: 700px) { .pt-stage.s3d .pt-glass { width: 40px; height: 52px; } }

@@ -128,7 +128,7 @@ async function potionPick(i) {
   s.busy = true;
   el.classList.add('used');
   s.added.push(b);
-  const hue = POTION_HUES[i % POTION_HUES.length], col = `hsl(${hue} 85% 60%)`;
+  const hue = POTION_HUES[i % POTION_HUES.length], col = `hsl(${hue}, 85%, 60%)`;
   // Fläschchen fliegt über den Kessel, kippt und wird ausgegossen – richtig oder falsch zeigt sich erst am Schluss
   const st = $('#pt-stage').getBoundingClientRect(), r0 = el.getBoundingClientRect(), cv = $('#pt-cauldron').getBoundingClientRect();
   const fly = el.cloneNode(true);
@@ -136,32 +136,56 @@ async function potionPick(i) {
   fly.style.left = `${r0.left - st.left}px`; fly.style.top = `${r0.top - st.top}px`; fly.style.width = `${r0.width}px`;
   $('#pt-fx').appendChild(fly);
   const x0 = r0.left - st.left, y0 = r0.top - st.top;
-  const x1 = cv.left - st.left + cv.width * 0.5 - r0.width * 0.62, y1 = cv.top - st.top - r0.height * 1.25;
+  const x1 = cv.left - st.left + cv.width * 0.5 - r0.width * 1.05, y1 = cv.top - st.top - r0.height * 1.15;
   ptAnim('present');
   tone([660], 0.05, 'sine', 0.05);
   await ptTween(520, (k) => {
     const e = k * k * (3 - 2 * k);
-    fly.style.transform = `translate(${(x1 - x0) * e}px, ${(y1 - y0) * e - Math.sin(k * Math.PI) * 70}px) rotate(${-k * 12}deg)`;
+    fly.style.transform = `translate(${(x1 - x0) * e}px, ${(y1 - y0) * e - Math.sin(k * Math.PI) * 70}px)`;
   });
   if (G.id !== 'potion') return;
+  // Korken springt auf
+  fly.classList.add('uncorked');
+  if (typeof gavSound === 'function') gavSound('plop');
+  await ptTween(320, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0 - Math.sin(k * Math.PI) * 6}px)`; });
   // kippen …
-  await ptTween(260, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${-12 + k * 140}deg)`; });
-  // … ausgiessen: farbiger Strahl, Spritzer, der Trank nimmt die Farbe an
-  const sx = x1 + r0.width * 0.62, sy = y1 + r0.height * 0.55, surf = cv.top - st.top + cv.height * 0.32;
-  const stream = document.createElement('i');
-  stream.className = 'pt-stream'; stream.style.left = `${sx}px`; stream.style.top = `${sy}px`; stream.style.height = `${Math.max(10, surf - sy)}px`; stream.style.background = `linear-gradient(${col}, color-mix(in srgb, ${col} 70%, #fff))`;
-  $('#pt-fx').appendChild(stream);
+  await ptTween(380, (k) => { const e = k * k * (3 - 2 * k); fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${e * 118}deg)`; });
+  // … ausgiessen: der Trank fliesst aus der Öffnung in einem Bogen in den Kessel
+  const glass = fly.querySelector('.pt-glass');
+  const surfY = cv.top - st.top + cv.height * 0.28, surfX = cv.left - st.left + cv.width * 0.5;
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const sv = document.createElementNS(svgNS, 'svg'); sv.setAttribute('class', 'pt-pour');
+  sv.setAttribute('viewBox', `0 0 ${st.width} ${st.height}`); sv.setAttribute('width', st.width); sv.setAttribute('height', st.height);
+  const path = document.createElementNS(svgNS, 'path'); path.setAttribute('stroke', col);
+  const core = document.createElementNS(svgNS, 'path'); core.setAttribute('class', 'core');
+  sv.append(path, core); $('#pt-fx').appendChild(sv);
+  fly.classList.add('pouring');
+  $('#pt-cauldron')?.classList.add('pouring');
   if (typeof gavSound === 'function') gavSound('pour');
   ptAnim('hold');
   potionStir(true);
-  for (let n = 0; n < 4; n++) gLater(() => potionSplash(sx, surf, col, 6), n * 140);
-  await ptTween(650, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${128 + Math.sin(k * 18) * 6}deg)`; });
-  stream.classList.add('end'); setTimeout(() => stream.remove(), 300);
-  fly.style.transition = 'opacity .25s'; fly.style.opacity = '0'; setTimeout(() => fly.remove(), 260);
-  // Farbe mischen
+  // Farbe im Kessel ändert sich während des Eingiessens (fliessend)
   const cols = s.added.map((x) => POTION_HUES[s.bottles.indexOf(x) % POTION_HUES.length]);
   const avg = Math.round(cols.reduce((a2, h) => a2 + h, 0) / cols.length);
-  potionBrew(`hsl(${avg} 80% 62%)`, `hsl(${avg} 70% 30%)`);
+  potionBrew(`hsl(${avg}, 80%, 58%)`, `hsl(${avg}, 70%, 30%)`);
+  let lastSplash = 0;
+  await ptTween(1000, (k) => {
+    const ang = 118 + Math.sin(k * 16) * 4;
+    fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0}px) rotate(${ang}deg)`;
+    const gr = glass.getBoundingClientRect(), cx = gr.left - st.left + gr.width / 2, cy = gr.top - st.top + gr.height / 2;
+    const a = ang * Math.PI / 180, L = glass.offsetHeight * 0.52;
+    const ox = cx + Math.sin(a) * L, oy = cy - Math.cos(a) * L;
+    const flow = k < 0.12 ? k / 0.12 : k > 0.85 ? (1 - k) / 0.15 : 1;
+    const ex = surfX - 8 + Math.sin(k * 30) * 3, ey = surfY;
+    const d = `M${ox.toFixed(1)} ${oy.toFixed(1)} C${(ox + 22).toFixed(1)} ${(oy + 4).toFixed(1)} ${(ex - 4).toFixed(1)} ${(oy + (ey - oy) * 0.35).toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+    path.setAttribute('d', d); core.setAttribute('d', d);
+    path.style.strokeWidth = `${(3 + flow * 7).toFixed(1)}px`; core.style.strokeWidth = `${(1 + flow * 2).toFixed(1)}px`;
+    if (performance.now() - lastSplash > 120 && flow > 0.5) { lastSplash = performance.now(); potionSplash(ex, ey, col, 4); }
+  });
+  sv.classList.add('end'); setTimeout(() => sv.remove(), 300);
+  $('#pt-cauldron')?.classList.remove('pouring');
+  await ptTween(260, (k) => { fly.style.transform = `translate(${x1 - x0}px, ${y1 - y0 - k * 20}px) rotate(${118 * (1 - k)}deg)`; fly.style.opacity = String(1 - k); });
+  fly.remove();
   potionBubbleBurst(5);
   potionStir(false);
   $$('#pt-kettle i')[s.added.length - 1]?.setAttribute('style', `background:${col};box-shadow:0 0 8px ${col}`);
@@ -339,17 +363,97 @@ async function potionDone() {
   if (e.id === 'cat') { const c = document.createElement('i'); c.className = 'pt-cat'; c.textContent = '🐈'; fx.appendChild(c); setTimeout(() => c.remove(), 3000); }
   if (e.id === 'invisible') { const b = document.createElement('i'); b.className = 'pt-boo'; b.textContent = 'Buh!'; fx.appendChild(b); setTimeout(() => b.remove(), 3000); }
   if (e.id === 'dance') cauldron.classList.add('fx-dance');
-  const a3 = s.av3?.alive ? s.av3 : null;
-  if (a3) {
-    ptAnim({ float: 'jump', tiny: 'shy', rainbow: 'dance', ducks: 'laugh', disco: 'dance', invisible: 'think', bubble: 'wave', spin: 'spin', food: 'clap', cat: 'laugh', tall: 'flex', fireworks: 'cheer', dance: 'dance', snow: 'shy' }[e.id] || 'cheer', 3000);
-  }
   if (typeof tone === 'function') tone([523, 659, 784, 1047, 1319], 0.12, 'triangle', 0.08);
-  await ptTween(3000, () => {});
+  await potionFx(e);
   if (G.id !== 'potion') return;
   stage.classList.remove(`fx-${e.id}`); av.classList.remove(`fx-${e.id}`); cauldron.classList.remove('glow', 'fx-dance');
   msg.hidden = true;
   if (s.round >= POTION_ROUNDS) { potionEnd(); return; }
   potionRound();
+}
+/* ---------- Zauber-Effekte (intensiv, mit dem 3D-Avatar) ---------- */
+/** Teilchen-Explosion an (x, y): Emojis oder farbige Sterne fliegen in alle Richtungen */
+function ptBurst(x, y, items, n = 30, power = 1) {
+  const fx = $('#pt-fx');
+  if (!fx) return;
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('i');
+    const a = Math.random() * Math.PI * 2, v = (90 + Math.random() * 220) * power;
+    d.className = 'pt-burst';
+    const it = items[i % items.length];
+    if (it.startsWith('#') || it.startsWith('hsl')) { d.classList.add('star'); d.style.setProperty('--c', it); } else d.textContent = it;
+    d.style.left = `${x}px`; d.style.top = `${y}px`;
+    d.style.setProperty('--x', `${Math.cos(a) * v}px`); d.style.setProperty('--y', `${Math.sin(a) * v - 60 * power}px`);
+    d.style.setProperty('--r', `${(Math.random() - 0.5) * 720}deg`); d.style.setProperty('--s', (0.7 + Math.random() * 0.9).toFixed(2));
+    d.style.animationDelay = `${Math.random() * 0.15}s`;
+    fx.appendChild(d); setTimeout(() => d.remove(), 1700);
+  }
+}
+/** Mitte des Avatars im Spielfeld */
+function ptAvatarCenter() {
+  const st = $('#pt-stage')?.getBoundingClientRect(), r = $('#pt-avatar')?.getBoundingClientRect();
+  return st && r ? { x: r.left - st.left + r.width / 2, y: r.top - st.top + r.height * 0.45 } : { x: 100, y: 100 };
+}
+async function potionFx(e) {
+  const s = G.s, a3 = s.av3?.alive ? s.av3 : null, stage = $('#pt-stage'), av = $('#pt-avatar');
+  const c = ptAvatarCenter(), col = s.color || '#7CFFB2';
+  stage.classList.add('pt-shake');
+  setTimeout(() => stage.classList.remove('pt-shake'), 600);
+  ptBurst(c.x, c.y, [col, '#ffffff', '#FFE066', col], 40, 1.2); // grosse Funken-Explosion um den Avatar
+  if (typeof gavSound === 'function') gavSound('magic');
+  const anim = { float: 'jump', tiny: 'shy', rainbow: 'dance', ducks: 'laugh', disco: 'dance', invisible: 'think', bubble: 'wave', spin: 'spin', food: 'clap', cat: 'laugh', tall: 'flex', fireworks: 'cheer', dance: 'dance', snow: 'shy' }[e.id] || 'cheer';
+  if (a3) { a3.setAnim(anim); av.classList.add('fx3d'); }
+  const ease = (k) => k * k * (3 - 2 * k);
+  const trail = (items, every = 90) => { const id = setInterval(() => { if (G.id !== 'potion') { clearInterval(id); return; } const p = ptAvatarCenter(); ptBurst(p.x, p.y + 30, items, 3, 0.35); }, every); return () => clearInterval(id); };
+  let stop = () => {};
+  if (a3) {
+    switch (e.id) {
+      case 'float': // hebt ab, schwebt mit Funkenspur, landet sanft
+        stop = trail(['✨', '⭐', col]);
+        await ptTween(3000, (k) => { const up = k < 0.2 ? ease(k / 0.2) : k > 0.8 ? ease((1 - k) / 0.2) : 1; a3.lift = up * 170 + Math.sin(k * 14) * 8; a3.lean = Math.sin(k * 9) * 0.15; });
+        break;
+      case 'tiny': // Puff! ganz klein, hüpft herum, Puff! wieder gross
+        ptBurst(c.x, c.y, ['💨', '☁️'], 14, 0.6);
+        await ptTween(500, (k) => { a3.scale = 1 - ease(k) * 0.72; });
+        await ptTween(1700, (k) => { a3.lift = Math.abs(Math.sin(k * Math.PI * 4)) * 40; });
+        ptBurst(c.x, c.y, ['💨', '☁️'], 14, 0.6);
+        await ptTween(500, (k) => { a3.scale = 0.28 + ease(k) * 0.72 + Math.sin(k * Math.PI) * 0.15; });
+        break;
+      case 'tall': // Gummiband: lang – breit – lang – normal
+        await ptTween(3000, (k) => { const w = Math.sin(k * Math.PI * 3) * (1 - k * 0.6); a3.sy = 1 + w * 0.75; a3.sx = 1 - w * 0.35; });
+        break;
+      case 'spin': // Wirbelsturm: dreht sich immer schneller, hebt dabei ab
+        stop = trail(['🌀', '💫', col], 70);
+        await ptTween(2800, (k) => { a3.rotY = 0.55 + ease(k) * Math.PI * 14; a3.lift = Math.sin(k * Math.PI) * 90; });
+        a3.rotY = 0.55;
+        break;
+      case 'invisible': // löst sich in Funken auf, «Buh!» und taucht wieder auf
+        ptBurst(c.x, c.y, ['✨', col, '#ffffff'], 36, 0.8);
+        await ptTween(600, (k) => { a3.alpha = 1 - k; });
+        await ptTween(1500, () => {});
+        ptBurst(c.x, c.y, ['💥', '✨', col], 30, 1.2);
+        await ptTween(400, (k) => { a3.alpha = k; a3.scale = 1 + Math.sin(k * Math.PI) * 0.35; });
+        break;
+      case 'bubble': // in einer Riesenblase davonschweben
+        await ptTween(3000, (k) => { const up = Math.sin(k * Math.PI); a3.lift = up * 140; a3.lean = Math.sin(k * 7) * 0.2; });
+        ptBurst(c.x, c.y - 100, ['🫧', '💦', '#ffffff'], 24, 0.8);
+        break;
+      case 'rainbow': case 'disco': case 'dance': // Party: hüpfen und wippen
+        stop = trail(e.id === 'rainbow' ? ['🌈', '#ff5e7e', '#ffd166', '#4ca8ff'] : ['🎵', '🎶', '✨'], 140);
+        await ptTween(3000, (k) => { a3.lift = Math.abs(Math.sin(k * Math.PI * 6)) * 30; a3.lean = Math.sin(k * Math.PI * 6) * 0.18; });
+        break;
+      case 'fireworks':
+        for (let i = 0; i < 6; i++) gLater(() => { const st = stage.getBoundingClientRect(); ptBurst(st.width * (0.2 + Math.random() * 0.6), st.height * (0.15 + Math.random() * 0.3), ['#ff5e7e', '#ffd166', '#4ca8ff', '#7cffb2', '#ffffff'], 36, 1.1); tone([300 + i * 60, 90], 0.25, 'sawtooth', 0.04); }, i * 420);
+        await ptTween(3000, (k) => { a3.lift = Math.abs(Math.sin(k * Math.PI * 4)) * 25; });
+        break;
+      default:
+        await ptTween(3000, (k) => { a3.lift = Math.abs(Math.sin(k * Math.PI * 3)) * 22; });
+    }
+    stop();
+    Object.assign(a3, { lift: 0, lean: 0, scale: 1, sx: 1, sy: 1, alpha: 1, rotY: 0.55 });
+    ptBurst(c.x, c.y, [col, '#ffffff'], 18, 0.6);
+    av.classList.remove('fx3d');
+  } else await ptTween(3000, () => {});
 }
 function potionEnd() {
   const s = G.s;
