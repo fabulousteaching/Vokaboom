@@ -798,3 +798,7 @@
 .br-stage.b3d .br-note { color: #14532D; } .br-stage.b3d .br-note.bad { color: #9F1239; }
 @media (min-width: 760px) { .br-stage.b3d .br-opts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .br-stage.b3d .br-end { z-index: 8; }
+
+/* Wörterregen: drei Leben */
+.rain-hearts { font-size: 1.05rem; letter-spacing: 2px; }
+.rain-msg:has(.rain-endbox) { background: rgba(4, 30, 60, .35); }

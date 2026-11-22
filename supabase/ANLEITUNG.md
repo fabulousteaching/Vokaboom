@@ -150,7 +150,7 @@ Auf der Startseite gibt es zwei Reiter: **Englisch** und **Französisch**. Jeder
 ## Vokabelspiele und Live in der Klasse
 
 **Vokabelspiele** (Schritt 2 jeder Portion): Memory (allein oder zu zweit), Ballon-Platzen (2 Stufen), Blitzrunde (2 Stufen), Buchstabensalat, Wortsuchsel (deutsche Wörter als Hinweis, antippen zeigt die Übersetzung; wahlweise auch rückwärts), Weck nicht den Drachen, Duell zu zweit, Welten-Lauf und neu:
-- **Wörterregen** – Regentropfen mit deutschen Wörtern fallen in die Stadt; vor dem Spiel wählen die Kinder **Antippen** (Wort aus Knöpfen wählen) oder **Eintippen** (Wort schreiben). Es beginnt mit Nieseln und wird im selben Spiel stärker: nach 8 gelösten Wörtern Regen, nach 18 Gewitter. Das Wasser steigt langsam (25 verpasste Tropfen).
+- **Wörterregen** – eine Hafenstadt am Meer im Regen; die Kinder wählen **Antippen** oder **Eintippen**. Es beginnt mit Nieseln und wird stärker (nach 8 Wörtern Regen, nach 18 Gewitter). Jeder Tropfen, der ins Meer fällt, und jede falsche Antwort lassen das Wasser steigen – nach 3 Fehlern versinkt die Stadt und wird zu Atlantis.
 - **Wortschlange** – oben steht das deutsche Wort, die Schlange frisst das richtige Wort in der Fremdsprache und wird länger. Ab dem 8. Wort schwimmen die Wörter langsam umher – trifft ein falsches Wort den Kopf, kostet das ein Leben.
 - **Angeln** – der eigene Avatar angelt den Fisch mit dem richtigen Wort; ein falscher Fisch zieht ihn ins Wasser (Teich, See, Meer). Verschiedene Fischarten.
 - **Brückenbau** – Blick von hinten über die Schulter des Avatars: jedes richtige Wort legt eine Platte vor ihn hin, und er geht einen Schritt weiter; eine falsche Platte bricht und stürzt in die Tiefe; 10–20 Bretter je nach Lernstand, jedes Mal eine andere Landschaft.

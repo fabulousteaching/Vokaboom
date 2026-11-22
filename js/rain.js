@@ -16,7 +16,7 @@ const RAIN_LEVELS = {
   3: { name: 'Gewitter', icon: '⛈️', fall: 9.5, fallMin: 5, every: 3, everyMin: 1.8, max: 4, streaks: 190, storm: true,
     sky: ['#070B1A', '#1C2440', '#3A4565'], city: '#0B1022', win: '#C9D8FF' },
 };
-const RAIN_MAX_LEVEL = 25; // Pegel: so viele verpasste Tropfen, dann ist das Wasser oben (steigt langsam)
+const RAIN_MAX_LEVEL = 3; // drei Fehler (Tropfen im Meer oder falsche Antwort), dann versinkt die Stadt – Atlantis
 const RAIN_UP = { 1: 8, 2: 18 }; // so viele gelöste Wörter, dann regnet es stärker
 const RAIN_MODE_KEY = 'vokaboom.rainMode';
 
@@ -61,7 +61,7 @@ function rainBegin(set, mode) {
       <span class="rain-score" id="rain-score">0</span>
       <span class="rain-combo" id="rain-combo" aria-live="polite"></span>
       <span class="rain-lvl" id="rain-lvl">${L.icon} ${L.name}</span>
-      <span class="rain-gauge" id="rain-gauge" title="Wasserpegel" aria-label="Wasserpegel"><b></b></span>
+      <span class="rain-hearts" id="rain-gauge" aria-label="Leben">❤️❤️❤️</span>
       <button type="button" class="icon-btn subtle rain-pause" data-action="rain-pause" aria-label="Pause">${icon('stop')}</button>
     </div>
     <div class="rain-stage" id="rain-stage">
@@ -173,6 +173,19 @@ function rainBackdrop(W, H, dpr, L) {
   fog.addColorStop(0, 'rgba(255,255,255,0)'); fog.addColorStop(1, 'rgba(200,215,255,.14)');
   x.fillStyle = fog; x.fillRect(0, base - H * 0.42, W, H * 0.42);
   skyline(base, H * 0.1, H * 0.28, L.city, 0.22, 3);
+  // Hafen: Kaimauer, Leuchtturm rechts, Kran links, Palmen
+  x.fillStyle = shade(L.city, -0.2); x.fillRect(0, base - 6, W, 8);
+  const lx = W * 0.9, lh = H * 0.34;
+  x.fillStyle = '#f4efe6'; x.beginPath(); x.moveTo(lx - 14, base); x.lineTo(lx - 9, base - lh); x.lineTo(lx + 9, base - lh); x.lineTo(lx + 14, base); x.fill();
+  x.fillStyle = '#d64545'; for (let k = 1; k < 5; k += 2) { const y0 = base - lh * (k / 5), y1 = base - lh * ((k + 1) / 5); x.fillRect(lx - 14, y1, 28, y0 - y1); }
+  x.fillStyle = '#2b2f45'; x.fillRect(lx - 11, base - lh - 16, 22, 16); x.fillStyle = L.win; x.globalAlpha = 0.9; x.fillRect(lx - 8, base - lh - 13, 16, 10); x.globalAlpha = 1;
+  x.fillStyle = '#d64545'; x.beginPath(); x.moveTo(lx - 13, base - lh - 16); x.lineTo(lx, base - lh - 30); x.lineTo(lx + 13, base - lh - 16); x.fill();
+  const cx0 = W * 0.08; x.strokeStyle = '#e0a526'; x.lineWidth = 4; x.beginPath(); x.moveTo(cx0, base); x.lineTo(cx0, base - H * 0.3); x.lineTo(cx0 + W * 0.12, base - H * 0.3); x.moveTo(cx0, base - H * 0.24); x.lineTo(cx0 + 18, base - H * 0.3); x.stroke();
+  x.lineWidth = 1.5; x.beginPath(); x.moveTo(cx0 + W * 0.1, base - H * 0.3); x.lineTo(cx0 + W * 0.1, base - H * 0.18); x.stroke();
+  for (const px of [W * 0.3, W * 0.62, W * 0.76]) {
+    x.strokeStyle = '#5a3a22'; x.lineWidth = 4; x.beginPath(); x.moveTo(px, base); x.quadraticCurveTo(px + 6, base - 30, px + 2, base - 54); x.stroke();
+    x.fillStyle = '#2f7a4a'; for (let k = 0; k < 6; k++) { const a = -Math.PI / 2 + (k - 2.5) * 0.55; x.beginPath(); x.ellipse(px + 2 + Math.cos(a) * 14, base - 54 + Math.sin(a) * 8, 15, 4, a, 0, Math.PI * 2); x.fill(); }
+  }
   return c;
   function shade(hex, amt) {
     const n = parseInt(hex.slice(1), 16), f = (v) => Math.round(Math.min(255, v + (255 - v) * amt));
@@ -282,7 +295,7 @@ function rainStep(dt) {
   if (s.flash <= 0) s.bolt = null;
   s.shake = Math.max(0, s.shake - dt);
 }
-const rainSurface = () => G.s.waterBase - (G.s.pegelShown / RAIN_MAX_LEVEL) * G.s.H * 0.42;
+const rainSurface = () => G.s.waterBase - (G.s.pegelShown / RAIN_MAX_LEVEL) * G.s.H * 0.3 - (G.s.atl || 0) * G.s.H * 0.9;
 /** Höhe der Wasseroberfläche an der Stelle px (mit Wellen) */
 function rainWaterY(px) {
   const s = G.s, wv = s.wave;
@@ -360,15 +373,18 @@ function rainDraw() {
   // Wasser
   const surf = rainSurface();
   const wg = x.createLinearGradient(0, surf, 0, H);
-  wg.addColorStop(0, s.L.storm ? 'rgba(40,60,100,.92)' : 'rgba(60,110,190,.9)'); wg.addColorStop(1, s.L.storm ? 'rgba(10,18,40,.98)' : 'rgba(20,40,100,.98)');
+  const ta = 1 - (s.atl || 0) * 0.45; // in Atlantis klarer: die versunkene Stadt ist zu sehen
+  wg.addColorStop(0, s.L.storm ? `rgba(30,80,110,${0.72 * ta})` : `rgba(30,120,170,${0.66 * ta})`); wg.addColorStop(1, s.L.storm ? `rgba(8,24,48,${0.94 * ta})` : `rgba(10,40,90,${0.93 * ta})`);
   x.fillStyle = wg;
   x.beginPath(); x.moveTo(0, H);
   const wy = [];
   for (let px = 0; px <= W + 5; px += 5) wy.push([Math.min(px, W), rainWaterY(Math.min(px, W))]);
   wy.forEach(([px, py]) => x.lineTo(px, py));
   x.lineTo(W, H); x.closePath(); x.fill();
+  // Unter Wasser: Lichtstrahlen, Blasen; in Atlantis Fische und Seetang an den Häusern
+  if (s.atl > 0 || surf < H * 0.8) rainUnder(x, surf);
   // Spiegelung der Stadtlichter
-  x.save(); x.globalAlpha = 0.18; x.beginPath(); x.rect(0, surf, W, H - surf); x.clip();
+  x.save(); x.globalAlpha = 0.18 * (1 - (s.atl || 0)); x.beginPath(); x.rect(0, surf, W, H - surf); x.clip();
   x.translate(0, surf * 2); x.scale(1, -1); x.drawImage(s.bg, 0, 0, W, H); x.restore();
   // Glanzlinie
   x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1.2; x.beginPath();
@@ -396,6 +412,31 @@ function rainDraw() {
       x.save(); x.translate(p.x, p.y); x.rotate(p.rot); x.fillStyle = `hsla(${p.hue},95%,72%,${a})`;
       x.beginPath(); for (let i = 0; i < 5; i++) { const ang2 = (i * 4 * Math.PI) / 5 - Math.PI / 2; x.lineTo(Math.cos(ang2) * p.r, Math.sin(ang2) * p.r); } x.closePath(); x.fill(); x.restore();
     }
+  }
+  x.restore();
+}
+function rainUnder(x, surf) {
+  const s = G.s, { W, H, t } = s, a = Math.min(1, (s.atl || 0) * 1.5);
+  x.save(); x.beginPath(); x.rect(0, Math.max(0, surf), W, H); x.clip();
+  // Lichtstrahlen
+  for (let i = 0; i < 5; i++) {
+    const rx = (i / 5) * W + Math.sin(t * 0.3 + i) * 30, g = x.createLinearGradient(0, surf, 0, H);
+    g.addColorStop(0, `rgba(200,240,255,${0.10 + a * 0.08})`); g.addColorStop(1, 'rgba(200,240,255,0)');
+    x.fillStyle = g; x.beginPath(); x.moveTo(rx, surf); x.lineTo(rx + 50, surf); x.lineTo(rx + 140, H); x.lineTo(rx + 60, H); x.fill();
+  }
+  if (a > 0) {
+    // Atlantis: Seetang an den Häusern, Fische, Blasen aus den Fenstern
+    s.atlFx = s.atlFx || { fish: Array.from({ length: 7 }, (_, i) => ({ x: Math.random() * W, y: H * (0.3 + Math.random() * 0.6), v: (Math.random() < 0.5 ? -1 : 1) * (20 + Math.random() * 30), c: ['#ffb84d', '#ff6f91', '#4ecdc4', '#ffd166'][i % 4], sz: 6 + Math.random() * 6 })), bub: Array.from({ length: 40 }, () => ({ x: Math.random() * W, y: H * Math.random(), r: 1 + Math.random() * 3, v: 20 + Math.random() * 40 })) };
+    x.globalAlpha = a;
+    for (let i = 0; i < 14; i++) { const kx = (i / 14) * W + 10, kh = 40 + (i % 4) * 22; x.strokeStyle = i % 2 ? '#2f8a5a' : '#3fa66a'; x.lineWidth = 4; x.beginPath(); x.moveTo(kx, H); for (let k = 1; k <= 6; k++) x.lineTo(kx + Math.sin(t * 1.4 + i + k) * 6, H - (kh * k) / 6); x.stroke(); }
+    for (const f of s.atlFx.fish) {
+      f.x += f.v / 60; if (f.x < -30) f.x = W + 30; if (f.x > W + 30) f.x = -30;
+      x.fillStyle = f.c; x.beginPath(); x.ellipse(f.x, f.y + Math.sin(t * 2 + f.x * 0.02) * 4, f.sz * 1.6, f.sz, 0, 0, Math.PI * 2); x.fill();
+      const dir = f.v > 0 ? -1 : 1; x.beginPath(); x.moveTo(f.x + dir * f.sz * 1.4, f.y); x.lineTo(f.x + dir * f.sz * 2.6, f.y - f.sz); x.lineTo(f.x + dir * f.sz * 2.6, f.y + f.sz); x.fill();
+    }
+    x.strokeStyle = 'rgba(220,245,255,.7)'; x.lineWidth = 1;
+    for (const b of s.atlFx.bub) { b.y -= b.v / 60; if (b.y < surf) b.y = H + 5; x.beginPath(); x.arc(b.x + Math.sin(t + b.y * 0.05) * 3, b.y, b.r, 0, Math.PI * 2); x.stroke(); }
+    x.globalAlpha = 1;
   }
   x.restore();
 }
@@ -443,9 +484,10 @@ function rainSubmit() {
   }
   if (best) { rainPop(best.d, best.st); return; }
   input.classList.remove('shake'); void input.offsetWidth; input.classList.add('shake');
-  s.combo = 0; rainHud();
+  s.combo = 0;
   sfx.bad();
   input.select();
+  rainStrike(s.W / 2, 'Falsch!');
 }
 function rainPop(d, status) {
   const s = G.s;
@@ -552,8 +594,19 @@ function rainPick(i) {
   const d = s.drops.find((x) => !x.gone && rainKey(x.w) === rainKey(w));
   if (d) { b?.classList.remove('new', 'shake'); rainPop(d, 'correct'); return; }
   if (b) { b.classList.remove('shake', 'new'); void b.offsetWidth; b.classList.add('shake'); }
-  s.combo = 0; rainHud();
+  s.combo = 0;
   sfx.bad();
+  rainStrike(s.W / 2, `Falsch: ${gameForm(w)}`);
+}
+/** Fehler: das Meer steigt eine Stufe, ein Leben weg */
+function rainStrike(x, text) {
+  const s = G.s;
+  if (s.done) return;
+  s.pegel = Math.min(RAIN_MAX_LEVEL, s.pegel + 1);
+  rainKick(x, 60, 6);
+  rainFloat(x, rainSurface() - 60, text, 'miss');
+  rainHud();
+  if (s.pegel >= RAIN_MAX_LEVEL) rainEnd();
 }
 function rainMiss(d) {
   const s = G.s;
@@ -596,8 +649,7 @@ function rainHud() {
   const s = G.s;
   const sc = $('#rain-score'); if (sc) { sc.textContent = s.score; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
   const cb = $('#rain-combo'); if (cb) cb.textContent = s.combo >= 3 ? `🔥 ${s.combo}er-Kombo` : '';
-  const g = $('#rain-gauge b'); if (g) g.style.width = `${(100 * s.pegel / RAIN_MAX_LEVEL).toFixed(1)}%`;
-  $('#rain-gauge')?.classList.toggle('high', s.pegel >= RAIN_MAX_LEVEL * 0.7);
+  const g = $('#rain-gauge'); if (g) g.textContent = '❤️'.repeat(Math.max(0, RAIN_MAX_LEVEL - s.pegel)) + '🤍'.repeat(Math.min(RAIN_MAX_LEVEL, s.pegel));
 }
 function rainPause(on) {
   const s = G.s;
@@ -615,6 +667,10 @@ function rainEnd() {
   if (s.done) return;
   s.done = true;
   s.drops.forEach((d) => d.el.classList.add('fade'));
+  // die Stadt versinkt im Meer …
+  s.atl = 0;
+  const sink = gEvery(() => { s.atl = Math.min(1, s.atl + 0.02); }, 40);
+  tone([392, 330, 262, 196], 0.35, 'sine', 0.06);
   const record = gameRecord(s.set, 'rain', s.score);
   const missed = [...new Map(s.missed.map((w) => [w.id, w])).values()].slice(0, 8);
   gLater(() => {
@@ -623,8 +679,9 @@ function rainEnd() {
     if (!m) return;
     m.hidden = false;
     m.innerHTML = `<div class="rain-endbox">
-      <div class="rain-end-art" aria-hidden="true">${s.hits >= 10 ? '🌈' : '☔'}</div>
-      <h2>${record ? 'Neuer Rekord!' : 'Der Pegel ist voll!'}</h2>
+      <div class="rain-end-art" aria-hidden="true">🔱</div>
+      <h2>${record ? 'Neuer Rekord!' : 'Die Stadt ist versunken!'}</h2>
+      <p class="small">Willkommen in <b>Atlantis</b> 🐠</p>
       <p class="lead"><b>${s.score}</b> Punkte · ${s.hits} Wörter gelöst${s.almost ? ` · ${s.almost} fast richtig` : ''}${s.best >= 3 ? ` · beste Kombo ${s.best}` : ''}</p>
       ${missed.length ? `<div class="rain-missed"><p class="small">Diese Wörter sind ins Wasser gefallen:</p><ul>${missed.map((w) => `<li><b lang="${s.lang}">${esc(gameForm(w))}</b> <span>${esc(w.german)}</span></li>`).join('')}</ul></div>` : ''}
       <p class="small muted">Erreicht: ${s.L.icon} ${s.L.name}</p>
@@ -633,7 +690,7 @@ function rainEnd() {
         <button class="btn ghost" data-action="games">Anderes Spiel</button></div>
     </div>`;
     if (s.hits >= 8 && typeof confetti === 'function') confetti();
-  }, 900);
+  }, 2600);
 }
 
 const rainActions = {
