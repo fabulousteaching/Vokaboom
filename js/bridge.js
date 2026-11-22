@@ -57,6 +57,7 @@ function bridgeBegin(set, theme, n, stage) {
   const top = $('.br-hud'), bar = $('.topbar');
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
   bridgeAsk();
+  if (typeof s3Bridge === 'function') s3Bridge();
   // 3D-Avatar (wenn möglich): schaut zur Schlucht und feuert an
   if (typeof gavMount === 'function') gavMount($('#br-avatar'), { rotY: 0.45 }).then((c) => { if (c && G.id === 'bridge') { G.s.av3 = c; c.setAnim('idle'); } });
 }

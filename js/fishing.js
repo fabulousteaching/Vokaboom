@@ -103,6 +103,7 @@ function fishBegin(set, level) {
   G.s.stage = stage;
   fishLayout();
   // 3D-Avatar (wenn möglich), hält die Angel
+  if (typeof s3Fishing === 'function') s3Fishing();
   if (typeof gavMount === 'function') gavMount($('#fi-avatar'), { rotY: 0.6 }).then((c) => { if (c && G.id === 'fish') { G.s.av3 = c; c.setAnim('hold'); } });
   const onResize = () => fishLayout();
   window.addEventListener('resize', onResize);
@@ -165,6 +166,7 @@ function fishRound() {
     const el = document.createElement('button');
     el.type = 'button'; el.className = 'fi-fish'; el.dataset.i = String(s.fish.length);
     el.setAttribute('aria-label', text); el.lang = s.lang;
+    el.dataset.kind = kind; el.dataset.c1 = c1; el.dataset.c2 = c2;
     el.style.width = `${bw + 34}px`; el.style.height = `${bh}px`;
     el.innerHTML = `<span class="fi-body-wrap fi-k-${kind}"><svg viewBox="0 0 ${bw + 34} ${bh}" aria-hidden="true">${fishSVG(kind, bw, bh, c1, c2, `${(s.t * 100) | 0}${k}`)}</svg><span class="fi-word">${esc(text)}</span></span>`;
     school.appendChild(el);
