@@ -478,3 +478,21 @@
   .search-wrap { grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
   .ws-grid { width: min(62vw, calc(100dvh - 190px)); }
 }
+
+/* 3D-Avatar in Spielen (js/gav3d.js) */
+.gav-canvas { position: absolute; pointer-events: none; z-index: 1; }
+.is3d > .av-svg { visibility: hidden; }
+.fi-avatar.is3d, .br-avatar.is3d, .pt-avatar.is3d { transform: none !important; }
+.fi-avatar.is3d.drip::after { z-index: 2; }
+.fi-lines.gone .fi-rod, .fi-lines.gone .fi-line, .fi-lines.gone .fi-bob { opacity: 0; transition: opacity .2s; }
+.fi-pdrop { position: absolute; left: 0; top: 0; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, rgba(200, 232, 255, .9) 45%, rgba(120, 190, 240, .75)); pointer-events: none; will-change: transform; }
+.fi-ring.small { width: 10px; height: 4px; margin: -2px -5px; border-width: 1.5px; animation-duration: .7s; }
+.fi-column { position: absolute; width: 34px; height: var(--h); margin-left: -17px; transform-origin: 50% 100%; translate: 0 -100%;
+  background: linear-gradient(to top, rgba(210, 236, 255, .95), rgba(255, 255, 255, .7) 70%, rgba(255, 255, 255, 0)); border-radius: 50% 50% 30% 30% / 70% 70% 20% 20%;
+  animation: fi-column 1s cubic-bezier(.2, .7, .4, 1) forwards; filter: blur(.4px); z-index: 6; }
+@keyframes fi-column { 0% { transform: scaleY(.1) scaleX(.6); opacity: .9; } 35% { transform: scaleY(1) scaleX(1); opacity: 1; } 100% { transform: scaleY(.2) scaleX(1.8); opacity: 0; } }
+.fi-foam { position: absolute; width: 140px; height: 26px; margin: -13px 0 0 -70px; border-radius: 50%; z-index: 6;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, .95) 0 30%, rgba(230, 245, 255, .7) 50%, rgba(255, 255, 255, 0) 70%); animation: fi-foam 1.5s ease-out forwards; }
+@keyframes fi-foam { 0% { transform: scale(.3); opacity: 1; } 30% { transform: scale(1.15); opacity: .95; } 100% { transform: scale(1.6, 1.2); opacity: 0; } }
+.fi-stage.quake { animation: fi-quake .35s ease; }
+@keyframes fi-quake { 25% { transform: translateY(3px); } 50% { transform: translateY(-2px); } 75% { transform: translateY(1px); } }

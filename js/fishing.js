@@ -11,6 +11,49 @@ const FISH_LEVELS = {
   3: { name: 'Meer', icon: '🌊', n: 5, v: 60, sky: ['#7FB8FF', '#CFE6FF'], water: ['#1E7FC9', '#0B2E66'], hills: ['#A9C7D9', '#7EA3BC'] },
 };
 const FISH_COLORS = [['#FF9F43', '#FF6B6B'], ['#54A0FF', '#5F27CD'], ['#1DD1A1', '#10AC84'], ['#FECA57', '#FF9F43'], ['#FF6B9D', '#C44569'], ['#48DBFB', '#0ABDE3']];
+/** Fischarten: jede sieht anders aus (Form, Flossen, Muster). Kopf links, Schwanz rechts. */
+const FISH_KINDS = ['classic', 'clown', 'long', 'puffer', 'angel', 'trout', 'tang'];
+function fishSVG(kind, bw, bh, c1, c2, id) {
+  const W = bw + 34, cy = bh / 2, ry = cy - 2;
+  const eye = (x, y, r = 5.5) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/><circle cx="${x - 1}" cy="${y}" r="${r * 0.55}" fill="#1b1b2f"/><circle cx="${x - 2}" cy="${y - 1.6}" r="${r * 0.22}" fill="#fff"/>`;
+  const mouth = (x, y) => `<path d="M${x} ${y} q5 3 9 0" stroke="#7a2a2a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  const shine = `<ellipse cx="${bw / 2}" cy="${cy - ry * 0.45}" rx="${bw / 2 - 16}" ry="${Math.max(3, ry * 0.22)}" fill="rgba(255,255,255,.28)"/>`;
+  const grad = `<defs><linearGradient id="fg${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient>
+    <clipPath id="fc${id}"><ellipse cx="${bw / 2}" cy="${cy}" rx="${bw / 2}" ry="${ry}"/></clipPath></defs>`;
+  const body = (extra = '') => `<ellipse cx="${bw / 2}" cy="${cy}" rx="${bw / 2}" ry="${ry}" fill="url(#fg${id})"/>${extra ? `<g clip-path="url(#fc${id})">${extra}</g>` : ''}`;
+  const tail = (fill, fork = false) => fork
+    ? `<path class="fi-tail" d="M${bw - 4} ${cy} L${bw + 32} 2 L${bw + 18} ${cy} L${bw + 32} ${bh - 2} Z" fill="${fill}"/>`
+    : `<path class="fi-tail" d="M${bw - 2} ${cy} L${bw + 32} 6 Q${bw + 22} ${cy} ${bw + 32} ${bh - 6} Z" fill="${fill}"/>`;
+  switch (kind) {
+    case 'clown': // orange mit weissen Streifen und schwarzem Rand
+      return grad + tail('#FF7A1A') + `<path d="M${bw * 0.35} 4 Q${bw * 0.55} -8 ${bw * 0.72} 6" fill="#FF7A1A" stroke="#1b1b2f" stroke-width="1.5"/>`
+        + `<ellipse cx="${bw / 2}" cy="${cy}" rx="${bw / 2}" ry="${ry}" fill="#FF8A1F"/><g clip-path="url(#fc${id})">${[0.24, 0.55, 0.85].map((t) => `<rect x="${bw * t - 7}" y="0" width="14" height="${bh}" fill="#fff" stroke="#1b1b2f" stroke-width="2"/>`).join('')}</g>`
+        + shine + eye(15, cy - 6) + mouth(5, cy + 6);
+    case 'long': // schlanker Hecht mit spitzer Schnauze und Gabelschwanz
+      return grad + tail(c2, true) + `<path d="M${bw * 0.55} ${cy - ry + 2} L${bw * 0.7} ${cy - ry - 8} L${bw * 0.8} ${cy - ry + 3}Z" fill="${c2}"/>`
+        + `<path d="M-6 ${cy} Q${bw * 0.1} ${cy - ry} ${bw * 0.45} ${cy - ry} Q${bw} ${cy - ry} ${bw} ${cy} Q${bw} ${cy + ry} ${bw * 0.45} ${cy + ry} Q${bw * 0.1} ${cy + ry} -6 ${cy}Z" fill="url(#fg${id})"/>`
+        + `<g opacity=".35">${Array.from({ length: Math.round(bw / 22) }, (_, i) => `<ellipse cx="${30 + i * 22}" cy="${cy + (i % 2 ? 4 : -4)}" rx="6" ry="3" fill="#fff"/>`).join('')}</g>`
+        + eye(14, cy - 4, 4.8) + `<path d="M-4 ${cy + 3} L12 ${cy + 4}" stroke="#7a2a2a" stroke-width="2" stroke-linecap="round"/>`;
+    case 'puffer': // runder Kugelfisch mit Stacheln
+      return grad + tail(c2) + `<g fill="${c2}">${Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2, x = bw / 2 + Math.cos(a) * (bw / 2 + 1), y = cy + Math.sin(a) * (ry + 1); return `<path d="M${x} ${y} l${Math.cos(a) * 7} ${Math.sin(a) * 7} l${-Math.sin(a) * 3} ${Math.cos(a) * 3}z"/>`; }).join('')}</g>`
+        + body(Array.from({ length: 9 }, (_, i) => `<circle cx="${20 + ((i * 37) % (bw - 30))}" cy="${8 + ((i * 23) % (bh - 14))}" r="2.6" fill="rgba(0,0,0,.18)"/>`).join('') + `<ellipse cx="${bw / 2}" cy="${bh - 4}" rx="${bw / 2}" ry="${ry * 0.45}" fill="#FFF6D6" opacity=".7"/>`)
+        + shine + eye(16, cy - 6, 7) + `<circle cx="6" cy="${cy + 7}" r="3" fill="#7a2a2a"/>`;
+    case 'angel': // Segelflossen oben und unten, Streifen
+      return grad + tail(c2) + `<path d="M${bw * 0.25} ${cy - ry + 3} Q${bw * 0.45} ${-16} ${bw * 0.85} ${cy - ry * 0.4}Z" fill="${c2}" opacity=".9"/><path d="M${bw * 0.3} ${cy + ry - 3} Q${bw * 0.5} ${bh + 16} ${bw * 0.85} ${cy + ry * 0.4}Z" fill="${c2}" opacity=".9"/>`
+        + body([0.3, 0.52, 0.74].map((t) => `<rect x="${bw * t - 4}" y="0" width="8" height="${bh}" fill="rgba(20,20,40,.3)"/>`).join(''))
+        + shine + eye(15, cy - 6) + mouth(5, cy + 6);
+    case 'trout': // Forelle mit Punkten und rosa Streifen
+      return grad + tail(c2) + `<path d="M${bw * 0.4} 6 Q${bw * 0.55} -5 ${bw * 0.68} 7" fill="${c2}"/>`
+        + body(`<rect x="0" y="${cy - 3}" width="${bw}" height="7" fill="rgba(255,120,170,.55)"/>${Array.from({ length: Math.round(bw / 9) }, (_, i) => `<circle cx="${12 + ((i * 29) % (bw - 16))}" cy="${5 + ((i * 17) % (bh - 10))}" r="2" fill="rgba(30,20,40,.45)"/>`).join('')}`)
+        + shine + eye(15, cy - 6) + mouth(5, cy + 6);
+    case 'tang': // Doktorfisch: tiefblau mit gelbem Schwanz und schwarzem Muster
+      return grad + tail('#FFD23F') + `<path d="M${bw * 0.2} 6 Q${bw * 0.5} -6 ${bw * 0.9} 8" fill="#1b2a6b"/>`
+        + `<ellipse cx="${bw / 2}" cy="${cy}" rx="${bw / 2}" ry="${ry}" fill="#2D6BFF"/><g clip-path="url(#fc${id})"><path d="M${bw * 0.25} ${cy - 4} Q${bw * 0.6} ${cy - ry - 4} ${bw * 0.98} ${cy - 2} Q${bw * 0.6} ${cy + 4} ${bw * 0.45} ${cy + 2} Q${bw * 0.35} ${cy + 8} ${bw * 0.25} ${cy - 4}Z" fill="#14194a"/></g>`
+        + shine + eye(15, cy - 6) + mouth(5, cy + 6);
+    default:
+      return grad + tail(c2) + `<path d="M${bw * 0.35} 6 Q${bw * 0.55} -6 ${bw * 0.7} 8" fill="${c2}"/>` + body() + shine + eye(16, cy - 6) + mouth(5, cy + 6);
+  }
+}
 
 function fishAvatar() {
   if (isKid() && typeof AV === 'object' && AV.state?.avatar) return AV.state.avatar;
@@ -59,6 +102,8 @@ function fishBegin(set, level) {
   const stage = $('#fi-stage');
   G.s.stage = stage;
   fishLayout();
+  // 3D-Avatar (wenn möglich), hält die Angel
+  if (typeof gavMount === 'function') gavMount($('#fi-avatar'), { rotY: 0.6 }).then((c) => { if (c && G.id === 'fish') { G.s.av3 = c; c.setAnim('hold'); } });
   const onResize = () => fishLayout();
   window.addEventListener('resize', onResize);
   G.fishCleanup = () => window.removeEventListener('resize', onResize);
@@ -114,21 +159,14 @@ function fishRound() {
   const school = $('#fi-school');
   items.forEach((it, k) => {
     const text = gameForm(it.w), [c1, c2] = FISH_COLORS[(k + s.caught.length) % FISH_COLORS.length];
-    const bw = Math.max(92, Math.min(190, 40 + text.length * 10.5)), bh = 50;
+    const kind = FISH_KINDS[(k * 3 + s.caught.length + s.lives) % FISH_KINDS.length];
+    const bw = Math.max(92, Math.min(190, 40 + text.length * 10.5)), bh = kind === 'puffer' ? 58 : kind === 'long' ? 44 : kind === 'angel' ? 52 : 50;
     const dir = Math.random() < 0.5 ? 1 : -1;
     const el = document.createElement('button');
     el.type = 'button'; el.className = 'fi-fish'; el.dataset.i = String(s.fish.length);
     el.setAttribute('aria-label', text); el.lang = s.lang;
     el.style.width = `${bw + 34}px`; el.style.height = `${bh}px`;
-    el.innerHTML = `<span class="fi-body-wrap"><svg viewBox="0 0 ${bw + 34} ${bh}" aria-hidden="true">
-        <defs><linearGradient id="fg${s.t | 0}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>
-        <path class="fi-tail" d="M${bw - 2} ${bh / 2} L${bw + 32} 6 Q${bw + 22} ${bh / 2} ${bw + 32} ${bh - 6} Z" fill="${c2}"/>
-        <path d="M${bw * 0.35} 6 Q${bw * 0.55} -6 ${bw * 0.7} 8" fill="${c2}"/>
-        <ellipse cx="${bw / 2}" cy="${bh / 2}" rx="${bw / 2}" ry="${bh / 2 - 2}" fill="url(#fg${s.t | 0}${k})"/>
-        <ellipse cx="${bw / 2}" cy="${bh / 2 - 8}" rx="${bw / 2 - 14}" ry="6" fill="rgba(255,255,255,.28)"/>
-        <circle cx="16" cy="${bh / 2 - 6}" r="5.5" fill="#fff"/><circle cx="15" cy="${bh / 2 - 6}" r="3" fill="#1b1b2f"/>
-        <path d="M5 ${bh / 2 + 6} q5 3 9 0" stroke="#7a2a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
-      </svg><span class="fi-word">${esc(text)}</span></span>`;
+    el.innerHTML = `<span class="fi-body-wrap fi-k-${kind}"><svg viewBox="0 0 ${bw + 34} ${bh}" aria-hidden="true">${fishSVG(kind, bw, bh, c1, c2, `${(s.t * 100) | 0}${k}`)}</svg><span class="fi-word">${esc(text)}</span></span>`;
     school.appendChild(el);
     const y = s.swimTop + span * k + span / 2 - bh / 2 + (Math.random() - 0.5) * Math.max(0, span - bh) * 0.6;
     const x = dir > 0 ? -bw - 40 - k * 30 : s.W + 6 + k * 30;
@@ -156,6 +194,12 @@ function fishStep(dt) {
   gone.forEach((f) => f.el.remove());
   if (gone.length) s.fish = s.fish.filter((f) => !gone.includes(f));
   s.fish.forEach((f, i) => { f.el.dataset.i = String(i); });
+  // Hand des 3D-Avatars → Angelrute
+  if (s.av3?.alive && !s.fallen) {
+    const av = $('#fi-avatar'), hp = s.av3.handPx();
+    if (av && hp) { s.hand = { x: av.offsetLeft + hp.x, y: av.offsetTop + hp.y }; if (!s.tipFix) s.tip = { x: s.hand.x + s.aw * 1.2, y: s.hand.y - s.aw * 1.1 }; }
+  }
+  fishParts(dt);
   fishDrawLine();
 }
 /** Rute, Schnur und Schwimmer */
@@ -166,6 +210,7 @@ function fishDrawLine() {
   const tip = { x: s.tip.x + pull * 26, y: s.tip.y + pull * 46 };
   const mid = { x: (s.hand.x + tip.x) / 2 + pull * 8, y: (s.hand.y + tip.y) / 2 - 8 + pull * 6 };
   rod.setAttribute('d', `M${s.hand.x} ${s.hand.y} Q${mid.x} ${mid.y} ${tip.x} ${tip.y}`);
+  $('#fi-lines')?.classList.toggle('gone', !!s.fallen);
   let hk = s.hook;
   if (!s.casting) { hk = { x: s.tip.x + 26, y: s.waterY + 6 + Math.sin(s.t * 2.4) * 3 }; s.hook = hk; }
   const sag = s.casting ? (pull ? 0 : 30) : 40;
@@ -218,55 +263,68 @@ async function fishCatch(f) {
   f.el.remove();
   s.fish = s.fish.filter((x) => x !== f);
   s.pull = 0; s.casting = false;
-  $('#fi-avatar')?.classList.add('cheer'); gLater(() => $('#fi-avatar')?.classList.remove('cheer'), 800);
+  if (s.av3?.alive) { s.av3.setAnim('cheer'); gLater(() => s.av3?.alive && !s.fallen && s.av3.setAnim('hold'), 1000); }
+  else { $('#fi-avatar')?.classList.add('cheer'); gLater(() => $('#fi-avatar')?.classList.remove('cheer'), 800); }
   fishSparkles(bucket.x + 10, bucket.y);
   fishHud();
   gLater(() => fishRound(), 500);
 }
 async function fishFail(f) {
-  const s = G.s;
+  const s = G.s, a3 = s.av3?.alive ? s.av3 : null;
   markResult(s.pk, s.cur, false);
   s.lives--;
   sfx.bad();
-  // Der Fisch zieht! Rute biegt sich, Avatar lehnt sich nach vorne …
+  // Der Fisch zieht! Rute biegt sich, Avatar rudert mit den Armen und kippt nach vorne …
   const av = $('#fi-avatar');
   fishFloat(f.x + f.bw / 2, f.y - 10, `Uff! ${gameForm(f.w)} = ${f.w.german}`, 'bad');
   s.fish.filter((x) => x.ok).forEach((x) => x.el.classList.add('right'));
-  await fishTween(600, (k) => {
+  a3?.setAnim('oops');
+  await fishTween(750, (k) => {
     s.pull = Math.min(1, k * 1.4) * (0.8 + Math.sin(k * 30) * 0.2);
     f.x += f.dir * 2.5; f.y += Math.sin(k * 20) * 1.5;
     f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0)`;
     s.hook = { x: f.x + (f.dir > 0 ? f.bw - 6 : 6), y: f.y + f.bh / 2 };
-    if (av) av.style.transform = `rotate(${k * 22}deg)`;
+    if (a3) a3.lean = -k * k * 0.55 + Math.sin(k * 26) * 0.05 * k; else if (av) av.style.transform = `rotate(${k * 22}deg)`;
   });
   if (G.id !== 'fish') return;
-  // … und plumpst ins Wasser
+  // … fliegt in hohem Bogen (mit Salto) …
   av.classList.add('falling');
-  const x0 = s.avX, y0 = s.avY, x1 = Math.min(s.W * 0.42, s.avX + s.aw * 2.2), y1 = s.waterY + s.ah * 0.35;
-  tone([300, 200, 120], 0.3, 'triangle', 0.08);
-  await fishTween(700, (k) => {
+  s.fallen = true; s.pull = 0; s.casting = false; // die Angel fliegt weg
+  const x0 = s.avX, y0 = s.avY, x1 = Math.min(s.W * 0.45, s.avX + s.aw * 2.4), y1 = s.waterY + s.ah * 0.45;
+  gavSound('whoosh');
+  let splashed = false;
+  await fishTween(820, (k) => {
     const e = k * k;
-    av.style.left = `${x0 + (x1 - x0) * k}px`; av.style.top = `${y0 + (y1 - y0) * e - Math.sin(k * Math.PI) * 50}px`;
-    av.style.transform = `rotate(${22 + k * 140}deg)`;
-    s.hook = { x: f.x + f.bw / 2, y: f.y + 10 };
+    av.style.left = `${x0 + (x1 - x0) * k}px`; av.style.top = `${y0 + (y1 - y0) * e - Math.sin(k * Math.PI) * s.ah * 0.55}px`;
+    if (a3) { a3.lean = -0.55 * (1 - k); a3.spinZ = -k * Math.PI * 1.15; } else av.style.transform = `rotate(${22 + k * 140}deg)`;
+    if (!splashed && k > 0.78) { splashed = true; fishBigSplash(x1 + s.aw / 2); }
   });
-  fishSplash(x1 + s.aw / 2, s.waterY, 26, true);
-  tone([160, 90], 0.35, 'sine', 0.12);
-  s.pull = 0; s.casting = false;
+  if (G.id !== 'fish') return;
   // Der Fisch schwimmt mit der Angel davon
   f.hooked = false; f.leaving = true; f.v *= 3;
   f.el.classList.remove('hooked');
-  for (let i = 0; i < 6; i++) gLater(() => fishBubble(x1 + s.aw / 2 + (Math.random() - 0.5) * 30, s.waterY + 30), i * 120);
-  await fishTween(500, () => {});
+  // … unter Wasser: Blubberblasen
+  gavSound('bubbles');
+  for (let i = 0; i < 10; i++) gLater(() => fishBubble(x1 + s.aw / 2 + (Math.random() - 0.5) * 30, y1 + s.ah * 0.3), i * 90);
+  await fishTween(700, (k) => { if (a3) a3.spinZ = -Math.PI * 1.15 - k * 0.6; av.style.top = `${y1 + k * 14}px`; });
   if (G.id !== 'fish') return;
-  // Kopf taucht auf, schüttelt sich und klettert zurück auf den Steg
-  av.style.transform = 'rotate(0deg)';
-  await fishTween(450, (k) => { av.style.top = `${y1 + 40 - k * (s.ah * 0.55)}px`; });
-  av.classList.add('shake');
-  await fishTween(600, () => {});
+  // Kopf taucht auf, prustet, schüttelt sich …
+  if (a3) { a3.spinZ = 0; a3.lean = 0; a3.setAnim('shy'); } else av.style.transform = 'rotate(0deg)';
+  const yUp = s.waterY - s.ah * 0.42;
+  await fishTween(520, (k) => { const e = fishEase(k); av.style.top = `${y1 + 14 + (yUp - y1 - 14) * e}px`; });
+  fishSplash(x1 + s.aw / 2, s.waterY, 12);
+  gavSound('plop');
+  if (a3) a3.setAnim('laugh'); else av.classList.add('shake');
+  await fishTween(800, (k) => { av.style.top = `${yUp + Math.sin(k * Math.PI * 3) * 4}px`; if (a3) a3.rotY = 0.6 + Math.sin(k * 40) * 0.25 * (1 - k); });
   av.classList.remove('shake');
-  await fishTween(650, (k) => { const e = fishEase(k); av.style.left = `${x1 + (x0 - x1) * e}px`; av.style.top = `${(y1 + 40 - s.ah * 0.55) + (y0 - (y1 + 40 - s.ah * 0.55)) * e - Math.sin(k * Math.PI) * 30}px`; });
+  if (a3) { a3.rotY = -0.6; a3.setAnim('jump'); } // dreht sich zum Steg und springt
+  // … und springt zurück auf den Steg
+  await fishTween(700, (k) => { const e = fishEase(k); av.style.left = `${x1 + (x0 - x1) * e}px`; av.style.top = `${yUp + (y0 - yUp) * e - Math.sin(k * Math.PI) * s.ah * 0.5}px`; });
+  if (G.id !== 'fish') return;
+  fishSplash(x1 + s.aw / 2, s.waterY, 8);
   av.classList.remove('falling'); av.style.transform = ''; av.classList.add('drip');
+  if (a3) { a3.rotY = 0.6; a3.setAnim('hold'); }
+  s.fallen = false;
   gLater(() => av.classList.remove('drip'), 1600);
   fishLayout();
   fishHud();
@@ -275,6 +333,53 @@ async function fishFail(f) {
 }
 
 /* ---------- Effekte ---------- */
+/** Wassertropfen mit Schwerkraft (fallen zurück ins Wasser und machen kleine Ringe) */
+function fishDrop(x, y, vx, vy, r) {
+  const fx = $('#fi-fx');
+  if (!fx) return;
+  const el = document.createElement('i');
+  el.className = 'fi-pdrop'; el.style.width = el.style.height = `${r * 2}px`;
+  fx.appendChild(el);
+  (G.s.parts = G.s.parts || []).push({ el, x, y, vx, vy, r, life: 2.2 });
+}
+function fishParts(dt) {
+  const s = G.s;
+  if (!s.parts?.length) return;
+  for (const p of s.parts) {
+    p.life -= dt; p.vy += 980 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    const sp = Math.hypot(p.vx, p.vy), st = Math.min(2.6, 1 + sp / 500);
+    p.el.style.transform = `translate3d(${(p.x - p.r).toFixed(1)}px, ${(p.y - p.r).toFixed(1)}px, 0) rotate(${Math.atan2(p.vy, p.vx).toFixed(2)}rad) scaleX(${st.toFixed(2)})`;
+    if (p.vy > 0 && p.y > s.waterY + 2) {
+      p.life = 0;
+      if (p.r > 2.6 && Math.random() < 0.5) { const ring = document.createElement('span'); ring.className = 'fi-ring small'; ring.style.left = `${p.x}px`; ring.style.top = `${s.waterY + 2}px`; $('#fi-fx')?.appendChild(ring); setTimeout(() => ring.remove(), 800); }
+    }
+  }
+  s.parts.filter((p) => p.life <= 0).forEach((p) => p.el.remove());
+  s.parts = s.parts.filter((p) => p.life > 0);
+}
+/** Grosses Platschen: Wassersäule, Spritzkrone, Schaum, Ringe und Geräusch */
+function fishBigSplash(x) {
+  const s = G.s, fx = $('#fi-fx'), y = s.waterY;
+  gavSound('splash');
+  if (!fx) return;
+  for (let i = 0; i < 3; i++) {
+    const ring = document.createElement('span');
+    ring.className = 'fi-ring big'; ring.style.left = `${x}px`; ring.style.top = `${y}px`; ring.style.animationDelay = `${i * 0.18}s`;
+    fx.appendChild(ring); setTimeout(() => ring.remove(), 1600);
+  }
+  const col = document.createElement('span'); col.className = 'fi-column'; col.style.left = `${x}px`; col.style.top = `${y}px`;
+  col.style.setProperty('--h', `${Math.round(s.ah * 0.9)}px`);
+  fx.appendChild(col); setTimeout(() => col.remove(), 1100);
+  const foam = document.createElement('span'); foam.className = 'fi-foam'; foam.style.left = `${x}px`; foam.style.top = `${y}px`;
+  fx.appendChild(foam); setTimeout(() => foam.remove(), 1500);
+  // Spritzkrone: schräg nach aussen, dazu ein paar hohe Tropfen in der Mitte
+  for (let i = 0; i < 34; i++) {
+    const side = i % 2 ? 1 : -1, a = -Math.PI / 2 + side * (0.25 + Math.random() * 0.85), v = 260 + Math.random() * 300;
+    fishDrop(x + side * Math.random() * s.aw * 0.5, y, Math.cos(a) * v, Math.sin(a) * v, 2 + Math.random() * 3.2);
+  }
+  for (let i = 0; i < 5; i++) fishDrop(x + (Math.random() - 0.5) * 10, y - 6, (Math.random() - 0.5) * 60, -(420 + Math.random() * 220), 3 + Math.random() * 2.5);
+  s.stage?.classList.remove('quake'); void s.stage?.offsetWidth; s.stage?.classList.add('quake');
+}
 function fishSplash(x, y, n, big) {
   const fx = $('#fi-fx');
   if (!fx) return;
