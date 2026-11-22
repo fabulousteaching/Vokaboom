@@ -1,7 +1,8 @@
 /* Vokaboom – Wörterregen
  * Regentropfen mit deutschen Wörtern fallen aus den Wolken. Wer das Wort in der Fremdsprache tippt, bringt den
  * Tropfen zum Zerplatzen. Verpasste Tropfen fallen ins Wasser: der Pegel steigt. Jedes gelöste Wort lässt eine
- * Seerose aufblühen. Stufen: Nieseln, Regen, Gewitter.
+ * Seerose aufblühen. Die Stufen kommen nacheinander im selben Spiel: Nieseln → Regen → Gewitter.
+ * Zwei Arten: Antippen (Wort aus Knöpfen wählen) oder Eintippen (Wort schreiben).
  * Szene (Himmel, Stadt, Wolken, Regen, Wasser, Spritzer) auf einem <canvas>, die Tropfen als DOM-Elemente
  * (scharfe Schrift, gut lesbar).
  */
@@ -15,31 +16,42 @@ const RAIN_LEVELS = {
   3: { name: 'Gewitter', icon: '⛈️', fall: 9.5, fallMin: 5, every: 3, everyMin: 1.8, max: 4, streaks: 190, storm: true,
     sky: ['#070B1A', '#1C2440', '#3A4565'], city: '#0B1022', win: '#C9D8FF' },
 };
-const RAIN_MAX_LEVEL = 5; // Pegel: so viele verpasste Tropfen, dann ist das Wasser oben
+const RAIN_MAX_LEVEL = 25; // Pegel: so viele verpasste Tropfen, dann ist das Wasser oben (steigt langsam)
+const RAIN_UP = { 1: 8, 2: 18 }; // so viele gelöste Wörter, dann regnet es stärker
+const RAIN_MODE_KEY = 'vokaboom.rainMode';
 
+function rainDefaultMode() {
+  try { const m = localStorage.getItem(RAIN_MODE_KEY); if (m === 'tap' || m === 'type') return m; } catch { /* egal */ }
+  return typeof kidReviewMode === 'function' && kidReviewMode() === 'choice' ? 'tap' : 'type';
+}
 function startRain(set) {
-  const lv = G.s.rainLevel || 1;
+  const lang = LANGS[langOf(set)].name;
   $('#view').innerHTML = gameShell('Wörterregen', `<div class="test-card setup choose-card rain-choose">
-    <h2>Wie stark regnet es?</h2>
-    <p class="muted">Tippe das Wort auf ${LANGS[langOf(set)].name}, bevor der Tropfen ins Wasser fällt.</p>
-    <div class="choose-grid three">
-      ${[1, 2, 3].map((n) => `<button class="choose-tile rain-tile rain-tile-${n}" data-action="rain-level" data-level="${n}">
-        <span class="choose-demo big-emoji" aria-hidden="true">${RAIN_LEVELS[n].icon}</span>
-        <strong>${RAIN_LEVELS[n].name}</strong><small>${['Langsam, höchstens 2 Tropfen.', 'Schneller, bis 3 Tropfen.', 'Blitz und Donner, bis 4 Tropfen!'][n - 1]}</small></button>`).join('')}
+    <h2>Wie willst du spielen?</h2>
+    <p class="muted">Bring die Tropfen zum Platzen, bevor sie ins Wasser fallen. Es fängt mit Nieseln an, dann regnet es stärker – am Schluss kommt ein Gewitter.</p>
+    <div class="choose-grid">
+      <button class="choose-tile rain-tile rain-tile-tap" data-action="rain-start" data-mode="tap">
+        <span class="choose-demo big-emoji" aria-hidden="true">👆</span>
+        <strong>Antippen</strong><small>Tippe das passende Wort auf ${lang} an.</small></button>
+      <button class="choose-tile rain-tile rain-tile-type" data-action="rain-start" data-mode="type">
+        <span class="choose-demo big-emoji" aria-hidden="true">⌨️</span>
+        <strong>Eintippen</strong><small>Schreib das Wort auf ${lang} selbst.</small></button>
     </div>
-    <p class="small muted">Tipp: Kleine Tippfehler? Drück ⏎ – fast richtig gibt halbe Punkte.</p>
+    <p class="small muted">🌦️ Nieseln → 🌧️ Regen → ⛈️ Gewitter</p>
   </div>`);
-  $(`.rain-tile-${lv}`)?.classList.add('last');
+  $(`.rain-tile-${rainDefaultMode()}`)?.classList.add('last');
 }
 
-function rainBegin(set, level) {
+function rainBegin(set, mode) {
   stopGame();
   G.id = 'rain';
-  const L = RAIN_LEVELS[level];
+  mode = mode === 'tap' ? 'tap' : 'type';
+  try { localStorage.setItem(RAIN_MODE_KEY, mode); } catch { /* egal */ }
+  const L = RAIN_LEVELS[1];
   const words = gameWords(set);
   Object.assign(G.s, {
-    rainLevel: level, L, set, words, pk: makePicker(words), lang: langOf(set),
-    drops: [], parts: [], ripples: [], lilies: [], streaks: [], clouds: [],
+    rainMode: mode, lv: 1, L, set, words, pk: makePicker(words), lang: langOf(set),
+    drops: [], sinking: [], slots: [], parts: [], ripples: [], lilies: [], streaks: [], clouds: [], bgOld: null, bgFade: 0, wacc: 0,
     score: 0, combo: 0, best: 0, hits: 0, almost: 0, missed: [], pegel: 0, pegelShown: 0,
     speed: 1, nextSpawn: 0.8, t: 0, last: 0, flash: 0, bolt: null, nextBolt: 6 + Math.random() * 6,
     shake: 0, paused: false, done: false, reduce: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
@@ -48,8 +60,8 @@ function rainBegin(set, level) {
     <div class="rain-hud">
       <span class="rain-score" id="rain-score">0</span>
       <span class="rain-combo" id="rain-combo" aria-live="polite"></span>
-      <span class="rain-lvl" title="${L.name}">${L.icon} ${L.name}</span>
-      <span class="rain-gauge" id="rain-gauge" title="Wasserpegel" aria-label="Wasserpegel">${'<i></i>'.repeat(RAIN_MAX_LEVEL)}</span>
+      <span class="rain-lvl" id="rain-lvl">${L.icon} ${L.name}</span>
+      <span class="rain-gauge" id="rain-gauge" title="Wasserpegel" aria-label="Wasserpegel"><b></b></span>
       <button type="button" class="icon-btn subtle rain-pause" data-action="rain-pause" aria-label="Pause">${icon('stop')}</button>
     </div>
     <div class="rain-stage" id="rain-stage">
@@ -57,12 +69,13 @@ function rainBegin(set, level) {
       <div class="rain-drops" id="rain-drops" aria-live="polite"></div>
       <div class="rain-msg" id="rain-msg" hidden></div>
     </div>
-    <form class="rain-form" id="rain-form" autocomplete="off">
+    ${mode === 'tap' ? '<div class="rain-choices" id="rain-choices"></div>' : `<form class="rain-form" id="rain-form" autocomplete="off">
       <input id="rain-q" type="text" lang="${langOf(set)}" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
         enterkeyhint="done" placeholder="Wort auf ${LANGS[langOf(set)].name} tippen …" aria-label="Wort auf ${LANGS[langOf(set)].name}">
       <button class="btn primary" type="submit" aria-label="Prüfen">⏎</button>
-    </form>`);
+    </form>`}`);
   const stage = $('#rain-stage'), cv = $('#rain-canvas'), input = $('#rain-q');
+  if (mode === 'tap') rainSyncChoices();
   G.s.stage = stage; G.s.cv = cv; G.s.ctx = cv.getContext('2d'); G.s.dropsEl = $('#rain-drops');
   rainResize();
   const onResize = () => { rainResize(); };
@@ -75,13 +88,15 @@ function rainBegin(set, level) {
     window.visualViewport?.removeEventListener('resize', onResize);
     document.removeEventListener('visibilitychange', onVis);
   };
-  input.addEventListener('input', rainTyping);
-  $('#rain-form').addEventListener('submit', (e) => { e.preventDefault(); rainSubmit(); });
-  stage.addEventListener('pointerdown', () => input.focus());
+  if (input) {
+    input.addEventListener('input', rainTyping);
+    $('#rain-form').addEventListener('submit', (e) => { e.preventDefault(); rainSubmit(); });
+    stage.addEventListener('pointerdown', () => input.focus());
+  }
   // Spielfeld ganz zeigen
   const top = $('.rain-hud'), bar = $('.topbar');
   if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (bar?.offsetHeight || 64) - 8), behavior: 'smooth' });
-  setTimeout(() => input.focus({ preventScroll: true }), 120);
+  if (input) setTimeout(() => input.focus({ preventScroll: true }), 120);
   G.s.last = performance.now();
   const loop = (now) => {
     if (G.id !== 'rain' || !G.s.stage?.isConnected) return;
@@ -100,14 +115,19 @@ function rainResize() {
   if (!stage) return;
   // Bei offener Bildschirmtastatur (Handy) die Bühne kleiner machen, damit das Eingabefeld sichtbar bleibt
   const vv = window.visualViewport, vh = vv ? vv.height : innerHeight;
-  const h = Math.round(Math.max(260, Math.min(1000, vh - 210))); // möglichst viel vom Bildschirm
+  const below = s.rainMode === 'tap' ? ($('#rain-choices')?.offsetHeight || 120) - 56 : 0; // Antwortknöpfe brauchen mehr Platz
+  const h = Math.round(Math.max(260, Math.min(1000, vh - 210 - below))); // möglichst viel vom Bildschirm
   stage.style.height = `${h}px`;
   const W = stage.clientWidth, H = h, dpr = Math.min(2, window.devicePixelRatio || 1);
   s.W = W; s.H = H; s.dpr = dpr;
   s.cv.width = Math.round(W * dpr); s.cv.height = Math.round(H * dpr);
   s.cv.style.width = `${W}px`; s.cv.style.height = `${H}px`;
   s.waterBase = H * 0.84; // Wasseroberfläche bei Pegel 0
-  s.bg = rainBackdrop(W, H, dpr, s.L);
+  s.bg = rainBackdrop(W, H, dpr, s.L); s.bgOld = null;
+  // Wasseroberfläche als Federkette: Tropfen schlagen Wellen, die sich ausbreiten
+  const n = Math.ceil(W / 6) + 2;
+  if (!s.wave || s.wave.n !== n) s.wave = { n, dx: W / (n - 1), h: new Float32Array(n), v: new Float32Array(n) };
+  else s.wave.dx = W / (n - 1);
   if (!s.streaks.length) s.streaks = Array.from({ length: s.reduce ? 20 : s.L.streaks }, () => rainStreak(W, H, true));
   if (!s.clouds.length) s.clouds = Array.from({ length: 7 }, (_, i) => ({ x: Math.random() * W, y: 10 + Math.random() * 42, r: 46 + Math.random() * 56, v: 4 + Math.random() * 8, a: 0.55 + Math.random() * 0.3, layer: i % 2 }));
   s.drops.forEach((d) => { d.x = Math.min(d.x, W - d.w / 2 - 8); });
@@ -193,6 +213,7 @@ function rainSpawn() {
   s.dropsEl.appendChild(el);
   const fall = Math.max(s.L.fallMin, s.L.fall / s.speed);
   s.drops.push({ w, el, x, y: -size * 1.3, size, v: (s.waterBase + size * 1.3) / fall, ph: Math.random() * 6.28, born: s.t });
+  if (s.rainMode === 'tap') rainSyncChoices();
 }
 function rainStep(dt) {
   const s = G.s;
@@ -206,17 +227,32 @@ function rainStep(dt) {
   const surf = rainSurface();
   for (const d of s.drops.slice()) {
     d.y += d.v * dt;
-    const sway = Math.sin(s.t * 1.6 + d.ph) * 6;
+    d.sway = Math.sin(s.t * 1.6 + d.ph) * 6;
     const bottom = d.y + d.size * 1.28;
-    d.el.style.transform = `translate3d(${(d.x - d.size / 2 + sway).toFixed(1)}px, ${d.y.toFixed(1)}px, 0) scaleY(${(1 + Math.min(0.06, d.v / 6000)).toFixed(3)})`;
-    if (bottom >= surf + 6) rainMiss(d);
+    d.el.style.transform = `translate3d(${(d.x - d.size / 2 + d.sway).toFixed(1)}px, ${d.y.toFixed(1)}px, 0) scaleY(${(1 + Math.min(0.06, d.v / 6000)).toFixed(3)})`;
+    if (bottom >= rainWaterY(d.x) + 2) rainMiss(d);
   }
+  // verpasste Tropfen tauchen ins Wasser ein und werden zu Wasser
+  for (const d of s.sinking) {
+    d.age += dt;
+    d.v = Math.max(40, d.v * (1 - dt * 3.2));
+    d.y += d.v * dt;
+    const hgt = d.size * 1.28, cut = Math.max(0, Math.min(hgt, d.y + hgt - rainWaterY(d.x)));
+    const sq = 1 + Math.min(0.25, d.age * 0.8);
+    d.el.style.transform = `translate3d(${(d.x - d.size / 2 + d.sway).toFixed(1)}px, ${d.y.toFixed(1)}px, 0) scaleX(${sq.toFixed(3)})`;
+    d.el.style.clipPath = `inset(0 -20% ${cut.toFixed(1)}px -20%)`;
+    rainKick(d.x, d.size * 0.3, 1.6 * dt * 60 * Math.max(0, 1 - d.age * 1.5));
+    if (cut >= hgt - 1 || d.age > 1.4) { d.el.remove(); d.dead = true; }
+  }
+  s.sinking = s.sinking.filter((d) => !d.dead);
+  rainWave(dt);
   // Hintergrundregen
   const ang = s.L.storm ? 0.22 : 0.12;
   for (const r of s.streaks) {
     r.y += r.v * dt; r.x += r.v * ang * dt;
     if (r.y > surf) {
       if (!s.reduce && Math.random() < 0.25) s.ripples.push({ x: r.x, y: surf + 2 + Math.random() * (s.H - surf - 4), r: 1, max: 6 + Math.random() * 8, a: 0.35 });
+      if (!s.reduce && Math.random() < 0.35) rainKick(r.x, 4, s.L.storm ? 0.9 : 0.45);
       Object.assign(r, rainStreak(s.W, s.H, false));
     }
   }
@@ -224,7 +260,10 @@ function rainStep(dt) {
   // Partikel
   for (const p of s.parts) {
     p.life -= dt;
-    if (p.kind === 'drop') { p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.y > rainSurface() && p.vy > 0) p.life = 0; }
+    if (p.kind === 'drop' || p.kind === 'jet') {
+      p.vy += 900 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.vy > 0 && p.y > rainWaterY(p.x)) { p.life = 0; rainKick(p.x, 5, p.kind === 'jet' ? 3 : 1.2); }
+    }
     else { p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; p.rot += dt * 4; }
   }
   s.parts = s.parts.filter((p) => p.life > 0);
@@ -238,10 +277,50 @@ function rainStep(dt) {
     if (s.nextBolt <= 0) { s.flash = 1; s.bolt = rainBolt(); s.shake = 0.35; s.nextBolt = 5 + Math.random() * 7; tone([70, 55], 0.5, 'sawtooth', 0.04); }
   }
   s.flash = Math.max(0, s.flash - dt * 2.6);
+  s.bgFade = Math.max(0, s.bgFade - dt * 0.45);
+  if (s.bgFade <= 0) s.bgOld = null;
   if (s.flash <= 0) s.bolt = null;
   s.shake = Math.max(0, s.shake - dt);
 }
 const rainSurface = () => G.s.waterBase - (G.s.pegelShown / RAIN_MAX_LEVEL) * G.s.H * 0.42;
+/** Höhe der Wasseroberfläche an der Stelle px (mit Wellen) */
+function rainWaterY(px) {
+  const s = G.s, wv = s.wave;
+  let off = 0;
+  if (wv) {
+    const f = Math.max(0, Math.min(wv.n - 1.001, px / wv.dx)), i = f | 0, k = f - i;
+    off = wv.h[i] * (1 - k) + wv.h[i + 1] * k;
+  }
+  return rainSurface() + off + Math.sin(px / 38 + s.t * 1.8) * 1.6 + Math.sin(px / 17 - s.t * 2.6) * 0.8;
+}
+/** Stoss ins Wasser: drückt die Oberfläche um x herum nach unten */
+function rainKick(x, r, force) {
+  const wv = G.s.wave;
+  if (!wv || !force) return;
+  const c = x / wv.dx, rr = Math.max(1, r / wv.dx);
+  for (let i = Math.max(0, Math.floor(c - rr)); i <= Math.min(wv.n - 1, Math.ceil(c + rr)); i++) {
+    const t = 1 - Math.abs(i - c) / (rr + 1);
+    if (t > 0) wv.v[i] += force * t * t;
+  }
+}
+/** Wellen rechnen (Federn + Ausbreitung), feste 60 Schritte pro Sekunde */
+function rainWave(dt) {
+  const s = G.s, wv = s.wave;
+  if (!wv) return;
+  s.wacc = Math.min(0.1, s.wacc + dt);
+  const { h, v, n } = wv;
+  while (s.wacc >= 1 / 60) {
+    s.wacc -= 1 / 60;
+    for (let i = 0; i < n; i++) { v[i] += -0.022 * h[i] - 0.03 * v[i]; h[i] += v[i]; }
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < n; i++) {
+        if (i > 0) { const d = 0.22 * (h[i] - h[i - 1]); v[i - 1] += d; }
+        if (i < n - 1) { const d = 0.22 * (h[i] - h[i + 1]); v[i + 1] += d; }
+      }
+    }
+    for (let i = 0; i < n; i++) { if (h[i] > 40) h[i] = 40; else if (h[i] < -40) h[i] = -40; }
+  }
+}
 function rainBolt() {
   const s = G.s, pts = [[s.W * (0.15 + Math.random() * 0.7), 0]];
   while (pts[pts.length - 1][1] < s.H * 0.6) { const [px, py] = pts[pts.length - 1]; pts.push([px + (Math.random() - 0.5) * 50, py + 18 + Math.random() * 26]); }
@@ -257,6 +336,7 @@ function rainDraw() {
   const sh = s.shake > 0 ? (Math.random() - 0.5) * 6 * s.shake : 0;
   x.save(); x.translate(sh, 0);
   x.drawImage(s.bg, 0, 0, W, H);
+  if (s.bgOld && s.bgFade > 0) { x.globalAlpha = s.bgFade; x.drawImage(s.bgOld, 0, 0, W, H); x.globalAlpha = 1; }
   // Blitz-Licht
   if (s.flash > 0) { x.fillStyle = `rgba(210,225,255,${s.flash * 0.45})`; x.fillRect(0, 0, W, H); }
   if (s.bolt) {
@@ -283,14 +363,16 @@ function rainDraw() {
   wg.addColorStop(0, s.L.storm ? 'rgba(40,60,100,.92)' : 'rgba(60,110,190,.9)'); wg.addColorStop(1, s.L.storm ? 'rgba(10,18,40,.98)' : 'rgba(20,40,100,.98)');
   x.fillStyle = wg;
   x.beginPath(); x.moveTo(0, H);
-  for (let px = 0; px <= W; px += 8) x.lineTo(px, surf + Math.sin(px / 38 + s.t * 1.8) * 2.2 + Math.sin(px / 17 - s.t * 2.6) * 1.1);
+  const wy = [];
+  for (let px = 0; px <= W + 5; px += 5) wy.push([Math.min(px, W), rainWaterY(Math.min(px, W))]);
+  wy.forEach(([px, py]) => x.lineTo(px, py));
   x.lineTo(W, H); x.closePath(); x.fill();
   // Spiegelung der Stadtlichter
   x.save(); x.globalAlpha = 0.18; x.beginPath(); x.rect(0, surf, W, H - surf); x.clip();
   x.translate(0, surf * 2); x.scale(1, -1); x.drawImage(s.bg, 0, 0, W, H); x.restore();
   // Glanzlinie
   x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1.2; x.beginPath();
-  for (let px = 0; px <= W; px += 8) { const py = surf + Math.sin(px / 38 + s.t * 1.8) * 2.2 + Math.sin(px / 17 - s.t * 2.6) * 1.1; px ? x.lineTo(px, py) : x.moveTo(px, py); }
+  wy.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
   x.stroke();
   // Wellenringe
   for (const r of s.ripples) {
@@ -303,6 +385,13 @@ function rainDraw() {
   for (const p of s.parts) {
     const a = Math.max(0, Math.min(1, p.life / p.max));
     if (p.kind === 'drop') { x.fillStyle = `rgba(190,225,255,${a})`; x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fill(); }
+    else if (p.kind === 'jet') { // längliche Tropfen der Spritzkrone, in Flugrichtung gestreckt
+      const sp = Math.hypot(p.vx, p.vy) || 1, st = Math.min(3.2, 1 + sp / 260);
+      x.save(); x.translate(p.x, p.y); x.rotate(Math.atan2(p.vy, p.vx));
+      x.fillStyle = `rgba(215,236,255,${Math.min(1, a * 1.2)})`; x.beginPath(); x.ellipse(0, 0, p.r * st, p.r, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = `rgba(255,255,255,${a * 0.8})`; x.beginPath(); x.arc(p.r * st * 0.35, -p.r * 0.3, p.r * 0.35, 0, Math.PI * 2); x.fill();
+      x.restore();
+    }
     else {
       x.save(); x.translate(p.x, p.y); x.rotate(p.rot); x.fillStyle = `hsla(${p.hue},95%,72%,${a})`;
       x.beginPath(); for (let i = 0; i < 5; i++) { const ang2 = (i * 4 * Math.PI) / 5 - Math.PI / 2; x.lineTo(Math.cos(ang2) * p.r, Math.sin(ang2) * p.r); } x.closePath(); x.fill(); x.restore();
@@ -311,7 +400,7 @@ function rainDraw() {
   x.restore();
 }
 function rainLily(x, l, surf) {
-  const bob = Math.sin(G.s.t * 1.5 + l.ph) * 1.6, k = easeOutBack(l.grow), y = surf + 6 + l.dy + bob;
+  const bob = Math.sin(G.s.t * 1.5 + l.ph) * 1.6, k = easeOutBack(l.grow), y = rainWaterY(l.x) + 6 + l.dy + bob;
   x.save(); x.translate(l.x, y); x.scale(k, k);
   x.fillStyle = '#2E9E5B'; x.beginPath(); x.ellipse(0, 0, 22, 7, 0, 0.25, Math.PI * 2 - 0.25); x.lineTo(0, 0); x.fill();
   x.fillStyle = '#48C27A'; x.beginPath(); x.ellipse(-2, -1, 16, 4.5, 0, 0.3, Math.PI * 2 - 0.3); x.lineTo(-2, -1); x.fill();
@@ -368,7 +457,8 @@ function rainPop(d, status) {
   if (status === 'correct') { s.combo++; s.hits++; } else { s.almost++; s.combo = 0; }
   s.best = Math.max(s.best, s.combo);
   s.score += pts;
-  s.speed = Math.min(2.2, s.speed * 1.035);
+  s.speed = Math.min(1.8, s.speed * 1.03);
+  if (RAIN_UP[s.lv] && s.hits + s.almost >= RAIN_UP[s.lv]) rainLevelUp();
   // Zerplatzen: Spritzer + Glitzer
   const n = s.reduce ? 6 : 18;
   for (let i = 0; i < n; i++) {
@@ -392,6 +482,79 @@ function rainPop(d, status) {
   s.drops.forEach((x) => x.el.classList.remove('aim'));
   rainHud();
 }
+/** Nächste Stufe im selben Spiel: Nieseln → Regen → Gewitter */
+function rainLevelUp() {
+  const s = G.s;
+  s.lv++;
+  s.L = RAIN_LEVELS[s.lv];
+  s.speed = 1;
+  s.bgOld = s.bg; s.bgFade = 1;
+  s.bg = rainBackdrop(s.W, s.H, s.dpr, s.L);
+  const want = s.reduce ? 20 : s.L.streaks;
+  while (s.streaks.length < want) s.streaks.push(rainStreak(s.W, s.H, false));
+  if (s.L.storm) s.nextBolt = 1.2;
+  const lv = $('#rain-lvl');
+  if (lv) { lv.textContent = `${s.L.icon} ${s.L.name}`; lv.classList.remove('up'); void lv.offsetWidth; lv.classList.add('up'); }
+  const el = document.createElement('div');
+  el.className = 'rain-levelup';
+  el.innerHTML = `<span aria-hidden="true">${s.L.icon}</span>${s.L.storm ? 'Gewitter! Jetzt wird’s wild!' : 'Es regnet stärker!'}`;
+  s.dropsEl.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+  tone([523, 659, 784], 0.14, 'triangle', 0.07);
+  if (s.rainMode === 'tap') rainSyncChoices();
+}
+/* ---------- Antippen: Knöpfe mit Wörtern in der Fremdsprache ---------- */
+const rainKey = (w) => normAnswer(gameForm(w));
+function rainSyncChoices() {
+  const s = G.s, box = $('#rain-choices');
+  if (!box) return;
+  const n = Math.min(s.L.max + 2, Math.max(2, new Set(s.words.map(rainKey)).size));
+  if (s.slots.length > n) s.slots.length = n;
+  while (s.slots.length < n) s.slots.push(null);
+  const needed = s.drops.filter((d) => !d.gone).map((d) => d.w);
+  const has = (w) => s.slots.some((x) => x && rainKey(x) === rainKey(w));
+  const isNeeded = (x) => x && needed.some((w) => rainKey(w) === rainKey(x));
+  const changed = new Set();
+  for (const w of needed) {
+    if (has(w)) continue;
+    const free = s.slots.map((x, i) => (x ? -1 : i)).filter((i) => i >= 0);
+    const spare = s.slots.map((x, i) => (x && !isNeeded(x) ? i : -1)).filter((i) => i >= 0);
+    const pool = free.length ? free : spare;
+    if (!pool.length) continue;
+    const i = pool[Math.floor(Math.random() * pool.length)];
+    s.slots[i] = w; changed.add(i);
+    // damit der neue Knopf nicht verrät, welcher richtig ist: auch einen anderen austauschen
+    const other = spare.filter((j) => j !== i);
+    if (!free.length && other.length) { const j = other[Math.floor(Math.random() * other.length)]; s.slots[j] = null; changed.add(j); }
+  }
+  for (let i = 0; i < n; i++) {
+    if (s.slots[i]) continue;
+    const cand = shuffle(s.words.filter((w) => !has(w)));
+    s.slots[i] = cand[0] || s.words[Math.floor(Math.random() * s.words.length)];
+    changed.add(i);
+  }
+  if (box.children.length !== n) {
+    box.style.setProperty('--n', n); box.style.setProperty('--n2', Math.ceil(n / 2));
+    box.innerHTML = s.slots.map((w, i) => `<button type="button" class="rain-choice" data-action="rain-pick" data-i="${i}" lang="${s.lang}">${esc(gameForm(w))}</button>`).join('');
+    return;
+  }
+  changed.forEach((i) => {
+    const b = box.children[i];
+    if (!b) return;
+    b.textContent = gameForm(s.slots[i]);
+    b.classList.remove('new', 'shake'); void b.offsetWidth; b.classList.add('new');
+  });
+}
+function rainPick(i) {
+  const s = G.s, w = s.slots[i], b = $('#rain-choices')?.children[i];
+  if (!w || s.done) return;
+  if (s.paused) { rainPause(false); return; }
+  const d = s.drops.find((x) => !x.gone && rainKey(x.w) === rainKey(w));
+  if (d) { b?.classList.remove('new', 'shake'); rainPop(d, 'correct'); return; }
+  if (b) { b.classList.remove('shake', 'new'); void b.offsetWidth; b.classList.add('shake'); }
+  s.combo = 0; rainHud();
+  sfx.bad();
+}
 function rainMiss(d) {
   const s = G.s;
   d.gone = true;
@@ -400,15 +563,23 @@ function rainMiss(d) {
   s.missed.push(d.w);
   s.combo = 0;
   s.pegel = Math.min(RAIN_MAX_LEVEL, s.pegel + 1);
-  const surf = rainSurface();
-  for (let i = 0; i < (s.reduce ? 6 : 16); i++) {
-    const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.6, v = 160 + Math.random() * 220;
-    s.parts.push({ kind: 'drop', x: d.x, y: surf, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 1.6 + Math.random() * 2.6, life: 1, max: 1 });
+  const surf = rainWaterY(d.x), cx = d.x + (d.sway || 0), half = d.size * 0.42;
+  // Spritzkrone: Tropfen spritzen schräg nach aussen und oben, in der Mitte schiesst eine Säule hoch
+  const nCrown = s.reduce ? 8 : 26;
+  for (let i = 0; i < nCrown; i++) {
+    const side = i % 2 ? 1 : -1, a = -Math.PI / 2 + side * (0.35 + Math.random() * 0.75), v = 220 + Math.random() * 260;
+    s.parts.push({ kind: 'jet', x: cx + side * half * (0.4 + Math.random() * 0.6), y: surf, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 1.8 + Math.random() * 2.6, life: 1.4, max: 1.4 });
   }
-  s.ripples.push({ x: d.x, y: surf + 3, r: 4, max: 90, a: 0.9, big: true }, { x: d.x, y: surf + 3, r: 1, max: 60, a: 0.7, big: true });
-  d.el.classList.add('splash');
-  setTimeout(() => d.el.remove(), 300);
-  rainFloat(d.x, surf - 34, `${d.w.german} = ${gameForm(d.w)}`, 'miss'); // Lösung zeigen
+  if (!s.reduce) {
+    for (let i = 0; i < 3; i++) s.parts.push({ kind: 'jet', x: cx + (Math.random() - 0.5) * 6, y: surf - 4, vx: (Math.random() - 0.5) * 40, vy: -(340 + i * 70 + Math.random() * 60), r: 3.6 - i * 0.7, life: 1.6, max: 1.6 });
+  }
+  rainKick(cx, half, 7);
+  s.ripples.push({ x: cx, y: surf + 3, r: 4, max: 110, a: 0.9, big: true }, { x: cx, y: surf + 3, r: 1, max: 70, a: 0.7, big: true });
+  // Der Tropfen taucht ein (wird unten abgeschnitten) statt zu verschwinden
+  Object.assign(d, { age: 0, v: d.v * 0.55, sway: d.sway || 0 });
+  d.el.classList.add('sink');
+  s.sinking.push(d);
+  rainFloat(d.x, surf - Math.min(110, d.size * 0.9), `${d.w.german} = ${gameForm(d.w)}`, 'miss'); // Lösung zeigen
   tone([220, 130], 0.22, 'sine', 0.08);
   rainHud();
   if (s.pegel >= RAIN_MAX_LEVEL) rainEnd();
@@ -425,7 +596,8 @@ function rainHud() {
   const s = G.s;
   const sc = $('#rain-score'); if (sc) { sc.textContent = s.score; sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
   const cb = $('#rain-combo'); if (cb) cb.textContent = s.combo >= 3 ? `🔥 ${s.combo}er-Kombo` : '';
-  $$('#rain-gauge i').forEach((el, i) => el.classList.toggle('on', i < s.pegel));
+  const g = $('#rain-gauge b'); if (g) g.style.width = `${(100 * s.pegel / RAIN_MAX_LEVEL).toFixed(1)}%`;
+  $('#rain-gauge')?.classList.toggle('high', s.pegel >= RAIN_MAX_LEVEL * 0.7);
 }
 function rainPause(on) {
   const s = G.s;
@@ -455,8 +627,9 @@ function rainEnd() {
       <h2>${record ? 'Neuer Rekord!' : 'Der Pegel ist voll!'}</h2>
       <p class="lead"><b>${s.score}</b> Punkte · ${s.hits} Wörter gelöst${s.almost ? ` · ${s.almost} fast richtig` : ''}${s.best >= 3 ? ` · beste Kombo ${s.best}` : ''}</p>
       ${missed.length ? `<div class="rain-missed"><p class="small">Diese Wörter sind ins Wasser gefallen:</p><ul>${missed.map((w) => `<li><b lang="${s.lang}">${esc(gameForm(w))}</b> <span>${esc(w.german)}</span></li>`).join('')}</ul></div>` : ''}
-      <div class="row center"><button class="btn primary" data-action="rain-level" data-level="${s.rainLevel}">${icon('shuffle')} Nochmal</button>
-        <button class="btn ghost" data-action="game-again">Andere Stufe</button>
+      <p class="small muted">Erreicht: ${s.L.icon} ${s.L.name}</p>
+      <div class="row center"><button class="btn primary" data-action="rain-start" data-mode="${s.rainMode}">${icon('shuffle')} Nochmal</button>
+        <button class="btn ghost" data-action="game-again">${s.rainMode === 'tap' ? 'Lieber eintippen' : 'Lieber antippen'}</button>
         <button class="btn ghost" data-action="games">Anderes Spiel</button></div>
     </div>`;
     if (s.hits >= 8 && typeof confetti === 'function') confetti();
@@ -464,6 +637,7 @@ function rainEnd() {
 }
 
 const rainActions = {
-  'rain-level': (el) => rainBegin(currentSet(), +el.dataset.level || 1),
+  'rain-start': (el) => rainBegin(currentSet(), el.dataset.mode),
+  'rain-pick': (el) => rainPick(+el.dataset.i),
   'rain-pause': () => rainPause(),
 };

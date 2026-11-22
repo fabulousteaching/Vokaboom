@@ -14,9 +14,27 @@
 @keyframes rain-bump { 40% { transform: scale(1.25); color: var(--brand); } }
 .rain-combo { font-weight: 800; color: #F97316; min-height: 1.2em; }
 .rain-lvl { margin-left: auto; font-weight: 600; color: var(--ink-2); }
-.rain-gauge { display: inline-flex; gap: 3px; align-items: flex-end; padding: 3px 6px; border-radius: 10px; background: var(--paper-2); }
-.rain-gauge i { width: 9px; height: 18px; border-radius: 3px; background: var(--line); transition: background .3s, transform .3s; }
-.rain-gauge i.on { background: linear-gradient(#7CC4FF, #2F6FD6); transform: scaleY(1.05); }
+.rain-gauge { position: relative; display: inline-block; width: 78px; height: 16px; border-radius: 99px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.rain-gauge::before { content: '💧'; position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: .7rem; z-index: 1; }
+.rain-gauge b { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, #7CC4FF, #2F6FD6); border-radius: 99px; transition: width .6s ease; }
+.rain-gauge.high b { background: linear-gradient(90deg, #60A5FA, #DC2626); }
+.rain-lvl.up { animation: rain-bump .6s cubic-bezier(.2, 1.6, .4, 1); }
+.rain-levelup { position: absolute; left: 50%; top: 32%; transform: translate(-50%, -50%); z-index: 4; display: grid; justify-items: center; gap: .2rem;
+  font: 800 clamp(1.3rem, 4vw, 2.1rem) var(--font-display, 'Bricolage Grotesque', system-ui); color: #fff; text-align: center; white-space: nowrap;
+  text-shadow: 0 3px 18px rgba(0, 0, 0, .55); animation: rain-lvlup 2.6s ease-out forwards; pointer-events: none; }
+.rain-levelup span { font-size: 2.6em; line-height: 1; }
+@keyframes rain-lvlup { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 25% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+.rdrop.sink { filter: drop-shadow(0 4px 8px rgba(5, 20, 60, .3)); }
+.rdrop.sink .rd-text { transition: opacity .35s; opacity: .35; }
+.rain-choices { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: .5rem; }
+.rain-choice { min-height: 58px; padding: .4rem .5rem; border-radius: 18px; border: 2px solid var(--line); background: var(--paper);
+  font: 800 1.15rem var(--font-display, 'Bricolage Grotesque', system-ui); color: var(--ink); overflow-wrap: anywhere; line-height: 1.1;
+  box-shadow: 0 4px 0 var(--line); transition: transform .1s, box-shadow .1s; touch-action: manipulation; }
+.rain-choice:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+.rain-choice.new { animation: rain-choice-in .35s ease-out; }
+.rain-choice.shake { animation: shake .35s; border-color: var(--red); }
+@keyframes rain-choice-in { from { opacity: 0; transform: scale(.85); } }
+@media (max-width: 700px) { .rain-choices { grid-template-columns: repeat(var(--n2, 2), minmax(0, 1fr)); } .rain-choice { min-height: 52px; font-size: 1.05rem; } }
 .rain-pause { width: 38px; height: 38px; }
 
 .rain-stage {

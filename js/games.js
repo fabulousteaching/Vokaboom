@@ -13,7 +13,7 @@ const GAMES = [
   { id: 'search', name: 'Wortsuchsel', art: '🔍', text: 'Finde die Wörter im Buchstabengitter.', min: 3 },
   { id: 'rocket', name: 'Weck nicht den Drachen', art: '🐉', text: 'Errate das Wort Buchstabe für Buchstabe. Jeder Fehler weckt den Drachen ein bisschen mehr …', min: 1 },
   { id: 'duel', name: 'Duell zu zweit', art: '⚔️', text: 'Zwei Kinder, ein Gerät: Wer tippt schneller?', min: 4 },
-  { id: 'rain', name: 'Wörterregen', art: '🌧️', text: 'Tippe das Wort, bevor der Regentropfen ins Wasser fällt.', min: 3 },
+  { id: 'rain', name: 'Wörterregen', art: '🌧️', text: 'Antippen oder eintippen, bevor der Regentropfen ins Wasser fällt. Vom Nieseln bis zum Gewitter.', min: 3 },
   { id: 'fish', name: 'Angeln', art: '🎣', text: 'Dein Avatar angelt: Fang den Fisch mit dem richtigen Wort – sonst landest du im Wasser!', min: 3 },
   { id: 'bridge', name: 'Brückenbau', art: '🌉', text: 'Jedes richtige Wort ist ein Brett – bau die Brücke, damit dein Avatar hinüberkommt.', min: 4 },
   { id: 'potion', name: 'Zaubertrank', art: '🧪', text: 'Mix mit deinem Avatar Zaubertränke aus den richtigen Wörtern – jedes Mal passiert etwas anderes!', min: 4 },
