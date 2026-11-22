@@ -845,3 +845,13 @@
 .pt-recipe li { font-size: var(--rfs, 1.3rem); line-height: 1.25; padding-top: .05em; padding-bottom: .05em; }
 .pt-recipe .pt-sol { font-size: .8em; }
 @media (max-width: 700px) { .pt-recipe { width: min(86vw, 300px); height: 150px; } }
+
+/* Wort-Anzeigen: feste Feldgrösse, einzeilig – lange Wörter werden kleiner (js/fitword.js) */
+.fi-ask strong, .br-q strong, .ws-de, .bwc-word, .g-de.big, .g-word-de, .pt-msgbox strong, .rain-levelup { display: block; max-width: 100%; white-space: nowrap; overflow: hidden; }
+.fi-ask { width: min(72%, 440px); box-sizing: border-box; }
+.br-stage.b3d .br-q { width: min(86%, 600px); box-sizing: border-box; }
+.ws-task { width: 100%; }
+.g-prompt { max-width: 100%; }
+.pt-msgbox { max-width: min(90%, 520px); }
+.rn-q { flex-wrap: nowrap !important; white-space: nowrap; overflow: hidden; max-width: 100%; }
+.blitz-card { white-space: nowrap; overflow: hidden; max-width: min(92%, 760px); }
