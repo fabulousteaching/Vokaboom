@@ -802,3 +802,22 @@
 /* Wörterregen: drei Leben */
 .rain-hearts { font-size: 1.05rem; letter-spacing: 2px; }
 .rain-msg:has(.rain-endbox) { background: rgba(4, 30, 60, .35); }
+
+/* Brückenbau 3D: Wort oben im Bild, Antworten unten als einzelne Kacheln (fast durchsichtig) */
+.br-stage.b3d .br-panel { inset: 0; left: 0; bottom: 0; transform: none; width: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  backdrop-filter: none; -webkit-backdrop-filter: none; pointer-events: none; display: block; animation: none; }
+.br-stage.b3d .br-panel > * { pointer-events: auto; }
+.br-stage.b3d .br-q { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: .3rem 1.4rem .4rem; border-radius: 18px;
+  background: rgba(255, 255, 255, .22); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.br-stage.b3d .br-q small { display: none; }
+.br-stage.b3d .br-q strong { color: #14182E; font-size: clamp(1.8rem, 5vw, 2.8rem); text-shadow: 0 0 10px rgba(255, 255, 255, .9), 0 0 3px #fff; }
+.br-stage.b3d.br-lava .br-q strong { color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, .8), 0 0 3px #000; }
+.br-stage.b3d .br-panel.in .br-q { animation: ws-pop .35s cubic-bezier(.2, 1.4, .4, 1); }
+.br-stage.b3d .br-opts, .br-stage.b3d .br-form { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(calc(100% - 24px), 760px); }
+.br-stage.b3d .br-opt { background: rgba(255, 255, 255, .55); border: 2px solid rgba(255, 255, 255, .7); color: #14182E; font-weight: 800;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .45); }
+.br-stage.b3d .br-opt:hover:not(:disabled) { background: rgba(255, 255, 255, .75); }
+.br-stage.b3d .br-note { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); margin: 0; padding: .2rem .8rem; border-radius: 99px; background: rgba(255, 255, 255, .7); }
+.br-stage.b3d .br-form { display: flex; gap: .5rem; }
+.br-stage.b3d .br-form input { flex: 1; background: rgba(255, 255, 255, .7); border: 2px solid rgba(255, 255, 255, .8); }
+@media (max-width: 760px) { .br-stage.b3d .br-note { bottom: 136px; } }

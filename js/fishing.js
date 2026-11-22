@@ -305,7 +305,7 @@ async function fishFail(f) {
     const e = k * k;
     av.style.left = `${x0 + (x1 - x0) * k}px`; av.style.top = `${y0 + (y1 - y0) * e - Math.sin(k * Math.PI) * s.ah * 0.55}px`;
     if (a3) { a3.lean = -0.55 * (1 - k); a3.spinZ = -k * Math.PI * 1.15; } else av.style.transform = `rotate(${22 + k * 140}deg)`;
-    if (!splashed && k > 0.78) { splashed = true; fishBigSplash(x1 + s.aw / 2); }
+    if (!splashed && k > 0.78) { splashed = true; fishBigSplash(x1 + s.aw / 2); fishZoom(x1 + s.aw / 2, s.waterY); }
   });
   if (G.id !== 'fish') return;
   // Der Fisch schwimmt mit der Angel davon
@@ -341,6 +341,10 @@ async function fishFail(f) {
 }
 
 /* ---------- Effekte ---------- */
+/** Kamera-Moment: kurz auf die Stelle zoomen (z. B. Platsch ins Wasser), dann zurück */
+function fishZoom(x, y) {
+  if (G.s.stage && typeof stageZoom === 'function') stageZoom(G.s.stage, x, y, 1.1, 1500);
+}
 /** Wassertropfen mit Schwerkraft (fallen zurück ins Wasser und machen kleine Ringe) */
 function fishDrop(x, y, vx, vy, r) {
   const fx = $('#fi-fx');

@@ -272,6 +272,8 @@ function potionSpell(color) {
     add('pt-spark', { '--c': i % 3 ? color : '#fff', '--x': `${Math.cos(a) * rr}px`, '--y': `${-60 - (i % 7) * 30}px`, '--r': `${(i % 2 ? 1 : -1) * 280}deg`, 'animation-delay': `${(i % 9) * 0.04}s` }, 1600);
   }
   stg.classList.remove('pt-flashing'); void stg.offsetWidth; stg.classList.add('pt-flashing');
+  // Kamera fährt kurz auf den Kessel zu und wieder zurück
+  if (typeof stageZoom === 'function') stageZoom(stg, x, y + 40, 1.14, 2600);
   setTimeout(() => stg.classList.remove('pt-flashing'), 900);
 }
 function potionNext() {

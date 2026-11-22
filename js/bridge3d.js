@@ -223,6 +223,7 @@ async function b3Mount(stage) {
 
   /* ---------- Bewegung, Kamera ---------- */
   const camPos = new T.Vector3(), camLook = new T.Vector3();
+  let shake = 0, zoom = 0; // Kamera-Momente: Wackeln (bricht), Heranfahren (Schatzkiste)
   const camTarget = () => { const p = hero.position; return [new T.Vector3(p.x + 0.35, p.y + B3.CAM.up, p.z + B3.CAM.back), new T.Vector3(p.x, p.y - 1.6, p.z - B3.CAM.look)]; };
   { const [a, b] = camTarget(); camPos.copy(a); camLook.copy(b); }
   const tweens = [];
@@ -230,7 +231,7 @@ async function b3Mount(stage) {
   let alive = true, raf = 0, last = performance.now(), t = 0, W = 0, H = 0;
   let PH = -1;
   function fit() {
-    const w = stage.clientWidth, h = stage.clientHeight, ph = ($('#br-panel')?.parentElement === stage ? $('#br-panel').offsetHeight : 0);
+    const w = stage.clientWidth, h = stage.clientHeight, ph = ($('#br-panel')?.parentElement === stage ? ($('#br-panel .br-opts, #br-panel .br-form')?.offsetHeight || 0) + 24 : 0);
     if (w === W && h === H && ph === PH) return;
     PH = ph;
     W = w; H = h; renderer.setSize(w, h, false); cv.style.width = `${w}px`; cv.style.height = `${h}px`; post?.setSize(w, h);
@@ -260,7 +261,10 @@ async function b3Mount(stage) {
     // Kamera folgt sanft
     const [cp, cl] = camTarget();
     camPos.lerp(cp, Math.min(1, dt * 2.5)); camLook.lerp(cl, Math.min(1, dt * 2.5));
-    cam.position.copy(camPos); cam.lookAt(camLook);
+    cam.position.copy(camPos);
+    if (zoom > 0) cam.position.lerp(camLook, zoom * 0.45);
+    if (shake > 0) { shake = Math.max(0, shake - dt * 1.8); cam.position.x += (Math.random() - 0.5) * shake * 0.35; cam.position.y += (Math.random() - 0.5) * shake * 0.25; }
+    cam.lookAt(camLook);
     sun.position.set(hero.position.x - 5, 10, hero.position.z + 4); sun.target.position.set(hero.position.x, 0, hero.position.z - 2);
     meter(dt);
     if (post) post.render(); else renderer.render(scene, cam);
@@ -300,6 +304,7 @@ async function b3Mount(stage) {
       // zwei Hälften
       const halves = [-1, 1].map((sx) => { const h = makePlank(); h.scale.x = 0.5; h.position.set(sx * B3.W / 4, plankY(z), z); scene.add(h); return h; });
       puff(new T.Vector3(0, plankY(z), z), P.plank, 22, 0.8);
+      shake = 0.9;
       tone([140, 90], 0.25, 'sawtooth', 0.05);
       await tween(1300, (k) => { halves.forEach((h, j) => { const sx = j ? 1 : -1; h.position.y = plankY(z) - 14 * k * k; h.position.x = sx * (B3.W / 4 + k * 1.2); h.rotation.z = sx * k * 3; h.rotation.x = k * 2; }); });
       halves.forEach((h) => scene.remove(h));
@@ -312,6 +317,7 @@ async function b3Mount(stage) {
       const face = Math.atan2(CH.x - hero.position.x, CH.z - hero.position.z);
       await tween(350, (k) => { hero.rotation.y = Math.PI + (face - Math.PI) * k; });
       fig.setAnim('present');
+      await tween(700, (k) => { zoom = k * k * (3 - 2 * k); });
       // Deckel geht auf, Goldschein, Münzen springen heraus
       if (typeof sfxx === 'function') sfxx('whoosh');
       await tween(700, (k) => { const e = 1 - Math.pow(1 - k, 3); lidPivot.rotation.x = -e * 1.95; gold.intensity = e * 4; });
@@ -324,7 +330,7 @@ async function b3Mount(stage) {
       }
       puff(top, 0xffd54a, 30, 3.2);
       await tween(900, () => {});
-      await tween(400, (k) => { hero.rotation.y = face + (0 - face) * k; });
+      await tween(400, (k) => { hero.rotation.y = face + (0 - face) * k; zoom = 1 - k * 0.6; });
       fig.setAnim('cheer');
       setTimeout(() => ctl.alive && fig.setAnim('dance'), 1600);
     },

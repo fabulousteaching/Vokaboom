@@ -26,6 +26,16 @@ const gamesOn = (set) => GAMES.filter((g) => !(set?.gamesOff || []).includes(g.i
 
 /* ---------- Hilfen ---------- */
 const G = { id: '', timers: [], raf: 0, keys: null, s: {} };
+/** Kamera-Moment: das Spielfeld zoomt kurz auf (x, y) und wieder zurück. Alle Ebenen (3D, Avatar, Texte) zoomen gemeinsam,
+ *  das Spielfeld selbst bleibt gleich gross (nichts überdeckt die Anzeige darüber). */
+function stageZoom(stage, x, y, k = 1.12, ms = 2000) {
+  if (!stage || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  for (const ch of stage.children) {
+    if (!ch.animate) continue;
+    ch.style.transformOrigin = `${x - ch.offsetLeft}px ${y - ch.offsetTop}px`;
+    ch.animate([{ scale: '1' }, { scale: String(k), offset: 0.3 }, { scale: String(k), offset: 0.7 }, { scale: '1' }], { duration: ms, easing: 'cubic-bezier(.4,0,.2,1)' });
+  }
+}
 function stopGame() {
   if (typeof ambStop === 'function') ambStop();
   if (G.runner) { try { G.runner.dispose(); } catch (e) { console.warn(e); } G.runner = null; }

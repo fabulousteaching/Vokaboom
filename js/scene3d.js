@@ -655,12 +655,18 @@ function s3PotionScene(ctl) {
     const fire = new T.Group(); ctl.at(fire, px, base + R * 0.45, 300); add(fire);
     const logM = new T.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.9 }); const logG = new T.CylinderGeometry(R * 0.08, R * 0.08, R * 1.1, 8); ctl.own(logM, logG);
     for (const a of [0.5, -0.5]) { const l = new T.Mesh(logG, logM); l.rotation.z = Math.PI / 2 + a * 0.3; l.rotation.y = a; fire.add(l); }
+    // lodernde Flammen aus vielen Leucht-Teilchen (steigen auf, werden kleiner und röter), darüber feiner Rauch
     const flames = [];
-    const flG = new T.ConeGeometry(R * 0.17, R * 0.62, 12); ctl.own(flG);
-    [[0xff5a1f, 1.2, 0], [0xffa21f, 0.95, -0.3], [0xffa21f, 0.9, 0.3], [0xfff0a0, 0.6, 0]].forEach(([c, s, x], i) => {
-      const m = new T.Mesh(flG, new T.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9 })); ctl.own(m.material);
-      m.position.set(x * R, R * 0.22 * s, i === 3 ? R * 0.1 : 0); m.scale.setScalar(s); m.userData = { s, ph: i * 1.7 }; fire.add(m); flames.push(m);
-    });
+    const NF = 34;
+    for (let i = 0; i < NF; i++) {
+      const sp = typeof fxGlow === 'function' ? fxGlow(T, 0xffa21f, R * 0.3, 0.9) : null;
+      if (!sp) break;
+      sp.userData = { t: Math.random(), x: (Math.random() - 0.5) * R * 0.75, life: 0.55 + Math.random() * 0.4 };
+      fire.add(sp); flames.push(sp);
+    }
+    const smoke = [];
+    for (let i = 0; i < 6; i++) { const sp = typeof fxGlow === 'function' ? fxGlow(T, 0x554a44, R * 0.5, 0.25) : null; if (!sp) break; sp.material.blending = T.NormalBlending; sp.userData = { t: i / 6 }; fire.add(sp); smoke.push(sp); }
+    const fc = new T.Color();
     const fl = new T.PointLight(0xff9a3a, 1.6, R * 5, 1.4); fl.position.set(0, R * 0.3, R * 0.6); fire.add(fl);
     let lastCol = '', swirl = 0;
     const brewTarget = new T.Color(0x7cffb2), brewNow = new T.Color(0x7cffb2);
@@ -698,7 +704,18 @@ function s3PotionScene(ctl) {
         m.scale.setScalar(R * (0.4 + k * 0.9)); m.material.opacity = isFail ? 0.5 * Math.sin(k * Math.PI) : 0.28 * Math.sin(k * Math.PI);
         if (isFail) m.material.color.set(0x777766);
       });
-      flames.forEach((m) => { const d = m.userData; m.scale.set(d.s * (1 + Math.sin(t * 13 + d.ph) * 0.08), d.s * (1 + Math.sin(t * 17 + d.ph) * 0.2), d.s); });
+      flames.forEach((m) => {
+        const d = m.userData; d.t += dt / d.life;
+        if (d.t >= 1) { d.t = 0; d.x = (Math.random() - 0.5) * R * 0.75; d.life = 0.5 + Math.random() * 0.45; }
+        const k = d.t;
+        m.position.set(d.x * (1 - k * 0.7) + Math.sin(t * 9 + d.x) * R * 0.03, R * (0.05 + k * 0.75), R * 0.15);
+        const sz = R * (0.42 - k * 0.32); m.scale.set(sz, sz * 1.35, 1);
+        fc.setHSL(0.13 - k * 0.11, 1, 0.62 - k * 0.15); m.material.color.copy(fc);
+        m.material.opacity = (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85) * 0.95;
+      });
+      smoke.forEach((m) => { const d = m.userData; d.t = (d.t + dt * 0.35) % 1; const k = d.t; m.position.set(Math.sin(k * 5 + t) * R * 0.15, R * (0.7 + k * 0.9), -R * 0.2); m.scale.setScalar(R * (0.3 + k * 0.6)); m.material.opacity = 0.22 * Math.sin(k * Math.PI); });
+      // Zauber: der Kessel dreht sich langsam (die Runen wandern ums Kesselrund), die Kamera fährt näher (CSS-Zoom)
+      cg.rotation.y += dt * (cauldron.classList.contains('glow') ? 1.6 : 0);
       fl.intensity = 1.4 + Math.sin(t * 15) * 0.3;
     });
   }
