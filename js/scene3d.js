@@ -172,68 +172,122 @@ const S3_FISH_LOOK = {
   // Grundfarbe/zweite Farbe kommen aus FISH_COLORS (oder fest für Clown/Doktorfisch)
   classic: {}, clown: { c1: 0xff8a1f, c2: 0xff7a1a }, long: {}, puffer: {}, angel: {}, trout: {}, tang: { c1: 0x2d6bff, c2: 0xffd23f },
 };
-/** Fisch als Voxel-Modell (Kopf links, Schwanz rechts). Gibt { body, tail, tailX } in Voxeln zurück. */
+/** Fisch als Voxel-Modell (Kopf links, Schwanz rechts): Körper mit Farbverlauf (dunkler Rücken, heller Bauch), Schuppen,
+ *  Kiemenbogen, Flossen. Augen, Brustflosse und Schwanz sind eigene Teile (bewegen sich). Masse in Voxeln. */
 function s3FishBuild(kind, c1, c2, Lb) {
-  const h = kind === 'puffer' ? 15 : kind === 'long' ? 10 : 13, ry = h / 2, rz = kind === 'puffer' ? 6 : 4, cx = Lb / 2;
+  const h = kind === 'puffer' ? 20 : kind === 'long' ? 13 : 17, ry = h / 2, rz = kind === 'puffer' ? 8 : 5.5, cx = Lb / 2;
+  const back = rnShade(c1, -0.22), belly = kind === 'puffer' ? 0xfff3cf : rnShade(c1, 0.32);
+  const shade = (x, y, z, base) => {
+    const k = (y - ry) / ry; // -1 unten … 1 oben
+    let c = k > 0 ? vxMix(base, back, Math.min(1, k * 0.9)) : vxMix(base, belly, Math.min(1, -k * 0.95));
+    // Schuppen: feine Halbmonde, nur auf der Seite
+    if (Math.abs(z) > rz * 0.55 && ((Math.round(x * 0.9) + (Math.round(y * 0.9) % 2) * 1) % 3 === 0) && y > ry * 0.5) c = rnShade(c, -0.07);
+    return c;
+  };
+  const gillX = kind === 'long' ? 5 : Lb * 0.24;
+  const pat = (x, y, z) => {
+    const t = x / Lb;
+    if (Math.abs(x - gillX - Math.abs(y - ry) * 0.25) < 0.7 && Math.abs(y - ry) < ry * 0.7 && Math.abs(z) > rz * 0.4) return rnShade(c1, -0.3); // Kiemenbogen
+    if (kind === 'clown') { for (const s of [0.24, 0.53, 0.82]) { const d = Math.abs(t - s) * Lb; if (d < 2.6) return d > 1.7 ? 0x1b1b2f : 0xffffff; } return shade(x, y, z, 0xff8a1f); }
+    if (kind === 'angel' && [0.32, 0.54, 0.76].some((s) => Math.abs(t - s) * Lb < 1.4)) return rnShade(c2, -0.4);
+    if (kind === 'trout') { if (Math.abs(y - ry) < 1.4) return 0xff8ab0; if (y > ry * 0.8 && s3Rand(x * 31 + y * 7 + z) < 0.1) return 0x2a1f33; }
+    if (kind === 'tang') { if (y > ry && t > 0.25 && t < 0.95 && y < ry + 5 - (t - 0.6) * 8) return 0x14194a; return shade(x, y, z, 0x2d6bff); }
+    if (kind === 'puffer' && y > ry * 0.9 && s3Rand(x * 13 + y * 5 + z * 3) < 0.07) return rnShade(c1, -0.4);
+    return shade(x, y, z, c1);
+  };
+  const fin = kind === 'tang' ? 0x14194a : kind === 'clown' ? 0xff7a1a : c2;
   const body = (B) => {
-    const pat = (x, y, z) => {
-      const t = x / Lb, belly = y < ry * 0.75;
-      if (kind === 'clown') { for (const s of [0.22, 0.52, 0.82]) { const d = Math.abs(t - s) * Lb; if (d < 2.2) return d > 1.4 ? 0x1b1b2f : 0xffffff; } return 0xff8a1f; }
-      if (kind === 'angel' && [0.3, 0.52, 0.74].some((s) => Math.abs(t - s) * Lb < 1.3)) return rnShade(c2, -0.35);
-      if (kind === 'trout') { if (Math.abs(y - ry) < 1.2) return 0xff8ab0; if (s3Rand(x * 31 + y * 7 + z) < 0.12) return 0x2a1f33; }
-      if (kind === 'tang') { if (y > ry && t > 0.25 && t < 0.95 && y < ry + 4 - (t - 0.6) * 6) return 0x14194a; return 0x2d6bff; }
-      if (kind === 'puffer' && belly) return 0xfff3cf;
-      if (kind === 'puffer' && s3Rand(x * 13 + y * 5 + z * 3) < 0.08) return rnShade(c1, -0.35);
-      return belly ? rnShade(c1, -0.1) : rnShade(c1, 0.04 + (y - ry) * 0.01);
-    };
     if (kind === 'long') {
-      for (let x = -3; x <= Lb; x++) { const t = (x + 3) / (Lb + 3); const rr = Math.max(0.6, Math.sin(Math.min(1, t * 1.2) * Math.PI * 0.95) * ry); B.tube('x', x, x, 0, ry, rr, pat); }
-      B.paint((v) => (Math.abs(v.z) <= 3 ? null : null));
+      for (let x = -4; x <= Lb; x++) { const t = (x + 4) / (Lb + 4); const rr = Math.max(0.8, Math.sin(Math.min(1, t * 1.15) * Math.PI * 0.94) * ry); B.tube('x', x, x, 0, ry, rr, pat); }
     } else B.ell(cx, ry, 0, cx, ry, rz, pat);
-    // Rückenflosse
-    const fin = kind === 'tang' ? 0x14194a : kind === 'clown' ? 0xff7a1a : c2;
-    if (kind === 'angel') { B.curve([[Lb * 0.25, h - 1, 0], [Lb * 0.45, h + 9, 0], [Lb * 0.8, h - 2, 0]], 1.4, fin); B.curve([[Lb * 0.3, 1, 0], [Lb * 0.5, -8, 0], [Lb * 0.8, 1, 0]], 1.4, fin); }
-    else B.curve([[Lb * 0.35, h - 1, 0], [Lb * 0.55, h + 3, 0], [Lb * 0.72, h - 1, 0]], 1.2, fin);
-    // Stacheln (Kugelfisch)
-    if (kind === 'puffer') for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; B.bar([cx + Math.cos(a) * cx * 0.95, ry + Math.sin(a) * ry * 0.95, 0], [cx + Math.cos(a) * (cx + 3), ry + Math.sin(a) * (ry + 3), 0], 0.7, rnShade(c2, -0.1)); }
-    // Seitenflosse
-    B.ell(Lb * 0.32, ry * 0.7, rz, 3, 1.6, 1, rnShade(c2, 0.05));
-    // Auge (vorne, zur Kamera) und Mund
-    const ex = kind === 'long' ? 2 : Lb * 0.14, ey = ry + 1.6, er = kind === 'puffer' ? 2.6 : 2;
-    B.ell(ex, ey, rz - 0.5, er, er, 1.2, 0xffffff, { mat: 1 });
-    B.ell(ex - 0.5, ey, rz + 0.6, er * 0.55, er * 0.55, 0.8, 0x14141c, { mat: 1 });
-    B.put(ex - 1, ey + 1, rz + 1.2, 0xffffff, 1);
-    B.box(Math.round(ex - 2), Math.round(ry - 2), Math.round(rz - 1), Math.round(ex), Math.round(ry - 2), Math.round(rz), 0x7a2a2a);
+    // Rücken- und Bauchflossen (mit Flossenstrahlen)
+    const ray = (a, b, r = 1.3) => B.curve([a, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + (b[1] > a[1] ? 2 : -2), 0], b], r, (x) => ((Math.round(x) % 3) ? fin : rnShade(fin, -0.18)));
+    if (kind === 'angel') { ray([Lb * 0.25, h - 1, 0], [Lb * 0.5, h + 12, 0]); ray([Lb * 0.35, h - 1, 0], [Lb * 0.8, h - 1, 0]); ray([Lb * 0.3, 1, 0], [Lb * 0.55, -10, 0]); ray([Lb * 0.4, 1, 0], [Lb * 0.8, 1, 0]); }
+    else { for (let k = 0; k < 5; k++) { const x0 = Lb * (0.36 + k * 0.08); B.bar([x0, h - 1.5, 0], [x0 + 1.5, h + 3.5 - Math.abs(k - 2) * 0.8, 0], 0.9, k % 2 ? fin : rnShade(fin, -0.15)); } B.bar([Lb * 0.6, 1.5, 0], [Lb * 0.66, -2.5, 0], 1, fin); }
+    if (kind === 'puffer') for (let k = 0; k < 18; k++) { const a = (k / 18) * Math.PI * 2; B.bar([cx + Math.cos(a) * cx * 0.92, ry + Math.sin(a) * ry * 0.92, 0], [cx + Math.cos(a) * (cx + 3.5), ry + Math.sin(a) * (ry + 3.5), 0], 0.6, rnShade(c2, -0.1)); }
+    // Mund (Lippen)
+    const mx = kind === 'long' ? -4 : 0.5;
+    B.ell(mx + 1, ry - 1.5, 0, 1.6, 1.1, rz * 0.5, rnShade(c1, -0.35));
   };
   const tail = (B) => {
     const tc = kind === 'tang' ? 0xffd23f : kind === 'clown' ? 0xff7a1a : c2;
-    const fork = kind === 'long' || kind === 'tang';
-    for (let x = 0; x <= 9; x++) { const w = 1 + x * 0.75; for (let y = Math.round(-w); y <= Math.round(w); y++) { if (fork && x > 5 && Math.abs(y) < (x - 5) * 0.8) continue; B.box(x, y + 50, -1, x, y + 50, 1, x > 7 ? rnShade(tc, -0.12) : tc); } }
+    const fork = kind === 'long' || kind === 'tang' || kind === 'trout';
+    for (let x = 0; x <= 12; x++) { const w = 1.4 + x * 0.8; for (let y = Math.round(-w); y <= Math.round(w); y++) { if (fork && x > 6 && Math.abs(y) < (x - 6) * 0.9) continue; B.box(x, y + 50, -1, x, y + 50, 1, (Math.abs(y) % 3 === 0 && x > 2) ? rnShade(tc, -0.2) : x > 9 ? rnShade(tc, 0.12) : tc); } }
   };
-  return { body, tail, h };
+  const pec = (B) => { for (let k = 0; k < 4; k++) B.bar([0, 0, 0], [5 - k * 0.6, -2 - k * 1.3, 0], 0.8, k % 2 ? rnShade(c2, 0.1) : c2); };
+  const eye = { x: kind === 'long' ? 2.5 : Lb * 0.13, y: ry + 2, r: kind === 'puffer' ? 3.4 : kind === 'long' ? 2.2 : 2.7, z: rz * (kind === 'long' ? 0.75 : 0.62) };
+  return { body, tail, pec, h, eye, rz, fin };
 }
 function s3FishModel(ctl, el) {
   const T = ctl.T, kind = el.dataset.kind || 'classic', c1 = s3Hex(T, el.dataset.c1 || '#ff9f43'), c2 = s3Hex(T, el.dataset.c2 || '#ff6b6b');
   const look = S3_FISH_LOOK[kind] || {};
   const W = el.offsetWidth, Hh = el.offsetHeight, bw = W - 34;
-  const fb = s3FishBuild(kind, look.c1 ?? c1, look.c2 ?? c2, 10);
-  const u = Hh / fb.h;
-  const Lb = Math.max(14, Math.round(bw / u));
+  const h0 = s3FishBuild(kind, 0, 0, 10).h;
+  const u = Hh / h0;
+  const Lb = Math.max(18, Math.round(bw / u));
   const F = s3FishBuild(kind, look.c1 ?? c1, look.c2 ?? c2, Lb);
-  const key = `fish|${kind}|${c1}|${c2}|${Lb}|${Math.round(u * 10)}`;
-  const gb = ctl.geo(`${key}|b`, F.body, { u, iter: 2, field: 1 });
+  const key = `fish2|${kind}|${c1}|${c2}|${Lb}|${Math.round(u * 10)}`;
+  const gb = ctl.geo(`${key}|b`, F.body, { u, iter: 3, field: 1.1 });
   const gt = ctl.geo(`${key}|t`, F.tail, { u, iter: 1, field: 0.8 });
+  const gp = ctl.geo(`${key}|p`, F.pec, { u, iter: 1, field: 0.8, project: false });
   const g = new T.Group(), inner = new T.Group();
-  const body = ctl.mesh(gb), tail = ctl.mesh(gt);
-  tail.position.set(Lb * u - u * 1.5, -50 * u, 0);
-  const tailPivot = new T.Group(); tailPivot.position.set(Lb * u - u * 1.5, F.h / 2 * u, 0); tail.position.set(0, (-50 - F.h / 2) * u + F.h / 2 * u - F.h / 2 * u + F.h / 2 * u, 0);
-  tail.position.y = -50 * u; tailPivot.add(tail);
-  inner.add(body, tailPivot);
-  // Mitte des Elements = Mitte von Körper+Schwanz
+  const body = ctl.mesh(gb);
+  const tailPivot = new T.Group(); tailPivot.position.set(Lb * u - u * 1.5, F.h / 2 * u, 0);
+  const tail = ctl.mesh(gt); tail.position.y = -50 * u; tailPivot.add(tail);
+  const pecPivot = new T.Group(); pecPivot.position.set(Lb * 0.3 * u, F.h * 0.42 * u, F.rz * u * 0.95);
+  pecPivot.add(ctl.mesh(gp));
+  // Augen: weisses Auge, Pupille (bewegt sich), Glanzpunkt, Lid (blinzeln)
+  if (!S3_EYE.T || S3_EYE.T !== T) {
+    S3_EYE.T = T;
+    S3_EYE.geo = new T.SphereGeometry(1, 20, 14);
+    S3_EYE.white = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 });
+    S3_EYE.iris = new T.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.15, metalness: 0.1 });
+    S3_EYE.ring = new T.MeshStandardMaterial({ color: 0xd9a400, roughness: 0.3 });
+    S3_EYE.shine = new T.MeshBasicMaterial({ color: 0xffffff });
+  }
+  const er = F.eye.r * u;
+  const eye = new T.Group(); eye.position.set(F.eye.x * u, F.eye.y * u, F.eye.z * u + er * 0.35);
+  const white = new T.Mesh(S3_EYE.geo, S3_EYE.white); white.scale.set(er, er, er * 0.75);
+  const pupil = new T.Group();
+  const ring = new T.Mesh(S3_EYE.geo, S3_EYE.ring); ring.scale.set(er * 0.62, er * 0.62, er * 0.3);
+  const iris = new T.Mesh(S3_EYE.geo, S3_EYE.iris); iris.scale.set(er * 0.45, er * 0.45, er * 0.3); iris.position.z = er * 0.06;
+  pupil.add(ring, iris); pupil.position.z = er * 0.55;
+  const shine = new T.Mesh(S3_EYE.geo, S3_EYE.shine); shine.scale.setScalar(er * 0.16); shine.position.set(-er * 0.28, er * 0.32, er * 0.95);
+  eye.add(white, pupil, shine);
+  inner.add(body, tailPivot, pecPivot, eye);
   inner.position.set(-W / 2, -Hh / 2, 0);
   g.add(inner);
-  g.userData = { base: { w: W }, tail: tailPivot, ph: Math.random() * 6 };
+  g.userData = { base: { w: W }, tail: tailPivot, pec: pecPivot, eye, pupil, er, ph: Math.random() * 6, blink: 1 + Math.random() * 3, look: { x: 0, y: 0, tx: 0, ty: 0, next: 0 }, inner };
   return g;
+}
+const S3_EYE = {};
+/** Fisch lebendig machen: Schwanz, Brustflosse, Körper, Augen (schauen umher oder zum Haken, blinzeln) */
+function s3FishLive(el, o, c) {
+  const d = o.userData, t = c.t, wig = el.classList.contains('wiggle'), hooked = el.classList.contains('hooked');
+  const sp = wig ? 30 : hooked ? 16 : 8;
+  if (d.tail) d.tail.rotation.y = Math.sin(t * sp + d.ph) * (wig ? 0.8 : 0.5);
+  if (d.pec) d.pec.rotation.z = -0.3 + Math.sin(t * sp * 0.8 + d.ph) * 0.45;
+  if (d.inner) d.inner.rotation.y = Math.sin(t * sp + d.ph + 1.2) * 0.06; // Körper schlängelt leicht mit
+  // Blickziel: beim Anbeissen zum Haken, sonst ab und zu woanders hin
+  const L = d.look, s = G.s;
+  if (hooked && s.hook) {
+    const dx = s.hook.x - (o.position.x), dy = -(s.hook.y) - o.position.y, n = Math.hypot(dx, dy) || 1;
+    L.tx = (dx / n) * Math.sign(o.scale.x || 1); L.ty = dy / n;
+  } else if (t > L.next) {
+    L.next = t + 0.8 + Math.random() * 2.2;
+    const a = Math.random() * Math.PI * 2, r = Math.random() < 0.3 ? 0 : 0.6 + Math.random() * 0.4;
+    L.tx = Math.cos(a) * r; L.ty = Math.sin(a) * r * 0.7;
+  }
+  const k = Math.min(1, 0.016 * 14);
+  L.x += (L.tx - L.x) * k; L.y += (L.ty - L.y) * k;
+  d.pupil.position.x = L.x * d.er * 0.38; d.pupil.position.y = L.y * d.er * 0.38;
+  // blinzeln (bei Angst: grosse Augen, kleine Pupille)
+  d.blink -= 0.016;
+  let sy = 1;
+  if (d.blink < 0) { sy = 0.12; if (d.blink < -0.12) d.blink = 2 + Math.random() * 4; }
+  const big = hooked && !el.classList.contains('wiggle') ? 1 : wig ? 1.25 : 1;
+  d.eye.scale.set(big, big * sy, big);
+  d.pupil.scale.setScalar(wig ? 0.7 : 1);
 }
 function s3FishScene(ctl) {
   const s = G.s, T = ctl.T, W = ctl.W, H = ctl.H, wy = s.waterY || H * 0.4, L = s.L, lv = s.fishLevel || 1;
@@ -281,6 +335,44 @@ function s3FishScene(ctl) {
   ctl.own(sw, swm.material); add(ctl.at(swm, W / 2, wy + 3, -580));
   const pos = sw.attributes.position, base = Float32Array.from(pos.array);
   ctl.frame((dt, t) => { for (let i = 0; i < pos.count; i++) { const x = base[i * 3] + W / 2; pos.array[i * 3 + 1] = base[i * 3 + 1] + Math.sin(x / 40 + t * 2) * 2 + Math.sin(x / 17 - t * 2.7) * 1; } pos.needsUpdate = true; });
+  // Lichtstrahlen im Wasser (weich, bewegen sich langsam)
+  const rays = [];
+  for (let i = 0; i < 6; i++) {
+    const rh = (H - wy) * (0.75 + s3Rand(i, 9) * 0.25), rw = 40 + s3Rand(i, 3) * 70;
+    const g = new T.PlaneGeometry(rw, rh);
+    const col = new Float32Array(12); [1, 1, 1, 1].forEach((_, k) => { col[k * 3] = 1; col[k * 3 + 1] = 1; col[k * 3 + 2] = 0.95; });
+    g.setAttribute('color', new T.BufferAttribute(col, 3));
+    const al = new Float32Array([0.5, 0.5, 0, 0]);
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.11, depthWrite: false, blending: T.AdditiveBlending }));
+    m.material.onBeforeCompile = () => {};
+    ctl.own(g, m.material);
+    const x = W * (0.2 + i * 0.14);
+    ctl.at(m, x, wy + rh / 2, -590); m.rotation.z = -0.22; m.userData = { x, ph: i * 1.3 };
+    add(m); rays.push(m);
+  }
+  // Lichtstrahlen oben hell, unten weg: Verlauf über eine kleine Textur
+  const rc = document.createElement('canvas'); rc.width = 4; rc.height = 64;
+  const rx2 = rc.getContext('2d'), gr = rx2.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(255,255,240,1)'); gr.addColorStop(1, 'rgba(255,255,240,0)');
+  rx2.fillStyle = gr; rx2.fillRect(0, 0, 4, 64);
+  const rtex = new T.CanvasTexture(rc); ctl.own(rtex);
+  rays.forEach((m) => { m.material.map = rtex; m.material.needsUpdate = true; });
+  ctl.frame((dt, t) => rays.forEach((m) => { m.material.opacity = 0.07 + Math.sin(t * 0.7 + m.userData.ph) * 0.05; m.position.x = m.userData.x + Math.sin(t * 0.3 + m.userData.ph) * 20; }));
+  // Schwebeteilchen im Wasser
+  const NP = 70, pg = new T.BufferGeometry(), pp = new Float32Array(NP * 3);
+  for (let i = 0; i < NP; i++) { pp[i * 3] = Math.random() * W; pp[i * 3 + 1] = -(wy + 20 + Math.random() * (H - wy - 30)); pp[i * 3 + 2] = -585; }
+  pg.setAttribute('position', new T.BufferAttribute(pp, 3));
+  const pts = new T.Points(pg, new T.PointsMaterial({ color: 0xe8f6ff, size: 2.4, transparent: true, opacity: 0.55, depthWrite: false }));
+  ctl.own(pg, pts.material); add(pts);
+  ctl.frame((dt, t) => { for (let i = 0; i < NP; i++) { pp[i * 3 + 1] += dt * (4 + (i % 5)); pp[i * 3] += Math.sin(t + i) * dt * 3; if (-pp[i * 3 + 1] < wy + 12) pp[i * 3 + 1] = -(H - 10); } pg.attributes.position.needsUpdate = true; });
+  // Glitzern auf der Wasseroberfläche
+  const gl = [];
+  const glG = new T.PlaneGeometry(14, 3), glM = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+  ctl.own(glG, glM);
+  for (let i = 0; i < 10; i++) { const m = new T.Mesh(glG, glM.clone()); ctl.own(m.material); m.userData = { ph: Math.random() * 6, sp: 1.5 + Math.random() * 2 }; add(ctl.at(m, W * (0.25 + Math.random() * 0.72), wy + 4 + Math.random() * 10, -570)); gl.push(m); }
+  ctl.frame((dt, t) => gl.forEach((m) => { m.material.opacity = Math.max(0, Math.sin(t * m.userData.sp + m.userData.ph)) * 0.8; }));
+  // Schilf vorne am Ufer (links unter dem Steg)
+  const reed = ctl.geo(`reed${lv}`, (B) => { for (let k = 0; k < 5; k++) { const x0 = k * 2.5, hh = 16 + (k % 3) * 5; B.curve([[x0, 0, 0], [x0 + 1, hh * 0.6, 0], [x0 + 2.5, hh, 0]], 0.7, k % 2 ? 0x5f9e4a : 0x4a8a3a); if (k % 2 === 0) B.ell(x0 + 2.5, hh + 2, 0, 1.2, 3, 1.2, 0x6b4226); } }, { u: Math.max(3, u * 0.55), iter: 1, project: false });
+  for (let i = 0; i < 2; i++) { const m = ctl.mesh(reed); add(ctl.at(m, s.aw * 2 + i * 40 + W * 0.02, wy + 4, -555)); ctl.frame((dt, t) => { m.rotation.z = Math.sin(t * 1.1 + i) * 0.05; }); }
   // Seerosen (Teich)
   if (lv === 1) { const lg = ctl.geo('lily', (B) => { B.cyl(0, 0, 0, 1, 7, 0x3f9e5a, { sx: 1.4 }); B.ell(2, 2, 0, 2, 2, 2, 0xff9ec4); B.put(2, 4, 0, 0xffe066); }, { u: 3, iter: 2 }); for (let i = 0; i < 3; i++) add(ctl.at(ctl.mesh(lg), W * (0.55 + i * 0.15), wy + 6, -560)); }
   // Grund: Sand, Steine, Wasserpflanzen
@@ -313,7 +405,7 @@ function s3Fishing() {
     G.s.s3 = ctl;
     ctl.track('.fi-fish', (el) => s3FishModel(ctl, el), {
       z: 10,
-      update: (el, o, c) => { const tp = o.userData.tail; if (tp) tp.rotation.y = Math.sin(c.t * (el.classList.contains('wiggle') ? 30 : 9) + o.userData.ph) * 0.55; },
+      update: s3FishLive,
     });
   });
 }
