@@ -155,9 +155,18 @@ function wsPlaceFoods() {
       p = q;
     }
     p = p || { x: sn.W / 2, y: sn.H / 2 };
-    sn.foods.push({ ...p, ...it, rad, born: performance.now() / 1000, ph: Math.random() * 6 });
+    // ab dem 8. gelösten Wort schwimmen die Wörter langsam umher (und werden mit jedem Wort etwas schneller)
+    let vx = 0, vy = 0;
+    if (s.solved >= WS_MOVE_FROM) { const a = Math.random() * Math.PI * 2, v = Math.min(55, 24 + (s.solved - WS_MOVE_FROM) * 2.5); vx = Math.cos(a) * v; vy = Math.sin(a) * v; }
+    sn.foods.push({ ...p, ...it, rad, vx, vy, born: performance.now() / 1000, ph: Math.random() * 6 });
+  }
+  if (s.solved === WS_MOVE_FROM && !sn.moveTold) {
+    sn.moveTold = true;
+    sn.floats.push({ x: sn.W / 2, y: sn.H * 0.35, text: 'Achtung: Jetzt bewegen sich die Wörter!', good: false, t: 0 });
+    tone([660, 880], 0.1, 'triangle', 0.06);
   }
 }
+const WS_MOVE_FROM = 8;
 
 /* ---------- Bewegung ---------- */
 const wsNorm = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
@@ -191,6 +200,14 @@ function wsStep(dt) {
     acc += Math.hypot(sn.path[i].x - sn.path[i - 1].x, sn.path[i].y - sn.path[i - 1].y);
     if (acc < WS.R * 2 * WS.BITE_SKIP) continue;
     if (Math.hypot(sn.path[i].x - sn.x, sn.path[i].y - sn.y) < WS.R * 1.2) { wsBite(); return; }
+  }
+  // bewegte Wörter: prallen an den Rändern ab (ein falsches Wort, das den Kopf trifft, kostet ein Leben)
+  for (const f of sn.foods) {
+    if (!f.vx && !f.vy) continue;
+    f.x += f.vx * dt; f.y += f.vy * dt;
+    if (f.x < f.rad + 6 && f.vx < 0) f.vx = -f.vx; else if (f.x > sn.W - f.rad - 6 && f.vx > 0) f.vx = -f.vx;
+    if (f.y < 26 && f.vy < 0) f.vy = -f.vy; else if (f.y > sn.H - 26 && f.vy > 0) f.vy = -f.vy;
+    for (const g of sn.foods) { if (g === f) continue; const dx = f.x - g.x, dy = f.y - g.y, d = Math.hypot(dx, dy) || 1; if (d < f.rad + g.rad + 6) { f.vx += (dx / d) * 8; f.vy += (dy / d) * 8; const sp = Math.hypot(f.vx, f.vy) || 1, v0 = Math.min(55, 24 + (G.s.solved - WS_MOVE_FROM) * 2.5); f.vx = f.vx / sp * v0; f.vy = f.vy / sp * v0; } }
   }
   // fressen
   for (let i = 0; i < sn.foods.length; i++) {
