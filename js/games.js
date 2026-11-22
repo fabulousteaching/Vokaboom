@@ -91,7 +91,30 @@ function gameRecord(set, id, score) {
   if (score > 0 && typeof avatarEarnPoints === 'function') avatarEarnPoints(1, null, 'game'); // fertig gespielt: 1 Punkt für Münzen
   return score > prev;
 }
+/* Spielfeld so gross wie möglich (wie in Teilmal): Höhe = Fenster − alles darüber − alles darunter, nichts scrollt.
+   Während des Spiels verschwinden Titel und breite Ränder (CSS: html.playing). */
+const VB_FIT = '.rn, .balloon-sky';
+let vbFitRaf = 0, vbFitSeen = null;
+const vbFitRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => vbFit()) : null;
+function vbFit() {
+  cancelAnimationFrame(vbFitRaf);
+  vbFitRaf = requestAnimationFrame(() => {
+    const v = document.getElementById('view');
+    if (v && vbFitRO && vbFitSeen !== v) { vbFitRO.observe(v); vbFitRO.observe(document.body); vbFitSeen = v; }
+    const sec = document.querySelector('#view > .mode.game-mode');
+    const st = sec?.querySelector(VB_FIT);
+    const playing = !!st && !sec.querySelector('.game-end');
+    document.documentElement.classList.toggle('playing', playing);
+    if (!playing) return;
+    const r = st.getBoundingClientRect(), sr = sec.getBoundingClientRect();
+    const below = (sr.bottom - r.bottom) + parseFloat(getComputedStyle(v).paddingBottom || 0) + 4;
+    const h = Math.max(320, Math.floor(innerHeight - (r.top + scrollY) - below));
+    if (Math.abs(r.height - h) > 1) st.style.height = `${h}px`;
+  });
+}
+window.addEventListener('resize', vbFit);
 function gameShell(title, inner) {
+  vbFit(); setTimeout(vbFit, 350); setTimeout(vbFit, 1200);
   return `<section class="mode game-mode game-${G.id}">
     <div class="mode-bar"><h1 class="mode-title">${esc(title)}</h1></div>
     <div class="game-area" id="game-area">${inner}</div>

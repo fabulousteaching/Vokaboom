@@ -1641,3 +1641,8 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
   .match-mode .mem-grid { grid-template-columns: none; grid-auto-flow: column; grid-template-rows: repeat(2, max(64px, calc((100dvh - 160px) / 2))); grid-auto-columns: minmax(0, calc((100dvh - 160px) * .75)); justify-content: center; max-width: none; gap: 6px; }
   .match-mode .mem { aspect-ratio: auto; height: 100%; }
 }
+
+/* Spielfeld so gross wie möglich (vbFit in js/games.js) */
+html.playing #view.view { padding-block: 10px 12px; }
+html.playing .game-mode > .mode-bar { display: none; }
+html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none; }
