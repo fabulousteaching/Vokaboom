@@ -15,15 +15,10 @@ const WS_SKINS = [
 ];
 
 function startSnakeGame(set) {
-  const last = G.s.snMode || 'letters';
   $('#view').innerHTML = gameShell('Wortschlange', `<div class="test-card setup choose-card">
-    <h2>Welche Schlange?</h2>
-    <div class="choose-grid">
-      <button class="choose-tile ${last === 'letters' ? 'last' : ''}" data-action="ws-mode" data-mode="letters"><span class="choose-demo big-emoji" aria-hidden="true">🐍🔤</span>
-        <strong>Stufe 1: Buchstaben</strong><small>Friss die Buchstaben der Reihe nach – das Wort entsteht in deiner Schlange.</small></button>
-      <button class="choose-tile ${last === 'words' ? 'last' : ''}" data-action="ws-mode" data-mode="words"><span class="choose-demo big-emoji" aria-hidden="true">🐍💬</span>
-        <strong>Stufe 2: Wörter</strong><small>Friss das richtige ${LANGS[langOf(set)].name}-Wort und werde immer länger.</small></button>
-    </div>
+    <h2>Wortschlange</h2>
+    <p class="muted">Oben steht ein deutsches Wort. Friss das richtige ${LANGS[langOf(set)].name}-Wort und werde immer länger!</p>
+    <div class="row center"><button class="btn primary big" data-action="ws-mode" data-mode="words">🐍 Los geht's</button></div>
     <p class="small muted">Lenken: Finger oder Maus aufs Feld halten, Pfeiltasten ↑ ↓ ← → oder der Joystick. Beiss dich nicht selbst!</p>
   </div>`);
 }
@@ -277,7 +272,7 @@ function wsEnd(why) {
       <h2>${record ? 'Neuer Rekord!' : why === 'bite' ? 'In den eigenen Schwanz gebissen!' : 'Keine Leben mehr'}</h2>
       <p class="lead"><b>${s.score}</b> Punkte · ${s.solved} ${s.solved === 1 ? 'Wort' : 'Wörter'} gefressen</p>
       <div class="row center"><button class="btn primary" data-action="ws-mode" data-mode="${s.snMode}">${icon('shuffle')} Nochmal</button>
-        <button class="btn ghost" data-action="game-again">Andere Stufe</button><button class="btn ghost" data-action="games">Anderes Spiel</button></div></div>`;
+        <button class="btn ghost" data-action="games">Anderes Spiel</button></div></div>`;
   }, 1100);
 }
 function wsBurst(x, y, cols, n) {
@@ -402,5 +397,5 @@ function wsDraw(T) {
 }
 
 const snakeActions = {
-  'ws-mode': (el) => wsBegin(currentSet(), el.dataset.mode === 'words' ? 'words' : 'letters'),
+  'ws-mode': () => wsBegin(currentSet(), 'words'), // nur noch Wörter einsammeln
 };
