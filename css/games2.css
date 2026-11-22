@@ -765,3 +765,21 @@
 .pt-msg .pt-msgbox { padding: .45rem 1.1rem; }
 .pt-msg:has(.pt-next) { place-content: start center; padding-top: 8px; }
 @media (min-width: 701px) { .pt-msg { padding-left: 20%; padding-right: 26%; } }
+
+/* Angeln: alte Fische tauchen ab */
+.fi-fish.vanish { transition: opacity .35s, filter .35s; opacity: 0; pointer-events: none; }
+
+/* Gut lesbare Aufgaben-Wörter in allen Spielen – passende Farbe, auch im Dunkelmodus */
+.fi-ask { background: rgba(255, 255, 255, .96); }
+.fi-ask strong { color: #0B4A82; }
+.fi-ask small { color: #1F78C4; }
+.fi-float, .rain-float { color: #1E2140; }
+.pt-msgbox small { color: #4A3A6A; }
+.g-de { color: var(--brand-ink); font-weight: 700; font-size: 1.2rem; }
+.g-de.big { color: var(--brand-ink); font-weight: 800; }
+.g-word-de { margin: .2rem 0; font: 800 clamp(1.5rem, 5vw, 2.1rem) var(--font-display, 'Bricolage Grotesque', system-ui); color: var(--brand-ink); }
+.ws-de { color: var(--green-ink); }
+.bwc-word { color: var(--brand-ink); }
+.br-q small { color: var(--brand-ink); font-weight: 700; }
+.br-q strong { color: var(--ink); }
+.rain-lvl, .br-theme { color: var(--ink); }

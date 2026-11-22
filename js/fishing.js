@@ -152,8 +152,13 @@ function fishRound() {
   s.cur = w;
   const ask = $('#fi-ask');
   if (ask) { ask.innerHTML = `<small>Fang das Wort für</small><strong lang="de">${esc(w.german || '?')}</strong>`; ask.classList.remove('in'); void ask.offsetWidth; ask.classList.add('in'); }
-  // neuer Schwarm: alter schwimmt weg, neuer schwimmt herein
-  s.fish.forEach((f) => { f.leaving = true; f.dir = f.x > s.W / 2 ? 1 : -1; f.v *= 2.2; });
+  // neuer Schwarm: die alten Fische tauchen sofort ab (blubbern weg), damit sie sich nicht mit den neuen kreuzen
+  s.fish.forEach((f) => {
+    f.el.classList.add('vanish');
+    for (let i = 0; i < 3; i++) gLater(() => fishBubble(f.x + f.bw / 2 + (Math.random() - 0.5) * 20, f.y + f.bh / 2), i * 70);
+    setTimeout(() => f.el.remove(), 380);
+  });
+  s.fish = [];
   const key = (x) => gameForm(x).toLowerCase();
   const others = shuffle(s.words.filter((x) => x !== w && key(x) !== key(w))).slice(0, s.L.n - 1);
   const items = shuffle([{ w, ok: true }, ...others.map((x) => ({ w: x, ok: false }))]);

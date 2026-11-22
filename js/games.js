@@ -450,7 +450,7 @@ function scrambleWord(set) {
     <p class="progress-label"><span>Wort ${s.i + 1} von ${s.total}</span></p>
     <div class="row center"><button class="btn primary round" data-action="scr-play" aria-label="Wort anhören">${icon('speaker', 'big')}</button>
       <button class="btn ghost small" data-action="scr-play" data-slow="1">${icon('snail')} Langsam</button></div>
-    ${w.german ? `<p class="muted center" lang="de">${esc(w.german)}</p>` : ''}
+    ${w.german ? `<p class="g-word-de center" lang="de">${esc(w.german)}</p>` : ''}
     <div class="scr-slots" id="scr-slots" lang="${set.lang}"></div>
     <div class="scr-tiles" id="scr-tiles" lang="${set.lang}"></div>
     <div class="row center"><button class="btn ghost small" data-action="scr-skip">Überspringen</button></div>
