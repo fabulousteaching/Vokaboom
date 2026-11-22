@@ -820,3 +820,88 @@ function s3PotionCat() {
   });
   return true;
 }
+
+/* =========================================================
+   Wörterregen: antike Stadt am Meer als Voxel-Szene; beim Versinken zerfällt sie zu den Ruinen von Atlantis
+   (die Regentropfen, das Wasser und die Teilchen zeichnet weiterhin js/rain.js darüber)
+   ========================================================= */
+function s3RainScene(ctl) {
+  const s = G.s, T = ctl.T, W = ctl.W, H = ctl.H, add = (o) => ctl.add(o);
+  const base = H * 0.84, hx = W * 0.5, hw = W * 0.46, hh = H * 0.3;
+  const u = Math.max(4, Math.round(W / 190));
+  // Himmel (Farbverlauf je Stufe, wechselt mit)
+  const sky = ctl.grad(0, 0, W, H, s.L.sky[0], s.L.sky[2], -1500);
+  add(sky);
+  let skyKey = '';
+  ctl.frame(() => { const k = s.L.sky.join(); if (k === skyKey) return; skyKey = k; const col = sky.geometry.attributes.color, a = new T.Color(s.L.sky[0]), b = new T.Color(s.L.sky[2]); [a, a, b, b].forEach((c, i) => col.setXYZ(i, c.r, c.g, c.b)); col.needsUpdate = true; });
+  // Berge in der Ferne
+  const nx = Math.ceil(W / (u * 2)) + 2;
+  const farM = ctl.mesh(ctl.geo(null, (B) => s3Band(B, nx, (x) => 10 + Math.abs(Math.sin(x * 0.05 + 1.3)) * 14 + Math.sin(x * 0.17) * 2, (x, y, z) => rwPatch(0x8796a8, 0.05, 4)(x, y, z), 3), { u: u * 2, iter: 2 }));
+  add(ctl.at(farM, 0, base + 4, -1300));
+  // Hügel der Stadt
+  const hillTop = (px) => { const t = Math.max(-1, Math.min(1, (px - hx) / hw)); return hh * (1 - t * t) * 0.98; };
+  const hill = ctl.mesh(ctl.geo(null, (B) => { const n = Math.ceil((hw * 2) / u); for (let i = 0; i <= n; i++) { const px = hx - hw + i * u, h = Math.round(hillTop(px) / u); for (let y = 0; y <= h; y++) B.box(i, y, -6, i, y, 6, (xx, yy, z) => (yy >= h - 1 ? 0x8fa06a : (yy % 6 === 0 ? 0xb8ab90 : rwPatch(0x9aa37a, 0.08, 3)(xx, yy, z)))); } }, { u, iter: 2 }));
+  add(ctl.at(hill, hx - hw, base, -900));
+  // Häuser: weisse Würfel mit Bogenfenstern, Kuppeln (blau/rot) oder Ziegeldächern; die Ruinen: niedriger, ohne Dächer, mit Moos
+  let r = 7; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+  const houses = [];
+  for (let row = 0; row < 5; row++) { let px = hx - hw * (0.84 - row * 0.13); const end = hx + hw * (0.84 - row * 0.13); while (px < end) { const w = 4 + Math.round(rnd() * 4), h = 3 + Math.round(rnd() * 3); houses.push({ px, row, w, h, roof: rnd() < 0.25 ? 'dome' : rnd() < 0.45 ? 'tile' : 'flat', dome: rnd() < 0.6 ? 0x3d7cc9 : 0xc8553d, gone: rnd() < 0.3, cut: rnd() }); px += (w + 1) * u + rnd() * 6; } }
+  const buildCity = (ruin) => (B) => {
+    for (const hs of houses) {
+      if (ruin && hs.gone) continue;
+      const x0 = Math.round((hs.px - (hx - hw)) / u), gy = Math.round((hillTop(hs.px + hs.w * u / 2) - hs.row * H * 0.045) / u) - 1;
+      const z0 = -4 + hs.row * 2, h = ruin ? Math.max(1, Math.round(hs.h * (0.35 + hs.cut * 0.4))) : hs.h;
+      B.box(x0, gy, z0, x0 + hs.w, gy + h, z0 + 3, (x, y, z) => (ruin ? (s3Rand(x * 3 + y * 7 + z) < 0.35 ? 0x5f8a5a : 0xb7c2bf) : (z === z0 + 3 && y === gy + Math.ceil(h * 0.6) && x % 2 === 1 && x > x0 && x < x0 + hs.w ? 0x3b4a5c : 0xf3eee4)));
+      if (ruin) { if (hs.cut > 0.6) B.box(x0 + 1, gy + h + 1, z0 + 1, x0 + 1, gy + h + 1, z0 + 1, 0x8fb0a8); continue; }
+      if (hs.roof === 'dome') B.ell(x0 + hs.w / 2, gy + h + 0.5, z0 + 1.5, hs.w * 0.35, hs.w * 0.35, 1.6, hs.dome, { keep: (x, y) => y >= gy + h });
+      else if (hs.roof === 'tile') for (let k = 0; k <= Math.ceil(hs.w / 2); k++) B.box(x0 + k, gy + h + 1 + Math.min(k, hs.w - k) * 0, z0, x0 + hs.w - k, gy + h + 1 + k, z0 + 3, 0xb9543c);
+      else B.box(x0, gy + h + 1, z0, x0 + hs.w, gy + h + 1, z0 + 3, 0xdcd4c4);
+    }
+    // Zypressen (intakt) / Seetang (Ruinen)
+    for (const fx of [0.12, 0.18, 0.78, 0.84]) {
+      const px = W * fx, x0 = Math.round((px - (hx - hw)) / u), gy = Math.round(hillTop(px) / u);
+      if (ruin) { for (let k = 0; k < 3; k++) { const pts = []; for (let i = 0; i <= 6; i++) pts.push([x0 + k * 1.5 + Math.sin(i + k) * 1.2, gy + i * 1.6, 2]); B.curve(pts, 0.6, [0x3fa66a, 0x2f8a5a, 0x5bbf73][k]); } }
+      else { for (let y = 0; y < 9; y++) B.ell(x0, gy + y, 3, Math.max(0.6, 1.6 - Math.abs(y - 3) * 0.25), 1, 1.2, 0x2e4a2e); }
+    }
+    // Korallen und Amphoren (Ruinen)
+    if (ruin) for (let k = 0; k < 14; k++) { const px = hx - hw * 0.9 + k * (hw * 1.8 / 14) + rnd() * 10, x0 = Math.round((px - (hx - hw)) / u), gy = Math.round(hillTop(px) / u); if (k % 3 === 0) { B.ell(x0, gy + 1, 5, 0.9, 1.4, 0.9, 0xc8763e); B.box(x0, gy + 2, 5, x0, gy + 3, 5, 0xc8763e); } else B.ell(x0, gy + 1, 5, 1.4, 1.6, 1.2, [0xff6f91, 0xffb02e, 0xb06bff][k % 3]); }
+  };
+  const city = ctl.mesh(ctl.geo(null, buildCity(false), { u, iter: 2 }));
+  const ruins = ctl.mesh(ctl.geo(null, buildCity(true), { u, iter: 2 }));
+  add(ctl.at(city, hx - hw, base, -880)); add(ctl.at(ruins, hx - hw, base, -880)); ruins.visible = false;
+  // Tempel oben: Treppe, sechs Säulen (einzeln, damit sie beim Versinken umkippen können), Giebel
+  const tw = Math.min(150, W * 0.16), ty = base - hillTop(hx) + 4, colH = tw * 0.42;
+  const steps = ctl.mesh(ctl.geo(null, (B) => { const n = Math.round(tw / u) + 3; for (let k = 0; k < 3; k++) B.box(-k, k * -1 + 0, -4 - k, n + k, -k, 4 + k, 0xece6da); }, { u, iter: 1 }));
+  add(ctl.at(steps, hx - tw / 2 - u, ty, -860));
+  const colG = ctl.geo('rcol' + u, (B) => { const ch = Math.round(colH / u); B.cyl(0, 0, 0, ch, 1.3, (x, y) => (y % 3 === 0 ? 0xe2dccd : 0xf4efe4)); B.box(-2, ch, -2, 2, ch + 1, 2, 0xe8e2d4); }, { u, iter: 2 });
+  const cols = [];
+  for (let k = 0; k < 6; k++) { const c = ctl.mesh(colG); const px = hx - tw / 2 + 6 + k * (tw - 12) / 5; add(ctl.at(c, px, ty - u, -855)); c.userData = { x: px, dir: k % 2 ? 1 : -1, fall: k === 1 || k === 4 || k === 5, half: k === 2 }; cols.push(c); }
+  const roof = ctl.mesh(ctl.geo(null, (B) => { const n = Math.round(tw / u) + 4; B.box(0, 0, -3, n, 1, 3, 0xece6da); for (let k = 0; k <= n / 2; k++) B.box(k, 2, -3, n - k, 2 + Math.round(k * 0.35), 3, 0xf1ebdf); }, { u, iter: 1 }));
+  add(ctl.at(roof, hx - tw / 2 - 2 * u, ty - u - colH - u, -856));
+  // Leuchtturm (antik) am Hafen
+  const tower = ctl.mesh(ctl.geo(null, (B) => { B.box(-4, 0, -4, 4, 18, 4, 0xe8e2d6); B.box(-3, 19, -3, 3, 30, 3, 0xe0dacd); B.box(-2, 31, -2, 2, 36, 2, 0xd8d2c4); B.ell(0, 38, 0, 1.6, 1.6, 1.6, 0xffd54a, { mat: 2 }); }, { u: Math.max(3, u * 0.9), iter: 1 }));
+  add(ctl.at(tower, W * 0.88, base, -870));
+  // Hafenmauer
+  const wall = ctl.mesh(ctl.geo(null, (B) => { const n = Math.ceil(W / u); B.box(0, 0, -2, n, 1, 2, (x) => (x % 6 === 0 ? 0x8a8478 : 0xa39d90)); }, { u, iter: 1 }));
+  add(ctl.at(wall, 0, base + u, -850));
+  // Atlantis: wenn die Stadt versinkt, kippen Säulen um, der Giebel stürzt, Häuser zerfallen – dann liegen die Ruinen da
+  let crumble = 0, crumbleT0 = 0;
+  ctl.rainState = () => ({ crumble, city: city.visible, ruins: ruins.visible, atl: s.atl });
+  ctl.frame((dt) => {
+    const a = s.atl || 0;
+    if (a <= 0) { crumbleT0 = 0; if (crumble) { crumble = 0; city.visible = true; ruins.visible = false; cols.forEach((c) => { c.rotation.z = 0; c.position.y = -(ty - u); c.scale.set(1, 1, 1); }); roof.rotation.z = 0; roof.position.y = -(ty - u - colH - u); tower.rotation.z = 0; } return; }
+    if (!crumbleT0) crumbleT0 = performance.now();
+    crumble = Math.min(1, (performance.now() - crumbleT0) / 2400); // nach Uhrzeit (auch auf langsamen Geräten gleich lang)
+    const k = Math.min(1, crumble / 0.6), e = k * k;
+    cols.forEach((c) => { const d = c.userData; if (d.fall) { c.rotation.z = d.dir * e * 1.45; c.position.y = -(ty - u) - e * 6; } if (d.half) c.scale.y = 1 - e * 0.55; });
+    roof.rotation.z = e * 0.35; roof.position.y = -(ty - u - colH - u) - e * colH * 0.9;
+    tower.rotation.z = -e * 0.18; tower.scale.y = 1 - e * 0.35;
+    if (crumble > 0.55 && !ruins.visible) { ruins.visible = true; city.visible = false; }
+    if (ruins.visible) ruins.scale.y = 0.85 + 0.15 * Math.min(1, (crumble - 0.55) / 0.45);
+  });
+}
+function s3Rain() {
+  const st = $('#rain-stage');
+  if (!st || typeof s3Mount !== 'function') return;
+  s3Mount(st, s3RainScene).then((ctl) => { if (ctl && G.id === 'rain') G.s.s3 = ctl; });
+}

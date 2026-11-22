@@ -77,6 +77,7 @@ function rainBegin(set, mode) {
   const stage = $('#rain-stage'), cv = $('#rain-canvas'), input = $('#rain-q');
   if (mode === 'tap') rainSyncChoices();
   G.s.stage = stage; G.s.cv = cv; G.s.ctx = cv.getContext('2d'); G.s.dropsEl = $('#rain-drops');
+  if (typeof s3Rain === 'function') s3Rain(); // Stadt im Avatar-Stil (3D)
   rainResize();
   const onResize = () => { rainResize(); };
   window.addEventListener('resize', onResize);
@@ -351,8 +352,9 @@ function rainDraw() {
   x.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sh = s.shake > 0 ? (Math.random() - 0.5) * 6 * s.shake : 0;
   x.save(); x.translate(sh, 0);
-  x.drawImage(s.bg, 0, 0, W, H);
-  if (s.bgOld && s.bgFade > 0) { x.globalAlpha = s.bgFade; x.drawImage(s.bgOld, 0, 0, W, H); x.globalAlpha = 1; }
+  if (s.s3?.alive) x.clearRect(0, 0, W, H); // Stadt und Himmel zeichnet die 3D-Szene darunter
+  else x.drawImage(s.bg, 0, 0, W, H);
+  if (!s.s3?.alive && s.bgOld && s.bgFade > 0) { x.globalAlpha = s.bgFade; x.drawImage(s.bgOld, 0, 0, W, H); x.globalAlpha = 1; }
   // Blitz-Licht
   if (s.flash > 0) { x.fillStyle = `rgba(210,225,255,${s.flash * 0.45})`; x.fillRect(0, 0, W, H); }
   if (s.bolt) {
@@ -388,7 +390,7 @@ function rainDraw() {
   if (s.atl > 0 || surf < H * 0.8) rainUnder(x, surf);
   // Spiegelung der Stadtlichter
   x.save(); x.globalAlpha = 0.18 * (1 - (s.atl || 0)); x.beginPath(); x.rect(0, surf, W, H - surf); x.clip();
-  x.translate(0, surf * 2); x.scale(1, -1); x.drawImage(s.bg, 0, 0, W, H); x.restore();
+  if (!s.s3?.alive) { x.translate(0, surf * 2); x.scale(1, -1); x.drawImage(s.bg, 0, 0, W, H); } x.restore();
   // Glanzlinie
   x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1.2; x.beginPath();
   wy.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
@@ -693,7 +695,7 @@ function rainEnd() {
         <button class="btn ghost" data-action="games">Anderes Spiel</button></div>
     </div>`;
     if (s.hits >= 8 && typeof confetti === 'function') confetti();
-  }, 2600);
+  }, 4600); // zuerst die versunkene Stadt zeigen
 }
 
 const rainActions = {
