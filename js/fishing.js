@@ -270,16 +270,25 @@ async function fishCatch(f) {
   fishFloat(f.x + f.bw / 2, f.y - 10, `+10 · ${gameForm(f.w)} = ${f.w.german}`, 'good');
   // Fisch zappelt, dann im Bogen aus dem Wasser in den Eimer
   f.el.classList.add('wiggle');
+  const bucket = { x: s.avX + s.aw * 1.25, y: s.waterY - 46 };
+  if (s.f3?.catchFish) { // 3D: zappelt an der Schnur aus dem Wasser, schwingt über den Eimer und plumpst hinein
+    s.pull = 0.7; s.casting = true;
+    const pullT = gEvery(() => { s.pull = 0.45 + Math.random() * 0.3; }, 90);
+    await s.f3.catchFish(f);
+    clearInterval(pullT);
+    if (G.id !== 'fish') return;
+  } else {
   s.pull = 0.6;
   await fishTween(380, (k) => { s.pull = 0.6 * (1 - k) + 0.25; });
   fishSplash(f.x + f.bw / 2, s.waterY, 10);
-  const start = { x: f.x, y: f.y }, bucket = { x: s.avX + s.aw * 1.25, y: s.waterY - 46 };
+  const start = { x: f.x, y: f.y };
   await fishTween(720, (k) => {
     const e = fishEase(k);
     f.x = start.x + (bucket.x - start.x) * e; f.y = start.y + (bucket.y - start.y) * e - Math.sin(k * Math.PI) * 120;
     if (!s.f3) f.el.style.transform = `translate3d(${f.x}px, ${f.y}px, 0) rotate(${(f.dir > 0 ? 1 : -1) * k * 360}deg) scale(${1 - k * 0.55})`;
     s.hook = { x: f.x + f.bw / 2, y: f.y + 10 };
   });
+  }
   f.el.remove();
   s.fish = s.fish.filter((x) => x !== f);
   s.pull = 0; s.casting = false;
@@ -307,6 +316,24 @@ async function fishFail(f) {
     if (a3) a3.lean = -k * k * 0.55 + Math.sin(k * 26) * 0.05 * k; else if (av) av.style.transform = `rotate(${k * 22}deg)`;
   });
   if (G.id !== 'fish') return;
+  if (s.f3?.dive && a3) { // 3D: die Kamera springt mit ins Wasser, taucht mit unter und wieder auf
+    s.fallen = true; s.pull = 0; s.casting = false;
+    gavSound('whoosh');
+    await s.f3.dive({
+      splash: () => { gavSound('splash'); s.stage?.classList.remove('quake'); void s.stage?.offsetWidth; s.stage?.classList.add('quake'); f.hooked = false; f.leaving = true; f.v *= 3; f.el.classList.remove('hooked'); },
+      under: () => gavSound('bubbles'),
+      surface: () => { gavSound('plop'); a3.setAnim('laugh'); },
+      jump: () => a3.setAnim('jump'),
+    });
+    if (G.id !== 'fish') return;
+    a3.lean = 0; a3.spinZ = 0; a3.rotY = 0.6; a3.setAnim('hold');
+    av?.classList.add('drip'); gLater(() => av?.classList.remove('drip'), 1600);
+    s.fallen = false;
+    fishLayout(); fishHud();
+    if (s.lives <= 0) { fishEnd(); return; }
+    fishRound();
+    return;
+  }
   // … fliegt in hohem Bogen (mit Salto) …
   av.classList.add('falling');
   s.fallen = true; s.pull = 0; s.casting = false; // die Angel fliegt weg

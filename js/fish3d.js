@@ -67,6 +67,7 @@ async function f3Mount(stage) {
   { const g = nC.getContext('2d'), id = g.createImageData(128, 128); for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) { const a = Math.sin(x * 0.2 + Math.sin(y * 0.15) * 2) * 0.5 + Math.sin(y * 0.27 + x * 0.05) * 0.5; const b = Math.cos(y * 0.21 + Math.sin(x * 0.12) * 2) * 0.5 + Math.cos(x * 0.31 - y * 0.07) * 0.5; const o = (y * 128 + x) * 4; id.data[o] = 128 + a * 40; id.data[o + 1] = 128 + b * 40; id.data[o + 2] = 255; id.data[o + 3] = 255; } g.putImageData(id, 0, 0); }
   const nT = new T.CanvasTexture(nC); nT.wrapS = nT.wrapT = T.RepeatWrapping; nT.repeat.set(6, 4); own.push(nT);
   const waterM = new T.MeshStandardMaterial({ color: new T.Color(L.water[0]).lerp(new T.Color(L.water[1]), 0.35), transparent: true, opacity: 0.5, roughness: 0.6, metalness: 0.05, envMapIntensity: 0.35, depthWrite: false }); // ruhige Oberfläche ohne Glitzern
+  waterM.side = T.DoubleSide; // auch von unten sichtbar (beim Tauchen mit dem Avatar)
   const water = new T.Mesh(new T.PlaneGeometry(320, 260, 160, 130), waterM); own.push(water.geometry, waterM);
   water.rotation.x = -Math.PI / 2; water.position.set(0, 0, -18); water.renderOrder = 2; scene.add(water);
   const wpos = water.geometry.attributes.position, wbase = Float32Array.from(wpos.array);
@@ -99,7 +100,8 @@ async function f3Mount(stage) {
   const dock = mesh(vox((B) => { for (let x = 0; x <= 34; x++) B.box(x, 0, -9, x, 1, 9, (xx, y) => (xx % 5 === 0 ? 0x5b3a22 : rnShade(0x9c6b3e, (s3Rand(Math.floor(xx / 5)) - 0.5) * 0.16 + (y === 1 ? 0.05 : 0)))); for (const px of [4, 17, 30]) B.tube('z', -9, 9, 0, -2, 2.4, (x, y, z) => ((Math.abs(z) % 6) < 1 ? 0x334155 : 0x2b5f8a), { mat: 1 }); }, { u: 0.12, iter: 1 })); // Schwimmkörper statt Stelzen
   scene.add(dock);
   const bucket = mesh(vox((B) => { B.cyl(0, 0, 0, 11, (y) => 5 + y * 0.22, (x, y) => (y > 9 ? 0xd8e1ea : rnShade(0x9fb2c5, (y % 4 === 0) ? -0.12 : 0)), { mat: 3 }); B.cyl(0, 0, 1, 11, (y) => 4 + y * 0.22, 0x3a4656); B.curve([[-7, 11, 0], [0, 18, 0], [7, 11, 0]], 0.5, 0x6b7a8c, { mat: 3 }); }, { u: 0.035, iter: 2 }));
-  scene.add(bucket);
+  bucket.scale.setScalar(1.7); scene.add(bucket); // grosser Eimer: die Fische passen hinein
+  let bucketWob = 0;
   const reedG = vox((B) => { for (let k = 0; k < 6; k++) { const x0 = k * 2.5, hh = 18 + (k % 3) * 6; B.curve([[x0, 0, (k % 2) * 2], [x0 + 1, hh * 0.6, 0], [x0 + 2.5, hh, 0]], 0.7, k % 2 ? 0x5f9e4a : 0x4a8a3a); if (k % 2 === 0) B.ell(x0 + 2.5, hh + 2, 0, 1.2, 3, 1.2, 0x6b4226); } }, { u: 0.06, iter: 1, project: false });
   const reeds = [];
   for (const [x, z] of [[-7.4, -1.6], [-8.2, -2.6]]) { const r = mesh(reedG, false); r.position.set(x, -0.3, z); scene.add(r); reeds.push(r); }
@@ -129,7 +131,7 @@ async function f3Mount(stage) {
     const look = S3_FISH_LOOK[kind] || {};
     const bw = el.offsetWidth - 34, Lb = Math.max(18, Math.round(bw / 4)); // längere Wörter → längere Fische
     const F = s3FishBuild(kind, look.c1 ?? c1, look.c2 ?? c2, Lb);
-    const u = 0.075;
+    const u = 0.056; // etwas kleinere Fische
     const gb = vox(F.body, { u, iter: 3, field: 1.1 }), gt = vox(F.tail, { u, iter: 1, field: 0.8 });
     const g = new T.Group(), body = mesh(gb);
     const inner2 = new T.Group(); inner2.add(body);
@@ -150,18 +152,115 @@ async function f3Mount(stage) {
   const dropG = new T.SphereGeometry(0.05, 8, 6), dropM = new T.MeshStandardMaterial({ color: 0xe6f6ff, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.9 }); own.push(dropG, dropM);
   const ringG = new T.RingGeometry(0.85, 1, 40), ringM = new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: T.DoubleSide, depthWrite: false }); own.push(ringG, ringM);
   const parts = [], rings = [];
-  const splash = (x, big) => {
-    const p = M(x, s.waterY + 1); p.y = 0.02;
-    const n = big ? 60 : 18;
+  const splash = (x, big) => splashW(M(x, s.waterY + 1), big);
+  const splashW = (p0, big, few) => {
+    const p = p0.clone(); p.y = 0.02;
+    const n = big ? 60 : few ? 8 : 18;
     for (let i = 0; i < n; i++) { const m = new T.Mesh(dropG, dropM); m.position.copy(p); const a = Math.random() * Math.PI * 2, sp = (big ? 1.2 : 0.6) + Math.random() * (big ? 2.2 : 1); m.userData = { v: new T.Vector3(Math.cos(a) * sp, (big ? 3.5 : 2) + Math.random() * (big ? 4 : 2), Math.sin(a) * sp), life: 2 }; m.scale.setScalar(0.6 + Math.random() * (big ? 1.4 : 0.8)); scene.add(m); parts.push(m); }
     for (let i = 0; i < (big ? 3 : 1); i++) { const r = new T.Mesh(ringG, ringM.clone()); own.push(r.material); r.rotation.x = -Math.PI / 2; r.position.set(p.x, 0.03, p.z); r.userData = { t: -i * 0.18, big }; scene.add(r); rings.push(r); }
     if (big) { av.splashT = 0.001; av.splashAt = p.clone(); }
   };
   const bubbleG = new T.SphereGeometry(0.04, 8, 6), bubbleM = new T.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, roughness: 0.05 }); own.push(bubbleG, bubbleM);
+  const bubbleW = (p) => { const m = new T.Mesh(bubbleG, bubbleM); m.position.copy(p); m.userData = { v: new T.Vector3((Math.random() - 0.5) * 0.2, 0.7 + Math.random() * 0.6, (Math.random() - 0.5) * 0.2), life: 4, bubble: true }; m.scale.setScalar(0.6 + Math.random() * 1.2); scene.add(m); parts.push(m); };
   const bubble = (x, y) => { const p = M(x ?? Math.random() * (s.W || 800), y ?? (s.H || 500) - 10); const m = new T.Mesh(bubbleG, bubbleM); m.position.copy(p); m.userData = { v: new T.Vector3(0, 0.6 + Math.random() * 0.5, 0), life: 4, bubble: true }; m.scale.setScalar(0.6 + Math.random()); scene.add(m); parts.push(m); };
   // Wassersäule beim grossen Platscher
   const colM = new T.MeshStandardMaterial({ color: 0xe6f6ff, transparent: true, opacity: 0.8, roughness: 0.1 }); const colG = new T.CylinderGeometry(0.12, 0.35, 1, 14, 1, true); colG.translate(0, 0.5, 0); own.push(colM, colG);
   const column = new T.Mesh(colG, colM); column.visible = false; scene.add(column);
+
+  /* ---------- Fang: Fisch zappelt an der Schnur aus dem Wasser, schwingt über den Eimer und plumpst hinein ---------- */
+  let catchA = null;
+  const sm = (k) => k * k * (3 - 2 * k);
+  const bucketTop = () => { bucket.updateMatrixWorld(true); const b = new T.Box3().setFromObject(bucket); return new T.Vector3((b.min.x + b.max.x) / 2, b.max.y - 0.12, (b.min.z + b.max.z) / 2); };
+  function catchStep(o, dt) {
+    const A = catchA; A.t0 = A.t0 || performance.now(); A.t = (performance.now() - A.t0) / 1000; // nach Uhrzeit
+    if (!A.from) { A.from = o.position.clone(); A.sc = o.scale.x; A.dir = A.f.dir > 0 ? 1 : -1; }
+    const T1 = 0.45, T2 = T1 + 0.5, T3 = T2 + 0.55, T4 = T3 + 0.38, t2 = A.t;
+    const tip = rod.position.clone().add(new T.Vector3(0, 0, 0)), surf = new T.Vector3(A.from.x, -0.12, A.from.z);
+    const hang = new T.Vector3(A.from.x + (tip.x - A.from.x) * 0.3, 0.95, A.from.z + (tip.z - A.from.z) * 0.2);
+    const top = bucketTop(), above = top.clone().add(new T.Vector3(0, 0.7, -0.05));
+    const wig = Math.sin(t2 * 34) * 0.35;
+    const len = (o.userData.len || 1) * 0.5;
+    if (t2 < T1) { // zappelt unter Wasser zur Oberfläche
+      const k = sm(t2 / T1); o.position.lerpVectors(A.from, surf, k); o.rotation.set(0, A.dir > 0 ? Math.PI : 0, wig * 0.5 + k * 0.5 * A.dir);
+    } else if (t2 < T2) { // wird aus dem Wasser gezogen, hängt am Haken (Maul oben)
+      if (!A.out) { A.out = true; splashW(surf, false, true); if (typeof gavSound === 'function') gavSound('plop'); }
+      const k = sm((t2 - T1) / (T2 - T1)); o.position.lerpVectors(surf, hang, k);
+      o.rotation.set(0, A.dir > 0 ? Math.PI : 0, (A.dir > 0 ? -1 : 1) * Math.PI / 2 * Math.min(1, k * 1.6) + wig);
+      if (Math.random() < 0.3) { const d = new T.Mesh(dropG, dropM); d.position.copy(o.position); d.userData = { v: new T.Vector3((Math.random() - 0.5) * 0.8, -0.5, (Math.random() - 0.5) * 0.5), life: 1 }; scene.add(d); parts.push(d); }
+    } else if (t2 < T3) { // schwingt zum Eimer
+      const k = sm((t2 - T2) / (T3 - T2)), ctrl = hang.clone().lerp(above, 0.5).add(new T.Vector3(0, 0.3, -0.3));
+      const a = hang.clone().lerp(ctrl, k), b = ctrl.clone().lerp(above, k); o.position.lerpVectors(a, b, k); o.scale.setScalar(A.sc * (1 - k * 0.2));
+      o.rotation.set(0, A.dir > 0 ? Math.PI : 0, (A.dir > 0 ? -1 : 1) * Math.PI / 2 + wig * 0.7);
+    } else if (t2 < T4) { // Haken los: plumpst senkrecht in den Eimer
+      const k = (t2 - T3) / (T4 - T3);
+      o.position.lerpVectors(above, top.clone().add(new T.Vector3(0, -0.1, 0)), k * k);
+      o.rotation.set(0, A.dir > 0 ? Math.PI : 0, (A.dir > 0 ? -1 : 1) * Math.PI / 2 + Math.sin(t2 * 40) * 0.2);
+      o.scale.setScalar(A.sc * (0.8 - k * 0.15));
+    } else {
+      o.visible = false; bucketWob = 1; splashW(top.clone().setY(0), false, true); parts.slice(-8).forEach((d) => { d.position.y = top.y; d.position.x = top.x + (Math.random() - 0.5) * 0.2; d.position.z = top.z; d.userData.v.multiplyScalar(0.45); d.userData.v.y = 1.6 + Math.random(); });
+      catchA = null; A.res(); return;
+    }
+    o.userData.tail.rotation.y = Math.sin(t2 * 30 + o.userData.ph) * 0.6;
+    // Haken im Maul: Spitze des Fisches (beim Hängen oben)
+    A.mouth = o.position.clone().add(new T.Vector3(0, t2 < T1 ? 0 : len, 0));
+    if (t2 >= T3) A.mouth = above.clone().add(new T.Vector3(0, 0.4, 0));
+  }
+
+  /* ---------- Sturz ins Wasser: die Kamera springt mit, taucht unter, taucht wieder auf, zurück auf den Steg ---------- */
+  let dive = null, wasUnder = false;
+  const airFog = scene.fog, underFog = new T.Fog(new T.Color(0x1d6f8e), 0.3, 9), underBg = new T.Color(0x1d6f8e);
+  const D = { fly: 0.8, under: 1.5, rise: 0.6, bob: 0.7, jump: 0.75 };
+  function diveStep(dt) {
+    const d = dive, τ = (performance.now() - d.t0) / 1000;
+    const t1 = D.fly, t2 = t1 + D.under, t3 = t2 + D.rise, t4 = t3 + D.bob, t5 = t4 + D.jump;
+    const P0 = d.P0, E = d.E, feetIn = -1.05, deep = -2.05, surf = -1.12;
+    let x = P0.x, y = P0.y, z = P0.z, spin = 0, lean = 0, rotY = av.rotY;
+    const fire = (k) => { if (!d.fired[k]) { d.fired[k] = true; d.ev[k]?.(); } };
+    if (τ < t1) { // Bogen mit Salto, Kopf voran ins Wasser
+      const k = τ / t1; x = P0.x + (E.x - P0.x) * k; z = P0.z + (E.z - P0.z) * k; y = P0.y + (feetIn - P0.y) * k * k + Math.sin(Math.PI * k) * 1.1;
+      spin = -k * Math.PI * 1.1; lean = d.lean0 * (1 - k);
+      if (k > 0.72) { fire('splash'); if (!d.sp) { d.sp = true; splashW(E, true); } }
+    } else if (τ < t2) { // unter Wasser: sinkt, dreht sich langsam auf, Blasen
+      fire('splash'); if (!d.sp) { d.sp = true; splashW(E, true); }
+      const k = (τ - t1) / D.under, e = sm(k);
+      x = E.x + 0.25 * e; z = E.z - 0.2 * e; y = feetIn + (deep - feetIn) * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2);
+      spin = -Math.PI * 1.1 * (1 - e) - Math.sin(k * Math.PI) * 0.4; rotY = 0.6 + Math.sin(k * 6) * 0.3;
+      fire('under');
+      d.bt = (d.bt || 0) - dt; if (d.bt <= 0) { d.bt = 0.07; bubbleW(new T.Vector3(x + (Math.random() - 0.5) * 0.3, y + 1.2, z + (Math.random() - 0.5) * 0.3)); }
+    } else if (τ < t3) { // schwimmt hoch
+      fire('rise');
+      const k = sm((τ - t2) / D.rise); x = E.x + 0.25; z = E.z - 0.2; y = deep + (surf - deep) * k; rotY = 0.6;
+      if (Math.random() < 0.4) bubbleW(new T.Vector3(x, y + 1.3, z));
+    } else if (τ < t4) { // Kopf ist draussen: prustet, schüttelt sich
+      fire('surface'); if (!d.sp2) { d.sp2 = true; splashW(new T.Vector3(E.x + 0.25, 0, E.z - 0.2), false); }
+      const k = (τ - t3) / D.bob; x = E.x + 0.25; z = E.z - 0.2; y = surf + Math.sin(k * Math.PI * 3) * 0.05; rotY = 0.6 + Math.sin(k * 40) * 0.25 * (1 - k);
+    } else if (τ < t5) { // springt zurück auf den Steg
+      fire('jump'); if (!d.sp3) { d.sp3 = true; splashW(new T.Vector3(E.x + 0.25, 0, E.z - 0.2), false); }
+      const k = sm((τ - t4) / D.jump), sx = E.x + 0.25, sz = E.z - 0.2;
+      x = sx + (P0.x - sx) * k; z = sz + (P0.z - sz) * k; y = surf + (P0.y - surf) * k + Math.sin(Math.PI * k) * 1.2; rotY = -0.6;
+    } else { yaw.position.copy(P0); spinG.rotation.x = 0; tilt.rotation.x = 0; const r = d.res; dive = null; fire('land'); r(); return; }
+    yaw.position.set(x, y, z); yaw.rotation.y = 2.0 + (rotY - 0.6) * 1.2; tilt.rotation.x = -lean; spinG.rotation.x = -spin;
+    yaw.scale.set(av.scale * av.sx, av.scale * av.sy, av.scale * av.sx);
+  }
+  const camPose = (τ) => {
+    const d = dive, E = d.E, A = yaw.position;
+    const head = A.clone().add(new T.Vector3(0, 0.9, 0));
+    const t1 = D.fly, t2 = t1 + D.under, t3 = t2 + D.rise, t4 = t3 + D.bob, t5 = t4 + D.jump;
+    const base = [cam.position.clone(), camLook.clone()];
+    const follow = [new T.Vector3(E.x + 0.9, 2.2, E.z + 4.4), E.clone().add(new T.Vector3(0.1, -0.3, 0))];
+    const underP = [new T.Vector3(E.x + 0.6, -0.95, E.z + 2.7), head];
+    const above = [new T.Vector3(E.x + 1.0, 1.35, E.z + 3.7), head];
+    const keys = [[0, base], [t1 * 0.85, follow], [t1 + 0.35, underP], [t2 + D.rise * 0.55, underP], [t3 + 0.15, above], [t4, above], [t5, base]];
+    for (let i = 0; i < keys.length - 1; i++) {
+      const [ta, pa] = keys[i], [tb, pb] = keys[i + 1];
+      if (τ <= tb) { const k = sm(Math.max(0, Math.min(1, (τ - ta) / (tb - ta)))); return [pa[0].clone().lerp(pb[0], k), pa[1].clone().lerp(pb[1], k)]; }
+    }
+    return base;
+  };
+  function diveCam() {
+    const [p, l] = camPose((performance.now() - dive.t0) / 1000);
+    cam.position.copy(p); cam.lookAt(l);
+  }
 
   /* ---------- Bildgrösse, Kamera ---------- */
   function fit() {
@@ -192,10 +291,12 @@ async function f3Mount(stage) {
     // Steg und Eimer an die Logik-Positionen
     const dp = dockPx(); const d0 = M(dp.x0, s.waterY - 12), d1 = M(dp.x1, s.waterY - 12);
     dock.position.set(d0.x, 0.08 + Math.sin(t * 1.3) * 0.025, ZN - 0.1); dock.rotation.z = Math.sin(t * 0.9) * 0.012; dock.scale.set((d1.x - d0.x) / (34 * 0.12), 1, 1);
-    const bk = M(s.avX + s.aw * 1.25 + 10, s.waterY - 12); bucket.position.set(bk.x, bk.y - 0.02, ZN + 0.4);
+    const bk = M(s.avX + s.aw * 1.25 + 22, s.waterY - 12); bucket.position.set(bk.x, bk.y - 0.02, ZN + 0.4);
+    bucketWob = Math.max(0, bucketWob - dt * 1.6); bucket.rotation.z = Math.sin(t * 22) * 0.12 * bucketWob;
     // Avatar folgt dem (unsichtbaren) Avatar-Element der Logik
     const el = $('#fi-avatar');
-    if (el) {
+    if (dive) diveStep(dt);
+    else if (el) {
       const ax = el.offsetLeft + (s.aw || 100) / 2, ay = el.offsetTop + (s.ah || 150) * 0.955;
       const p = M(ax, ay); yaw.position.set(p.x, p.y + av.lift * 0.01, p.z + (ay <= s.waterY ? 0.2 : 0));
       yaw.rotation.y = 2.0 + (av.rotY - 0.6) * 1.2;
@@ -211,7 +312,7 @@ async function f3Mount(stage) {
     rod.position.copy(handW); rod.scale.set(1, handW.distanceTo(tipW), 1);
     rod.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), tipW.clone().sub(handW).normalize());
     // Schnur zum Haken
-    const hk = s.casting && s.hook ? M(s.hook.x, s.hook.y) : new T.Vector3(tipW.x + 0.4, Math.sin(t * 2.4) * 0.03, Math.min(ZN - 0.4, tipW.z - 0.6));
+    const hk = catchA?.mouth ? catchA.mouth.clone() : s.casting && s.hook ? M(s.hook.x, s.hook.y) : new T.Vector3(tipW.x + 0.4, Math.sin(t * 2.4) * 0.03, Math.min(ZN - 0.4, tipW.z - 0.6));
     if (!s.casting) bobber.position.set(hk.x, 0.04 + Math.sin(t * 2.4) * 0.03, hk.z);
     const pa = lineG.attributes.position;
     for (let i = 0; i < 16; i++) { const k = i / 15; const sag = Math.sin(k * Math.PI) * (pull ? 0.1 : 0.45); pa.setXYZ(i, tipW.x + (hk.x - tipW.x) * k, tipW.y + (hk.y - tipW.y) * k - sag, tipW.z + (hk.z - tipW.z) * k); }
@@ -222,6 +323,7 @@ async function f3Mount(stage) {
       if (!f.el?.isConnected) continue;
       now2.add(f.el);
       let o = fishObjs.get(f.el); if (!o) { o = fishModel(f.el); fishObjs.set(f.el, o); }
+      if (catchA && catchA.f === f) { catchStep(o, dt); f.el.style.opacity = '0'; continue; }
       const p = M(f.x + f.bw / 2, f.y + f.bh / 2);
       o.position.copy(p);
       const dir = f.dir > 0 ? 1 : -1;
@@ -233,7 +335,7 @@ async function f3Mount(stage) {
       const sc = toScreen(p);
       const bwp = f.el.offsetWidth, bhp = f.el.offsetHeight;
       labs.push({ el: f.el, x: sc.x - bwp / 2, y: sc.y - bhp / 2 - 4, w: bwp, h: bhp });
-      f.el.style.opacity = f.y < s.waterY - 10 ? '0' : '';
+      f.el.style.opacity = f.y < s.waterY - 10 || dive ? '0' : '';
     }
     // Schilder, die sich überdecken würden, auseinanderschieben (oben/unten), damit jedes Wort lesbar bleibt
     for (let it = 0; it < 4; it++) for (let a = 0; a < labs.length; a++) for (let b = a + 1; b < labs.length; b++) {
@@ -253,12 +355,24 @@ async function f3Mount(stage) {
     if (av.splashT) { av.splashT += dt; const k = av.splashT; column.visible = k < 0.9; column.position.copy(av.splashAt); column.scale.set(1, Math.sin(Math.min(1, k / 0.9) * Math.PI) * 2.2 + 0.01, 1); colM.opacity = 0.8 * (1 - k / 0.9); if (k > 0.9) av.splashT = 0; }
     // Kamera (sanftes Schweben)
     cam.position.set(camBase.x + Math.sin(t * 0.25) * 0.15, camBase.y + Math.sin(t * 0.33) * 0.08, camBase.z); cam.lookAt(camLook);
+    if (dive) diveCam();
+    const under = cam.position.y < -0.02; // unter Wasser: blaues, trübes Licht
+    if (under !== wasUnder) { wasUnder = under; scene.fog = under ? underFog : airFog; scene.background = under ? underBg : skyT; }
     meter(dt);
     if (post) post.render(); else renderer.render(scene, cam);
     raf = requestAnimationFrame(loop);
   };
   const ctl = {
     alive: true, av, splash, bubble,
+    /** Fang in 3D (Promise endet, wenn der Fisch im Eimer liegt) */
+    catchFish(f) { return new Promise((res) => { catchA = { f, t: 0, res }; }); },
+    /** Sturz ins Wasser mit Kamera unter Wasser; ev: { splash, under, rise, surface, jump, land } */
+    dive(ev = {}) {
+      return new Promise((res) => {
+        const P0 = yaw.position.clone(), E = new T.Vector3(Math.min(P0.x + 2.7, 2.2), 0, P0.z - 2.1);
+        dive = { t0: performance.now(), P0, E, ev, fired: {}, res, lean0: av.lean };
+      });
+    },
     /** Pixel der Logik → Bildschirm (für Texte, Funken) */
     screen(x, y) { const p = toScreen(M(x, y)); return [p.x, p.y]; },
     dispose() {
