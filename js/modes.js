@@ -672,7 +672,10 @@ function speakZone(set, w) {
   }
   if (s === 'bad' && speakM.ph) {
     const r = speakM.ph;
-    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz.</strong> Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
+    const LET = { T: 't', P: 'p', K: 'k', S: 's', Z: 's', D: 'd', B: 'b', G: 'g', F: 'f', V: 'w', M: 'm', N: 'n', L: 'l', R: 'r', W: 'w', HH: 'h', TH: 'th', DH: 'th', SH: 'sch', CH: 'tsch', JH: 'dsch', NG: 'ng', Y: 'j', ZH: 'sch' };
+    const extra = (r.extra || []).map((x) => LET[x] || x.toLowerCase());
+    const why = extra.length ? ` Da war ein Laut zu viel: „${esc(extra.join('“, „'))}“.` : '';
+    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz.</strong>${why} Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
       <div class="row center">${listenBtns}</div>
       <div class="row center">
         <button class="btn primary" data-action="listen">${icon('mic')} Nochmal sprechen</button>

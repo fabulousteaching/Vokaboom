@@ -143,7 +143,7 @@ function loadPhoneticEngine(lang = 'en') {
 /* ---------- Aufnehmen: hört zu, bis nach dem Sprechen kurz Stille ist ---------- */
 const phRec = { stop: null };
 
-async function phRecord({ onStart, onLevel, maxMs = 5000, silenceMs = 650 } = {}) {
+async function phRecord({ onStart, onLevel, maxMs = 6000, silenceMs = 900 } = {}) { // 0,9 s Pause: „the … weather“ wird nicht abgeschnitten
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: db.settings.micId ? { deviceId: { exact: db.settings.micId } } : true });
@@ -265,39 +265,108 @@ function phScore(engine, post, phones) {
   for (let t = 0; t < frames; t++) if (argmax(probs.subarray(t * V, t * V + V)) !== SIL) { if (first < 0) first = t; last = t; }
   const ids = phones.map((p) => vocab[p]);
   if (first < 0 || last - first + 1 < Math.max(8, ids.length * 2)) return { silent: true };
-  const n = last - first + 1;
-  const sub = probs.subarray(first * V, (last + 1) * V);
-  const align = core.forcedAlign(sub, n, V, ids);
   const id2p = {};
   for (const [p, i] of Object.entries(vocab)) id2p[i] = p;
   const same = phones.map((p) => [vocab[p], ...(EN_SAME[p] || []).map((q) => vocab[q])].filter((x) => x != null));
   const close = phones.map((p) => (EN_CLOSE[p] || []).map((q) => vocab[q]).filter((x) => x != null));
-  const st = ids.map(() => ({ g: [], votes: new Float64Array(V) }));
-  for (let t = 0; t < n; t++) {
-    const row = sub.subarray(t * V, t * V + V);
-    const j = align[t], s = st[j];
-    const b = argmax(row);
-    let own = 0;
-    for (const c of same[j]) own = Math.max(own, row[c]);
-    for (const c of close[j]) own = Math.max(own, EN_CLOSE_W * row[c]);
-    s.g.push(Math.min(0, Math.log(own + 1e-8) - Math.log(row[b] + 1e-8)));
-    for (let c = 0; c < V; c++) s.votes[c] += row[c];
+  // Bewertung für einen Ausschnitt [a, b]
+  const rate = (a, b) => {
+    const n = b - a + 1;
+    if (n < Math.max(8, ids.length * 2)) return null;
+    const sub = probs.subarray(a * V, (b + 1) * V);
+    const align = core.forcedAlign(sub, n, V, ids);
+    const st = ids.map(() => ({ g: [], votes: new Float64Array(V) }));
+    for (let t = 0; t < n; t++) {
+      const row = sub.subarray(t * V, t * V + V);
+      const j = align[t], s = st[j];
+      const bb = argmax(row);
+      let own = 0;
+      for (const c of same[j]) own = Math.max(own, row[c]);
+      for (const c of close[j]) own = Math.max(own, EN_CLOSE_W * row[c]);
+      s.g.push(Math.min(0, Math.log(own + 1e-8) - Math.log(row[bb] + 1e-8)));
+      for (let c = 0; c < V; c++) s.votes[c] += row[c];
+    }
+    const result = phones.map((p, j) => {
+      const s = st[j];
+      // Ränder eines Lauts sind unsicher: die besseren zwei Drittel der Frames zählen
+      const g = s.g.slice().sort((x, y) => y - x).slice(0, Math.max(1, Math.ceil(s.g.length * 0.67)));
+      const score = g.length ? Math.round(100 * Math.exp(g.reduce((acc, x) => acc + x, 0) / g.length)) : 0;
+      const top = argmax(s.votes);
+      const heard = same[j].includes(top) ? p : (id2p[top] || '?');
+      return { exp: p, heard, score };
+    });
+    // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte
+    const ps = result.map((r) => r.score);
+    const mean = ps.reduce((acc, x) => acc + x, 0) / ps.length;
+    return { gop: Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length))), phones: result };
+  };
+  // Atem, Schmatzen oder Mikrofon-Geräusch ganz am Rand (bis 60 ms) nicht dem ersten/letzten Laut anrechnen
+  let best = null;
+  for (const da of [0, 3, 6]) for (const db of [0, 3, 6]) {
+    const r = rate(first + da, last - db);
+    if (r && (!best || r.gop > best.gop)) best = r;
   }
-  const result = phones.map((p, j) => {
-    const s = st[j];
-    // Ränder eines Lauts sind unsicher: die besseren zwei Drittel der Frames zählen
-    const g = s.g.slice().sort((a, b) => b - a).slice(0, Math.max(1, Math.ceil(s.g.length * 0.67)));
-    const score = g.length ? Math.round(100 * Math.exp(g.reduce((a, x) => a + x, 0) / g.length)) : 0;
-    const top = argmax(s.votes);
-    const heard = same[j].includes(top) ? p : (id2p[top] || '?');
-    return { exp: p, heard, score };
-  });
-  // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte:
-  // ein etwas undeutlicher Laut kippt nicht gleich alles, ein falscher zählt immer
-  const ps = result.map((r) => r.score);
-  const mean = ps.reduce((a, x) => a + x, 0) / ps.length;
-  const score = Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length)));
-  return { silent: false, score, phones: result };
+  if (!best) return { silent: true };
+  // zweite Prüfung: frei gehörte Lautfolge – deutlich eingeschobene Mitlaute („list-t-en“, „lam-p“) kosten Punkte
+  const dec = phDecode(engine, post);
+  const extra = phInserted(phones, dec);
+  const score = Math.max(0, best.gop - 45 * extra.length); // ein deutlich eingeschobener Mitlaut macht ein anderes Wort (lamb → lamp)
+  return { silent: false, score, gop: best.gop, extra: extra.map((x) => x.ph), dec: dec.map((x) => `${x.ph}:${x.n}:${Math.round(x.p * 100)}`).join(' '), phones: best.phones };
+}
+
+/**
+ * Frei gehörte Lautfolge (ohne Vorgabe, welches Wort kommt): je 10 ms der wahrscheinlichste Laut;
+ * Ausreisser von nur 10 ms zählen nicht, Stille fällt weg.
+ */
+function phDecode(engine, post) {
+  const { vocab } = engine, { probs, frames, V } = post;
+  const SIL = vocab['[SIL]'];
+  const special = new Set(['[UNK]', '[PAD]', '<s>', '</s>'].map((k) => vocab[k]).filter((x) => x != null));
+  const id2p = {};
+  for (const [ph, i] of Object.entries(vocab)) id2p[i] = ph;
+  const runs = [];
+  for (let t = 0; t < frames; t++) {
+    const row = probs.subarray(t * V, t * V + V);
+    let b = 0, bv = -1;
+    for (let c = 0; c < V; c++) { if (special.has(c)) continue; if (row[c] > bv) { bv = row[c]; b = c; } }
+    const r = runs[runs.length - 1];
+    if (r && r.id === b) { r.n++; r.p += bv; } else runs.push({ id: b, n: 1, p: bv });
+  }
+  const out = [];
+  for (const r of runs) {
+    if (r.n < 2 || r.id === SIL) continue;
+    const last = out[out.length - 1];
+    if (last && last.ph === id2p[r.id]) { last.n += r.n; last.p += r.p; } else out.push({ ph: id2p[r.id], n: r.n, p: r.p });
+  }
+  out.forEach((x) => { x.p /= x.n; });
+  return out;
+}
+
+const EN_VOWELS = new Set(['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW']);
+/**
+ * Deutlich gehörte Mitlaute, die im Wort nicht vorkommen (eingeschoben): mindestens 50 ms lang, mindestens 70 % sicher,
+ * nicht ganz am Anfang (dort ist es oft Atem oder ein Mikrofon-Geräusch).
+ */
+function phInserted(exp, dec) {
+  const heard = dec.map((x) => x.ph);
+  const sub = (a, b) => (a === b || (EN_SAME[a] || []).includes(b) ? 0 : (EN_CLOSE[a] || []).includes(b) ? 0.3 : 1);
+  const n = exp.length, m = heard.length;
+  const d = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
+  for (let i = 1; i <= n; i++) d[i][0] = i;
+  for (let j = 1; j <= m; j++) d[0][j] = j * 0.8;
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 0.8, d[i - 1][j - 1] + sub(exp[i - 1], heard[j - 1]));
+  // Rückweg: welche gehörten Laute wurden als „eingeschoben“ ausgerichtet?
+  const ins = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && Math.abs(d[i][j] - (d[i - 1][j - 1] + sub(exp[i - 1], heard[j - 1]))) < 1e-9) { i--; j--; }
+    else if (j > 0 && Math.abs(d[i][j] - (d[i][j - 1] + 0.8)) < 1e-9) { ins.push({ j: j - 1, before: i }); j--; }
+    else i--;
+  }
+  return ins.filter(({ j: jj, before }) => {
+    const x = dec[jj];
+    return before > 0 && !EN_VOWELS.has(x.ph) && x.n >= 5 && x.p >= 0.7;
+  }).map(({ j: jj }) => dec[jj]);
 }
 
 /** Mit und ohne Artikel („to/the/a“, „le/la/les/l’ …“) prüfen, das bessere Ergebnis zählt */
