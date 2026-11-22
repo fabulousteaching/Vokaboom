@@ -281,6 +281,7 @@ function rnPool(T, scene, geo, mats, cap, { shadow = false, receive = true } = {
 /* =========================================================
    Das Spiel
    ========================================================= */
+const RN_COINS_PER = 50; // so viele Münzen auf dem Weg ergeben 1 echte Münze
 async function runnerStart(host, opts) {
   const T = await w3Three();
   if (typeof w3LoadEngine === 'function') await w3LoadEngine();
@@ -293,7 +294,7 @@ async function runnerStart(host, opts) {
   host.classList.add('rn', `rn-w-${W.id}`);
   host.innerHTML = `
     <div class="rn-top"><div class="rn-host">${o.hudHTML || ''}</div>
-      <div class="rn-stats"><span class="rn-gems" title="Gesammelte Kristalle"><i>💎</i><b id="rngems">0</b></span><span class="rn-speed" title="Tempo – jede richtige Antwort macht dich ein bisschen schneller">⚡ <b id="rnspeed">0</b> km/h</span><span class="rn-dist"><b id="rndist">0</b> m</span></div></div>
+      <div class="rn-stats"><span class="rn-gems" title="Gesammelte Münzen – je 50 gibt es 1 echte Münze für den Avatar-Shop"><i class="rn-coin" aria-hidden="true"></i><b id="rngems">0</b><small id="rngemsx"></small></span><span class="rn-speed" title="Tempo – jede richtige Antwort macht dich ein bisschen schneller">⚡ <b id="rnspeed">0</b> km/h</span><span class="rn-dist"><b id="rndist">0</b> m</span></div></div>
     <div class="rn-ask" id="rnask" hidden><small id="rnhint">${esc2(o.hint || 'Lauf durch das richtige Ergebnis')}</small><div class="rn-q" id="rnq"></div><i class="rn-bar"><b id="rnbar"></b></i></div>
     <div class="rn-count" id="rncount"></div>
     <div class="rn-help" id="rnhelp"><span><b>← →</b> Spur</span><span><b>↑</b> springen</span><span><b>↓</b> rutschen</span><small>Wischen oder Pfeiltasten</small></div>
@@ -422,12 +423,12 @@ async function runnerStart(host, opts) {
   if (pit) { pit.rotation.x = -Math.PI / 2; pit.position.y = W.pit.y; scene.add(pit); own.push(pit.geometry); }
   own.push(pitMat);
 
-  /* Kristalle (zum Einsammeln) */
-  const gemGeo = ownGeo(new T.OctahedronGeometry(0.26, 0));
-  const gemMat = new T.MeshStandardMaterial({ color: W.gem || 0x7df9ff, emissive: W.gem || 0x22d3ee, emissiveIntensity: 0.55, roughness: 0.15, metalness: 0.3 });
+  /* Münzen (zum Einsammeln): je 50 gibt es 1 echte Münze für den Avatar-Shop */
+  const gemGeo = ownGeo((() => { const g = new T.CylinderGeometry(0.27, 0.27, 0.07, 28); g.rotateX(Math.PI / 2); return g; })()); // Münze (steht, dreht sich um die Hochachse)
+  const gemMat = new T.MeshStandardMaterial({ color: 0xffc83d, emissive: 0x7a4b00, emissiveIntensity: 0.45, roughness: 0.25, metalness: 0.85 });
   own.push(gemMat);
   const gemPool = rnPool(T, scene, gemGeo, gemMat, 120, { shadow: false });
-  const gemGlow = new T.SpriteMaterial({ map: rnGlowTex(T, 'rgba(160,250,255,.9)', 'rgba(160,250,255,0)'), transparent: true, depthWrite: false, blending: T.AdditiveBlending });
+  const gemGlow = new T.SpriteMaterial({ map: rnGlowTex(T, 'rgba(255,220,120,.9)', 'rgba(255,220,120,0)'), transparent: true, depthWrite: false, blending: T.AdditiveBlending });
   own.push(gemGlow.map, gemGlow);
 
   /* Welt-eigene Extras (Hintergrund, Lichtstrahlen, Fische …): in Bahn-Koordinaten (x, y, -d), drehen mit der Blickrichtung */
@@ -1181,6 +1182,13 @@ async function runnerStart(host, opts) {
         if (g.got || Math.abs(g.d - S.d) > 0.7 || Math.abs(laneX(g.lane) - S.x) > 0.8 || Math.abs(g.y - (S.y + 0.7)) > 1.1) continue;
         g.got = true; gemPool.hide(g.i); S.gems++; elGems.textContent = S.gems;
         sound('tone', [1568 + (S.gems % 4) * 120], 0.05, 'sine', 0.035);
+        if (S.gems % RN_COINS_PER === 0) { // 50 Münzen auf dem Weg = 1 echte Münze
+          S.realCoins = (S.realCoins || 0) + 1;
+          if (typeof avatarEarnCoins === 'function') avatarEarnCoins(1, null, false);
+          const x = document.getElementById('rngemsx'); if (x) x.textContent = ` (+${S.realCoins})`;
+          sound('tone', [1319, 1568, 2093], 0.1, 'triangle', 0.06);
+          elGems.parentNode.classList.remove('pay'); void elGems.offsetWidth; elGems.parentNode.classList.add('pay');
+        }
       }
       // Tore
       const next = gates.find((g) => !g.passed);

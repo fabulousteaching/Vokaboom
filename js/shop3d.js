@@ -407,7 +407,7 @@ function w3RunRulesHTML(what = 'Ergebnis') {
     ['🛢️', 'Rollende Fässer', 'rollen quer über die Spuren: drüber springen oder ausweichen'],
     ['🛣️', 'Schmale Strasse', 'manchmal gibt es nur zwei Spuren oder nur eine'],
     ['↪️', 'Kurven', 'rechtzeitig nach links oder rechts wischen – sonst prallst du in die Leitwand (ein Leben weg)'],
-    ['💎', 'Kristalle', 'unterwegs einsammeln'],
+    ['🪙', 'Münzen', 'unterwegs einsammeln – je 50 gibt es 1 echte Münze für den Avatar-Shop'],
   ];
   return `<details class="rn-rules"><summary>📖 Regeln und Hindernisse</summary><ul>${R.map(([e, t, d]) => `<li><span aria-hidden="true">${e}</span><div><b>${t}</b> ${d}</div></li>`).join('')}</ul><p class="muted small">Neue Hindernisse kommen nach und nach dazu – ohne Ankündigung. Probier aus, was sie können!</p></details>`;
 }

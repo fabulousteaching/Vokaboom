@@ -109,3 +109,9 @@
 .rn-wrong li { padding: 8px 12px; border-radius: 12px; background: #ffe9e2; }
 #rnwrap { position: relative; }
 #rnwrap > .rn-load { position: relative; min-height: 420px; border-radius: 22px; }
+
+/* Münzen statt Kristalle */
+.rn-coin { display: inline-block; width: 1.05em; height: 1.05em; border-radius: 50%; vertical-align: -0.15em; background: radial-gradient(circle at 35% 30%, #FFF3B0, #FFC83D 45%, #C98A00); box-shadow: inset 0 0 0 2px #E0A526; font-style: normal; }
+.rn-gems small { font-weight: 800; color: #FFE066; margin-left: .15rem; }
+.rn-gems.pay { animation: rn-pay .7s ease; }
+@keyframes rn-pay { 30% { transform: scale(1.25); color: #FFE066; } }
