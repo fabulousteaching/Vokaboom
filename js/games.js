@@ -97,6 +97,7 @@ function gameSrs(w, result) {
   const words = set.progress.words = set.progress.words || {};
   const s = words[w.id] = words[w.id] || { n: 0, bad: 0, almost: 0 };
   srsUpdate(s, 'game', result);
+  if (typeof plogAnswer === 'function' && ui.game) plogAnswer(set, `g:${ui.game}`, result === 'correct'); // Übersicht der Lehrperson
   set.updated = Date.now();
   saveDB();
 }

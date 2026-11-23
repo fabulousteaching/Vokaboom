@@ -1650,3 +1650,18 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 /* Wechsel zwischen Vokaboom und Teilmal (oben rechts, erst wenn die Lehrperson beide Tools nutzt) */
 .tool-switch { display: inline-flex; align-items: center; gap: .35rem; margin-right: .35rem; white-space: nowrap; }
 @media (max-width: 560px) { .tool-switch .ts-name { display: none; } }
+
+/* Übersicht: Zeitspanne, Übungszeit, Detail eines Feldes */
+.stat-range { margin: .2rem 0 .7rem; }
+.stat-summary { margin: 0 0 .7rem; font-size: 1.05rem; }
+.stat-table .time-cell b { white-space: nowrap; }
+.stat-table .cell .t-line { color: var(--ink-2); }
+.stat-table .cell.click { cursor: pointer; }
+.stat-table .cell.click:hover, .stat-table .cell.click:focus-visible { outline: 2px solid var(--primary, #4F46E5); outline-offset: -2px; }
+.stat-table .cell.on { outline: 3px solid var(--primary, #4F46E5); outline-offset: -3px; }
+.cell-detail h4 { margin: 1rem 0 .4rem; }
+.ex-table { width: 100%; border-collapse: collapse; margin-top: .4rem; }
+.ex-table th, .ex-table td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line, #e5e7eb); }
+.ex-table thead th { font-size: .85rem; color: var(--ink-2); font-weight: 600; }
+.ex-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.ex-steps li { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem .5rem; border-radius: 8px; background: var(--surface-2, rgba(0,0,0,.03)); }

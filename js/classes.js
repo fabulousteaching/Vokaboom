@@ -432,7 +432,7 @@ function kidHomeHTML() {
 /* =========================================================
    Klassen der Lehrperson
    ========================================================= */
-const klass = { list: [], students: {}, progress: {}, loaded: false, loading: null, error: '', tab: 'kids', statSet: '', kidDetail: '', confirm: '', busy: false };
+const klass = { list: [], students: {}, progress: {}, loaded: false, loading: null, error: '', tab: 'kids', statSet: '', kidDetail: '', statRange: 'today', cellDetail: null, confirm: '', busy: false };
 const classById = (id) => klass.list.find((c) => c.id === id);
 const currentClass = () => classById(ui.classId);
 const studentsOf = (cid) => klass.students[cid] || [];
@@ -515,7 +515,7 @@ function openClasses() {
   loadClasses().then(() => { if (ui.view === 'classes') render(); });
 }
 function openClass(id, tab) {
-  klass.tab = tab || klass.tab || 'kids'; klass.confirm = ''; klass.kidDetail = '';
+  klass.tab = tab || klass.tab || 'kids'; klass.confirm = ''; klass.kidDetail = ''; klass.cellDetail = null;
   go('class', { classId: id, setId: null });
   if (klass.tab === 'stats') refreshStats();
 }
@@ -584,7 +584,7 @@ async function deleteClass(id) {
 }
 
 /* ---------- Eine Klasse ---------- */
-const CLASS_TABS = [['kids', 'user', 'Kinder'], ['sets', 'stack', 'Portionen'], ['cards', 'image', 'Kärtchen'], ['stats', 'check', 'Auswertung']];
+const CLASS_TABS = [['kids', 'user', 'Kinder'], ['sets', 'stack', 'Portionen'], ['cards', 'image', 'Kärtchen'], ['stats', 'check', 'Übersicht']];
 
 function renderClass() {
   const v = $('#view');
@@ -1181,15 +1181,23 @@ function wordDifficulty(c, setIds) {
 function classStatsHTML(c, kids) {
   const prog = klass.progress[c.id];
   const sets = (c.set_ids || []).map(getSet).filter(Boolean);
-  const head = `<div class="stats-head"><h2>Auswertung</h2><button class="btn small ghost" data-action="stats-refresh">${icon('flip')} Aktualisieren</button></div>`;
+  const range = PLOG_RANGES.some((r) => r[0] === klass.statRange) ? klass.statRange : 'today';
+  const days = plogDays(range), rangeName = { today: 'heute', '3d': 'in den letzten 3 Tagen', week: 'in der letzten Woche', month: 'im letzten Monat' }[range];
+  const head = `<div class="stats-head"><h2>Übersicht</h2><button class="btn small ghost" data-action="stats-refresh">${icon('flip')} Aktualisieren</button></div>
+    <div class="seg stat-range" role="tablist" aria-label="Zeitspanne">${PLOG_RANGES.map(([id, label]) => `<button class="seg-btn" role="tab" data-action="stats-range" data-range="${id}" aria-pressed="${range === id}" aria-selected="${range === id}">${label}</button>`).join('')}</div>`;
   if (klass.statsError) return `<div class="panel">${head}<p class="banner bad">${icon('x')} ${esc(klass.statsError)}</p></div>`;
   if (!prog) return `<div class="panel">${head}<p class="muted"><span class="spinner"></span> Wird geladen …</p></div>`;
   if (!kids.length || !sets.length) return `<div class="panel">${head}<p class="empty">${!kids.length ? 'Noch keine Kinder in dieser Klasse.' : 'Noch keine Portion freigegeben (Bereich „Portionen“).'}</p></div>`;
 
-  const matrix = `<div class="stat-scroll"><table class="stat-table">
-    <thead><tr><th scope="col">Kind</th><th scope="col" title="Wiederholen nach der Vergessenskurve">🧠 Wiederholen</th>${sets.map((s) => `<th scope="col">${esc(s.name)}</th>`).join('')}</tr></thead>
+  const timeOf = (st, set) => plogSum(prog[st.id]?.[set.id], days);
+  const kidTime = (st) => sets.reduce((a, set) => (kidHidesSet(c, st.id, set.id) ? a : a + timeOf(st, set).sec), 0);
+  const totalSec = kids.reduce((a, st) => a + kidTime(st), 0), active = kids.filter((st) => kidTime(st) > 0).length;
+  const summary = `<p class="stat-summary"><b>${plogMin(totalSec)}</b> ${rangeName} geübt · ${active} von ${kids.length} ${kids.length === 1 ? 'Kind' : 'Kindern'}${active ? ` · im Schnitt ${plogMin(totalSec / active)} pro Kind, das geübt hat` : ''}</p>`;
+  const matrix = `${summary}<div class="stat-scroll"><table class="stat-table">
+    <thead><tr><th scope="col">Kind</th><th scope="col" title="Übungszeit ${rangeName} (alle Portionen)">⏱ Zeit</th><th scope="col" title="Wiederholen nach der Vergessenskurve">🧠 Wiederholen</th>${sets.map((s) => `<th scope="col">${esc(s.name)}</th>`).join('')}</tr></thead>
     <tbody>${kids.map((st) => `<tr class="${klass.kidDetail === st.id ? 'sel' : ''}">
       <th scope="row"><button class="link-btn kid-link" data-action="stats-kid" data-id="${st.id}">${kidWordImg(st.username, 'kid-mini')}${esc(kidName(st))}</button></th>
+      ${(() => { const s = kidTime(st); return `<td class="cell time-cell ${s ? '' : 'empty'}"><b>${s ? plogMin(s) : '–'}</b></td>`; })()}
       ${(() => {
         const r = kidSrsStats(prog[st.id], sets);
         if (!r.inBox) return '<td class="cell empty">–</td>';
@@ -1200,13 +1208,39 @@ function classStatsHTML(c, kids) {
       ${sets.map((set) => {
         const k = kidSetStats(prog[st.id]?.[set.id], set);
         if (kidHidesSet(c, st.id, set.id)) return '<td class="cell empty" title="Für dieses Kind ausgeschaltet"><small>ausgenommen</small></td>';
-        if (!k || !k.n) return '<td class="cell empty">–</td>';
-        return `<td class="cell ${accClass(k.acc)}" title="${k.n} Antworten, ${k.bad} falsch">
-          <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/4 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small><small class="muted">${fmtDay(k.last)}</small></td>`;
+        const tm = timeOf(st, set), on = klass.cellDetail && klass.cellDetail.kid === st.id && klass.cellDetail.set === set.id;
+        const tLine = `<small class="t-line">⏱ ${tm.sec ? plogMin(tm.sec) : `${rangeName} nicht geübt`}</small>`;
+        const attrs = `data-action="stats-cell" data-kid="${st.id}" data-set="${esc(set.id)}" tabindex="0" role="button" aria-pressed="${on}" title="Antippen: Übungen im Detail"`;
+        if (!k || !k.n) return tm.sec ? `<td class="cell click ${on ? 'on' : ''}" ${attrs}><b>–</b>${tLine}</td>` : '<td class="cell empty">–</td>';
+        return `<td class="cell click ${accClass(k.acc)} ${on ? 'on' : ''}" ${attrs}>
+          <b>${pctTxt(k.acc)}</b><small>${k.words}/${k.total} Wörter · ${k.steps}/4 Übungen${k.test != null ? ` · Test ${k.test} %` : ''}</small>${tLine}<small class="muted">${fmtDay(k.last)}</small></td>`;
       }).join('')}
     </tr>`).join('')}</tbody></table></div>
-    <p class="muted small">Prozent = Anteil richtiger Antworten in allen Übungen (fast richtig zählt halb). Tippe auf ein Kind für seine schwierigsten Wörter.
+    <p class="muted small">⏱ = aktive Übungszeit in der gewählten Zeitspanne (Übungen und Spiele; Pausen ohne Tippen zählen nicht). Tippe auf ein Feld für die einzelnen Übungen.
+      Prozent = Anteil richtiger Antworten in allen Übungen (fast richtig zählt halb). Tippe auf ein Kind für seine schwierigsten Wörter.
       🧠 Wiederholen: „fällig“ = Wörter, die das Kind heute wiederholen sollte; „sicher“ = im 5. Fach (sitzt seit über 2 Wochen). Rot = fällige Wörter und seit mehr als 4 Tagen nicht wiederholt.</p>`;
+
+  let cellDetail = '';
+  const cd = klass.cellDetail, cdKid = cd && kids.find((x) => x.id === cd.kid), cdSet = cd && sets.find((x) => x.id === cd.set);
+  if (cdKid && cdSet) {
+    const p = prog[cdKid.id]?.[cdSet.id] || {}, sum = plogSum(p, days);
+    const keys = Object.keys(sum.by).sort((a, b) => (sum.by[b][0] - sum.by[a][0]) || (sum.by[b][1] - sum.by[a][1]));
+    const STEP = [['cards', 'Lernkarten'], ['write', 'Schreiben'], ['speak', 'Aussprechen'], ['dictation', 'Hören & Schreiben'], ['test', 'Test']];
+    const stepInfo = (k) => {
+      const v = p[k];
+      if (!v) return '<span class="muted">noch nicht gemacht</span>';
+      const res = k === 'test' && v.best != null ? `bester Test ${v.best} %` : v.correct != null && v.total ? `${v.correct} von ${v.total} gleich richtig` : 'gemacht';
+      return `${res}${v.date ? ` <span class="muted">· ${fmtDay(v.date)}</span>` : ''}`;
+    };
+    cellDetail = `<div class="panel cell-detail" id="cell-detail"><div class="stats-head"><h3>${kidWordImg(cdKid.username, 'kid-mini')} ${esc(kidName(cdKid))} · ${esc(cdSet.name)}</h3><button class="icon-btn subtle" data-action="stats-cell" data-kid="" aria-label="Schliessen">${icon('x')}</button></div>
+      <p class="small"><b>${plogMin(sum.sec)}</b> ${rangeName} geübt${sum.days > 1 ? ` an ${sum.days} Tagen` : ''}${sum.n ? ` · ${sum.n} Antworten, ${Math.round((sum.ok / sum.n) * 100)} % richtig` : ''}</p>
+      ${keys.length ? `<table class="ex-table"><thead><tr><th scope="col">Übung</th><th scope="col">Zeit</th><th scope="col">Antworten</th><th scope="col">richtig</th></tr></thead><tbody>
+        ${keys.map((k) => { const [sec, n, ok] = sum.by[k]; return `<tr><th scope="row">${esc(plogLabel(k))}</th><td>${sec ? plogMin(sec) : '–'}</td><td>${n || '–'}</td><td>${n ? `<span class="pill ${accClass(ok / n)}">${Math.round((ok / n) * 100)} %</span>` : '–'}</td></tr>`; }).join('')}
+      </tbody></table>` : `<p class="muted small">In dieser Zeitspanne nichts geübt.</p>`}
+      <h4>Lernweg (insgesamt)</h4>
+      <ul class="ex-steps">${STEP.map(([k, l]) => `<li><span>${l}</span><span>${stepInfo(k)}</span></li>`).join('')}</ul>
+    </div>`;
+  }
 
   let detail = '';
   const st = kids.find((x) => x.id === klass.kidDetail);
@@ -1236,7 +1270,7 @@ function classStatsHTML(c, kids) {
         <span class="diff-num"><b>${Math.round(d.rate * 100)} %</b> falsch · ${d.kidsBad} von ${d.kidsTried} ${d.kidsTried === 1 ? 'Kind' : 'Kindern'}</span>
       </li>`).join('')}</ol>` : '<p class="empty">Noch keine Übungsdaten für diese Portion.</p>'}
   </div>`;
-  return `<div class="panel">${head}${matrix}</div>${detail}${words}`;
+  return `<div class="panel">${head}${matrix}</div>${cellDetail}${detail}${words}`;
 }
 
 /* ---------- Aktionen (werden in main.js eingehängt) ---------- */
@@ -1261,6 +1295,13 @@ const classActions = {
   'kid-delete-yes': (el) => kidDelete(el.dataset.id),
   'cards-pdf': () => downloadCardsPDF(),
   'stats-refresh': () => refreshStats(),
+  'stats-range': (el) => { klass.statRange = el.dataset.range; render(); },
+  'stats-cell': (el) => {
+    const k = el.dataset.kid, s = el.dataset.set;
+    klass.cellDetail = !k || (klass.cellDetail && klass.cellDetail.kid === k && klass.cellDetail.set === s) ? null : { kid: k, set: s };
+    render();
+    if (klass.cellDetail) $('#cell-detail')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  },
   'class-review': (el) => { const c = currentClass(); if (c) saveClassReview(c, el.dataset.mode); },
   'stats-kid': (el) => { klass.kidDetail = klass.kidDetail === el.dataset.id ? '' : el.dataset.id; render(); if (klass.kidDetail) $('.kid-detail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
   /* Kinder */
