@@ -1236,7 +1236,7 @@ function classStatsHTML(c, kids) {
       <p class="small"><b>${plogMin(sum.sec)}</b> ${rangeName} geübt${sum.days > 1 ? ` an ${sum.days} Tagen` : ''}${sum.n ? ` · ${sum.n} Antworten, ${Math.round((sum.ok / sum.n) * 100)} % richtig` : ''}</p>
       ${keys.length ? `<table class="ex-table"><thead><tr><th scope="col">Übung</th><th scope="col">Zeit</th><th scope="col">Antworten</th><th scope="col">richtig</th></tr></thead><tbody>
         ${keys.map((k) => { const [sec, n, ok] = sum.by[k]; return `<tr><th scope="row">${esc(plogLabel(k))}</th><td>${sec ? plogMin(sec) : '–'}</td><td>${n || '–'}</td><td>${n ? `<span class="pill ${accClass(ok / n)}">${Math.round((ok / n) * 100)} %</span>` : '–'}</td></tr>`; }).join('')}
-      </tbody></table>` : `<p class="muted small">In dieser Zeitspanne nichts geübt.</p>`}
+      </tbody></table>` : `<p class="muted small">${p.log ? 'In dieser Zeitspanne nichts geübt.' : 'Die Übungszeit wird erst seit dem 23. November gemessen – was das Kind vorher geübt hat, hat noch keine Minuten (Prozente und Lernweg zählen aber).'}</p>`}
       <h4>Lernweg (insgesamt)</h4>
       <ul class="ex-steps">${STEP.map(([k, l]) => `<li><span>${l}</span><span>${stepInfo(k)}</span></li>`).join('')}</ul>
     </div>`;
