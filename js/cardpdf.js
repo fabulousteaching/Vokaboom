@@ -1,13 +1,13 @@
 /* Vokaboom – Vokabelkärtchen als PDF zum Ausschneiden (für Lehrpersonen und Kinder)
  *
- * Faltkärtchen: links das Wort in der Fremdsprache, rechts Deutsch (mit Bild). Entlang der gestrichelten Linie
- * ausschneiden, in der Mitte falten (und zusammenkleben) – so braucht es keinen beidseitigen Druck.
- * A4, 2 × 7 Kärtchen pro Seite. Das PDF entsteht im Browser (Seiten als Bilder, buildPDF aus js/classes.js).
+ * Zum beidseitigen Drucken: Seite 1 Vorderseiten (Deutsch mit Bild), Seite 2 Rückseiten (Fremdsprache), gespiegelt,
+ * so dass jedes Wort nach dem Wenden an der langen Kante genau hinter seiner Übersetzung liegt. A4, 3 × 6 Kärtchen pro Blatt. Das PDF entsteht im Browser (Seiten als Bilder, buildPDF aus js/classes.js).
  */
 'use strict';
 
-const VC_HALF_W = 46, VC_H = 34; // mm: eine Kartenseite (gefaltet)
-const VC_COLS = 2, VC_ROWS = 7, VC_GX = 8, VC_GY = 3.5;
+const VC_W = 62, VC_H = 42; // mm pro Kärtchen
+const VC_COLS = 3, VC_ROWS = 6;
+const VC_X0 = (210 - VC_COLS * VC_W) / 2, VC_Y0 = 22; // links und rechts gleich viel Rand: die Rückseite liegt beim Wenden genau darauf
 
 /** Bild eines Worts laden (nur, wenn es sich ins PDF zeichnen lässt) */
 function vcLoadImg(src) {
@@ -49,43 +49,36 @@ function vcText(ctx, text, cx, cy, maxW, maxH, max, font, color) {
   const lh = size * 1.15, y0 = cy - ((lines.length - 1) * lh) / 2;
   lines.forEach((l, i) => ctx.fillText(l, cx, y0 + i * lh));
 }
-async function vcDrawCard(ctx, x, y, s, set, w, imgs) {
+/** Ein Kärtchen: Vorderseite Deutsch (mit Bild), Rückseite Fremdsprache */
+function vcDrawCard(ctx, x, y, s, set, w, imgs, back) {
   const X = (mm) => (x + mm) * s, Y = (mm) => (y + mm) * s, L = (mm) => mm * s;
   const disp = (px) => `800 ${px}px 'Bricolage Grotesque', Lexend, system-ui, sans-serif`;
   const body = (px) => `600 ${px}px Lexend, system-ui, sans-serif`;
-  const W2 = VC_HALF_W * 2;
-  // Hintergründe der beiden Seiten
-  ctx.fillStyle = '#F3F1FF'; ctx.fillRect(X(0), Y(0), L(VC_HALF_W), L(VC_H));
-  ctx.fillStyle = '#FFFBEF'; ctx.fillRect(X(VC_HALF_W), Y(0), L(VC_HALF_W), L(VC_H));
-  // Schneidelinie (gestrichelt) und Faltlinie (gepunktet)
-  ctx.save();
-  ctx.strokeStyle = '#9AA0AE'; ctx.lineWidth = L(0.3); ctx.setLineDash([L(2), L(1.4)]);
-  ctx.strokeRect(X(0), Y(0), L(W2), L(VC_H));
-  ctx.strokeStyle = '#C4C8D2'; ctx.setLineDash([L(0.5), L(1.2)]);
-  ctx.beginPath(); ctx.moveTo(X(VC_HALF_W), Y(0)); ctx.lineTo(X(VC_HALF_W), Y(VC_H)); ctx.stroke();
-  ctx.restore();
-  // Fremdsprache (links)
-  ctx.font = body(L(2.2)); ctx.fillStyle = '#7C6FD6'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(LANGS[set.lang]?.short || '', X(2.2), Y(2));
-  vcText(ctx, stripParens(w.foreign) || w.foreign, X(VC_HALF_W / 2), Y(VC_H / 2 + 0.5), L(VC_HALF_W - 6), L(VC_H - 8), L(6.2), disp, '#2A2266');
-  // Deutsch (rechts), mit Bild
-  ctx.font = body(L(2.2)); ctx.fillStyle = '#C08A14'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText('DE', X(VC_HALF_W + 2.2), Y(2));
+  // Schneidelinien nur auf der Vorderseite (die Rückseite bleibt ohne Rand, falls der Drucker ein wenig verschiebt)
+  if (!back) {
+    ctx.save(); ctx.strokeStyle = '#A3A8B4'; ctx.lineWidth = L(0.25); ctx.setLineDash([L(1.8), L(1.3)]);
+    ctx.strokeRect(X(0), Y(0), L(VC_W), L(VC_H)); ctx.restore();
+  }
+  const tag = back ? (LANGS[set.lang]?.short || '') : 'DE';
+  ctx.font = body(L(2.2)); ctx.fillStyle = back ? '#7C6FD6' : '#C08A14'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText(tag, X(3.5), Y(3.2));
+  if (back) { vcText(ctx, stripParens(w.foreign) || w.foreign, X(VC_W / 2), Y(VC_H / 2), L(VC_W - 10), L(VC_H - 12), L(7.5), disp, '#2A2266'); return; }
   const p = vcPic(set, w);
-  let picH = 0;
-  const pcx = X(VC_HALF_W + VC_HALF_W / 2), pcy = Y(11.5), ps = L(14);
+  let pic = false;
+  const pcx = X(VC_W / 2), pcy = Y(15), ps = L(17);
   if (p) {
-    picH = 15;
+    pic = true;
     if (p.kind === 'emoji') { ctx.font = `${ps * 0.86}px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.src, pcx, pcy + ps * 0.04); }
     else if (p.kind === 'color') { ctx.fillStyle = p.src; ctx.beginPath(); ctx.arc(pcx, pcy, ps * 0.42, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = L(0.3); ctx.stroke(); }
-    else if (p.kind === 'number') { vcText(ctx, p.src, pcx, pcy, ps * 1.6, ps, ps * 0.8, disp, '#C08A14'); }
+    else if (p.kind === 'number') vcText(ctx, p.src, pcx, pcy, ps * 1.6, ps, ps * 0.8, disp, '#C08A14');
     else {
       const img = imgs.get(p.src);
-      if (img) { const k = Math.min(ps / img.width, ps / img.height); ctx.drawImage(img, pcx - (img.width * k) / 2, pcy - (img.height * k) / 2, img.width * k, img.height * k); } else picH = 0;
+      if (img) { const k = Math.min(ps / img.width, ps / img.height); ctx.drawImage(img, pcx - (img.width * k) / 2, pcy - (img.height * k) / 2, img.width * k, img.height * k); } else pic = false;
     }
   }
-  if (picH) vcText(ctx, stripParens(w.german) || w.german, X(VC_HALF_W * 1.5), Y(26.5), L(VC_HALF_W - 6), L(10), L(4.4), disp, '#5A3C00');
-  else vcText(ctx, stripParens(w.german) || w.german, X(VC_HALF_W * 1.5), Y(VC_H / 2 + 0.5), L(VC_HALF_W - 6), L(VC_H - 8), L(6.2), disp, '#5A3C00');
+  const de = stripParens(w.german) || w.german;
+  if (pic) vcText(ctx, de, X(VC_W / 2), Y(32.5), L(VC_W - 10), L(12), L(5.2), disp, '#3B2A00');
+  else vcText(ctx, de, X(VC_W / 2), Y(VC_H / 2), L(VC_W - 10), L(VC_H - 12), L(7.5), disp, '#3B2A00');
 }
 
 /** PDF mit allen Vokabeln der Portion herunterladen */
@@ -102,30 +95,35 @@ async function downloadVocabCardsPDF(set, btn) {
     await Promise.all([...new Set(words.map((w) => vcPic(set, w)).filter((p) => p && p.src && !['emoji', 'color', 'number'].includes(p.kind)).map((p) => p.src))]
       .map(async (src) => { const im = await vcLoadImg(src); if (im) imgs.set(src, im); }));
     const s = 11.81; // 300 dpi
-    const PW = 210, PH = 297, per = VC_COLS * VC_ROWS, CW = VC_HALF_W * 2;
-    const x0 = (PW - VC_COLS * CW - (VC_COLS - 1) * VC_GX) / 2, y0 = 20;
-    const pages = [], nPages = Math.ceil(words.length / per);
-    for (let i = 0; i < words.length; i += per) {
+    const PW = 210, PH = 297, per = VC_COLS * VC_ROWS, sheets = Math.ceil(words.length / per);
+    const pages = [];
+    const page = (batch, back, no) => {
       const cv = document.createElement('canvas');
       cv.width = Math.round(PW * s); cv.height = Math.round(PH * s);
       const ctx = cv.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
-      // Kopfzeile mit Anleitung
-      ctx.fillStyle = '#2A2266'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-      ctx.font = `800 ${5 * s}px 'Bricolage Grotesque', Lexend, sans-serif`;
-      ctx.fillText(set.name, x0 * s, 11 * s);
-      ctx.font = `500 ${2.7 * s}px Lexend, system-ui, sans-serif`; ctx.fillStyle = '#5B6070';
-      ctx.fillText(`✂ Ausschneiden (gestrichelte Linie), in der Mitte falten und zusammenkleben.  ·  ${LANGS[set.lang]?.name || ''} – Deutsch  ·  Seite ${pages.length + 1}/${nPages}`, x0 * s, 16 * s);
-      const batch = words.slice(i, i + per);
-      for (let k = 0; k < batch.length; k++) {
-        const cx = x0 + (k % VC_COLS) * (CW + VC_GX), cy = y0 + Math.floor(k / VC_COLS) * (VC_H + VC_GY);
-        await vcDrawCard(ctx, cx, cy, s, set, batch[k], imgs);
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      if (!back) {
+        ctx.fillStyle = '#2A2266'; ctx.font = `800 ${5 * s}px 'Bricolage Grotesque', Lexend, sans-serif`;
+        ctx.fillText(set.name, VC_X0 * s, 11 * s);
+        ctx.font = `500 ${2.7 * s}px Lexend, system-ui, sans-serif`; ctx.fillStyle = '#5B6070';
+        ctx.fillText(`Beidseitig drucken (an der langen Kante wenden), dann entlang der Linien ausschneiden.  ·  Vorne Deutsch, hinten ${LANGS[set.lang]?.name || ''}  ·  Blatt ${no}/${sheets}`, VC_X0 * s, 16.5 * s);
       }
+      batch.forEach((w, k) => {
+        const c = k % VC_COLS, r = Math.floor(k / VC_COLS);
+        const col = back ? VC_COLS - 1 - c : c; // Rückseite gespiegelt: liegt nach dem Wenden genau hinter dem Wort
+        vcDrawCard(ctx, VC_X0 + col * VC_W, VC_Y0 + r * VC_H, s, set, w, imgs, back);
+      });
       const url = cv.toDataURL('image/jpeg', 0.9);
       const bin = atob(url.split(',')[1]);
       const bytes = new Uint8Array(bin.length);
-      for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
+      for (let j2 = 0; j2 < bin.length; j2++) bytes[j2] = bin.charCodeAt(j2);
       pages.push({ jpeg: bytes, w: cv.width, h: cv.height });
+    };
+    for (let i = 0; i < words.length; i += per) {
+      const batch = words.slice(i, i + per), no = i / per + 1;
+      page(batch, false, no); page(batch, true, no);
+      await new Promise((r) => setTimeout(r, 0));
     }
     const blob = buildPDF(pages);
     const a = document.createElement('a');
