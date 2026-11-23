@@ -184,15 +184,15 @@ function toast(msg, kind = '') {
 }
 
 /* ---------------- Dialoge ---------------- */
-function openModal(html, { cls = '', onClose, label = 'Dialog' } = {}) {
+function openModal(html, { cls = '', onClose, label = 'Dialog', locked = false } = {}) {
   closeModal(true);
   const wrap = document.createElement('div');
   wrap.className = 'modal-wrap';
   wrap.innerHTML = `<div class="modal ${cls}" role="dialog" aria-modal="true" aria-label="${esc(label)}">${html}</div>`;
-  wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) closeModal(); });
+  wrap.addEventListener('mousedown', (e) => { if (e.target === wrap && !locked) closeModal(); });
   document.body.appendChild(wrap);
   document.body.classList.add('has-modal');
-  ui.modal = { el: wrap, onClose, returnFocus: document.activeElement };
+  ui.modal = { el: wrap, onClose, returnFocus: document.activeElement, locked };
   setTimeout(() => (wrap.querySelector('[autofocus]') || wrap.querySelector('input, button'))?.focus(), 40);
   return wrap;
 }
@@ -500,6 +500,7 @@ function createSetFromDraft() {
   ui.draft = { text: '', name: '', swap: false, layout: '' };
   openSet(set.id);
   startPictureFill(set);
+  if (cloud.uid && !isKid() && typeof openLibAssign === 'function') setTimeout(() => { if (getSet(set.id)) openLibAssign(set, 'shelf', { required: true }); }, 350); // gleich einordnen: Lehrmittel › Schuljahr › Unit
 }
 function autoName(rows) {
   const first = rows.slice(0, 3).map((r) => core(r.foreign, homeLang())).join(', ');

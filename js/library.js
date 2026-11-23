@@ -211,17 +211,21 @@ async function libOpenItem(setId) {
 const ASG = { setId: '', lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, allGrades: false };
 /** Schuljahre, für die das Lehrmittel Bände hat (neues Lehrmittel: alle) */
 const lmGrades = (lmId) => LIB_GRADES.filter((g) => LIB.data?.units.some((u) => u.lehrmittel_id === lmId && u.grade === g));
-async function openLibAssign(set, mode = 'share') {
+async function openLibAssign(set, mode = 'share', { required = false } = {}) {
   if (!set) return;
   if (!cloud.uid) { openLogin(); return; }
   const cur = libUnit(set.libUnit);
-  Object.assign(ASG, { setId: set.id, lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, mode });
-  openModal('<div class="asg"><p class="muted"><span class="spinner"></span> Lehrmittel werden geladen …</p></div>', { cls: 'wide asg-modal', label: mode === 'shelf' ? 'Portion einordnen' : 'In der Bibliothek teilen' });
+  Object.assign(ASG, { setId: set.id, lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, mode, required, guess: null });
+  openModal('<div class="asg"><p class="muted"><span class="spinner"></span> Lehrmittel werden geladen …</p></div>', { cls: 'wide asg-modal', label: mode === 'shelf' ? 'Portion einordnen' : 'In der Bibliothek teilen', locked: required });
   const wrap = ui.modal.el;
   wrap.addEventListener('submit', (e) => { const f = e.target.closest('.asg-new'); if (f) { e.preventDefault(); libCreate(f.dataset.kind, f.querySelector('input').value); } });
   try { await libLoad(true); } catch { /* Meldung unten */ }
   const u = (mode === 'shelf' && libUnit(set.shelf?.unitId)) || libUnit(set.libUnit) || cur;
   if (u) Object.assign(ASG, { lm: u.lehrmittel_id, grade: u.grade, unit: u.id });
+  else if (mode === 'shelf' && LIB.data) { // Vorschlag anhand des Namens
+    const g = set.shelf || shelfGuess(set);
+    if (g && libLm(g.lmId)) { Object.assign(ASG, { lm: g.lmId, grade: g.grade || 0, unit: libUnit(g.unitId) ? g.unitId : '' }); ASG.guess = g; }
+  }
   asgRender();
 }
 function asgRender() {
@@ -242,8 +246,9 @@ function asgRender() {
   const newForm = (kind, ph) => `<form class="asg-new" data-kind="${kind}"><input type="text" maxlength="60" placeholder="${ph}" aria-label="${ph}" autocomplete="off"><button class="btn small secondary" type="submit">${icon('plus')} Anlegen</button></form>
     ${ASG.msg[kind] ? `<p class="asg-msg" role="alert">${ASG.msg[kind]}</p>` : ''}`;
   const shelfMode = ASG.mode === 'shelf';
-  box.innerHTML = `<header class="modal-head"><div><p class="eyebrow">${flag(lang)} ${LANGS[lang].name} · „${esc(set.name)}“</p><h2>${shelfMode ? 'Portion einordnen' : 'In der Bibliothek teilen'}</h2></div>
-      <button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
+  box.innerHTML = `<header class="modal-head"><div><p class="eyebrow">${flag(lang)} ${LANGS[lang].name} · „${esc(set.name)}“</p><h2>${shelfMode ? (ASG.required ? 'Wo gehört die Portion hin?' : 'Portion einordnen') : 'In der Bibliothek teilen'}</h2></div>
+      ${ASG.required ? '' : `<button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button>`}</header>
+    ${ASG.required && ASG.guess ? `<p class="banner good small asg-guess">${icon('check')}<span>Vorschlag anhand des Namens: <b>${esc(ASG.guess.lm)}${ASG.guess.grade ? ` › ${gradeName(ASG.guess.grade)}` : ''} › ${esc(ASG.guess.unit)}</b> – bitte prüfen.${libUnit(ASG.guess.unitId) ? '' : ` Die ${esc(ASG.guess.unit)} gibt es noch nicht – unten bei ${unitWord(set.lang === 'fr' ? 'fr' : 'en')} kurz anlegen.`}</span></p>` : ''}
     <div class="asg">
       ${step(1, 'Lehrmittel', !!ASG.lm, `${lms.length ? `<ul class="asg-list">${lms.map((l) => `<li><button type="button" class="asg-opt ${ASG.lm === l.id ? 'on' : ''}" data-action="asg-pick" data-k="lm" data-v="${l.id}" aria-pressed="${ASG.lm === l.id}">${tick(ASG.lm === l.id)}${esc(l.name)}</button></li>`).join('')}</ul>` : '<p class="small muted">Noch keine Lehrmittel – leg das erste an.</p>'}
         ${newForm('lm', 'Neues Lehrmittel, z. B. ' + (lang === 'fr' ? 'dis donc!' : 'New World'))}`)}
@@ -254,8 +259,8 @@ function asgRender() {
       <p class="small muted">${shelfMode ? 'Nur für dich: So ist die Portion auf deiner Startseite unter dem Lehrmittel und der Unit abgelegt. Geteilt wird nichts.' : 'Geteilt werden nur Name, Vokabeln und Bildauswahl – keine eigenen Fotos, kein Übungsstand, nicht deine E-Mail-Adresse.'}</p>
     </div>
     <footer class="modal-foot">
-      ${shelfMode ? (set.shelf ? '<button type="button" class="btn ghost danger-ghost" data-action="shelf-remove">Einordnung entfernen</button>' : '') : set.published ? '<button type="button" class="btn ghost danger-ghost" data-action="asg-remove">Aus der Bibliothek nehmen</button>' : ''}
-      <button type="button" class="btn ghost" data-action="close-modal">Abbrechen</button>
+      ${shelfMode ? (ASG.required ? '<button type="button" class="btn ghost" data-action="shelf-remove" title="Zum Beispiel eigene Wortlisten ohne Lehrmittel">Gehört zu keinem Lehrmittel</button>' : set.shelf ? '<button type="button" class="btn ghost danger-ghost" data-action="shelf-remove">Einordnung entfernen</button>' : '') : set.published ? '<button type="button" class="btn ghost danger-ghost" data-action="asg-remove">Aus der Bibliothek nehmen</button>' : ''}
+      ${ASG.required ? '' : '<button type="button" class="btn ghost" data-action="close-modal">Abbrechen</button>'}
       ${shelfMode ? `<button type="button" class="btn primary" data-action="shelf-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('check')} Einordnen</button>`
         : `<button type="button" class="btn primary" data-action="asg-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('book')} ${set.published ? 'Speichern' : 'Teilen'}</button>`}
     </footer>`;
@@ -350,6 +355,7 @@ function shelfOf(unitId) {
 }
 function shelfSave() {
   const set = db.sets.find((s) => s.id === ASG.setId), sh = shelfOf(ASG.unit);
+  ASG.required = false;
   if (!set || !sh) return;
   set.shelf = sh; set.updated = Date.now(); saveDB();
   closeModal(true);
@@ -359,64 +365,76 @@ function shelfSave() {
 function shelfRemove() {
   const set = db.sets.find((s) => s.id === ASG.setId);
   if (!set) return;
+  ASG.required = false;
   delete set.shelf; set.updated = Date.now(); saveDB();
-  closeModal(true); toast('Einordnung entfernt.'); render();
+  const was = !!set.shelf; closeModal(true); if (was) toast('Einordnung entfernt.'); render();
 }
 /* ---------- Automatisch einordnen (anhand des Namens) ----------
- * „YW 3 - Unit 2 - 3. Portion“ → Lehrmittel „Young World 3“ (aus der Bibliothek, auch als Abkürzung „YW 3“) › Unit 2.
- * Ohne passendes Lehrmittel in der Bibliothek: der Text vor „Unit“ wird zum Lehrmittel („YW 3“ › Unit 2).
- * Ohne „Unit/Unité + Zahl“ im Namen bleibt die Portion „Nicht eingeordnet“. Schon eingeordnete werden nie geändert. */
-const lmInitials = (name) => String(name).split(/[\s\-–_.]+/).filter(Boolean).map((w) => (/^\d+$/.test(w) ? w : w[0])).join('').toLowerCase();
-function lmMatches(lmName, key) {
-  if (!key) return false;
-  const k = libKey(lmName), ini = libKey(lmInitials(lmName));
-  return k === key || (key.length >= 4 && k.includes(key)) || (k.length >= 4 && key.includes(k)) || (ini.length >= 2 && (key === ini || key.startsWith(ini) && /\d/.test(ini)));
+ * Nur mit Lehrmitteln, die es in der Bibliothek schon gibt. Erkannt werden ganze Namen und Abkürzungen:
+ * „YW 3“, „JW3“ (J wie Y) → Young World 3 · „NW“ → New World (welches, entscheidet die Unit/Klasse) · „DD 5“ → dis donc! 5.
+ * Dazu braucht es „Unit/Unité + Zahl“ im Namen. Ohne eindeutigen Anhaltspunkt bleibt die Portion frei. */
+const lmNorm = (t) => libKey(t).replace(/j/g, 'y'); // deutsch oft „J“ für „Y“ (JW = YW)
+const lmLetters = (name) => lmNorm(String(name).split(/[\s\-–_.!?,]+/).filter((w) => w && !/^\d+$/.test(w)).map((w) => w[0]).join(''));
+/** Wie gut passt der Text vor „Unit“ zu einem Lehrmittel? 0 = gar nicht, 3 = mit gleicher Nummer */
+function lmScore(lmName, before) {
+  const k = lmNorm(lmName), kNo = k.replace(/\d+/g, ''), ini = lmLetters(lmName), num = (String(lmName).match(/\d+/) || [])[0];
+  const toks = String(before).split(/[\s\-–—_:|,·/()]+/).filter(Boolean);
+  let best = 0;
+  for (let i = 0; i < toks.length; i++) { // auch „Englisch YW 3“: hinten anfangen
+    const part = toks.slice(i).join(' '), b = lmNorm(part), bNo = b.replace(/\d+/g, ''), bnum = (part.match(/\d+/) || [])[0];
+    if (!bNo) continue;
+    const name = bNo === kNo || (bNo.length >= 2 && bNo === ini) || (bNo.length >= 5 && (kNo.startsWith(bNo) || bNo.startsWith(kNo)));
+    if (!name) continue;
+    const sc = bnum && num ? (bnum === num ? 3 : 0) : bnum || num ? 1 : 2;
+    best = Math.max(best, sc);
+  }
+  return best;
 }
 function shelfGuess(set) {
+  if (!LIB.data) return null;
   const name = String(set.name || ''), lang = langOf(set);
   const m = name.match(/\b(?:unit|unité|unite|u)\s*\.?\s*(\d{1,2})\b/i);
   if (!m) return null;
   const no = String(+m[1]);
-  const before = name.slice(0, m.index).replace(/[\s\-–—:|,·/()]+$/u, '').trim(), key = libKey(before);
+  const before = name.slice(0, m.index).trim();
   const gm = name.match(/\b([3-9])\.\s*(?:klasse|kl\.?)/i), grade = gm ? +gm[1] : 0;
-  if (LIB.data && key) {
-    const cands = LIB.data.units.map((u) => ({ u, l: libLm(u.lehrmittel_id) }))
-      .filter(({ u, l }) => l && l.lang === lang && String(+((u.name.match(/\d+/) || [])[0])) === no && lmMatches(l.name, key) && (!grade || u.grade === grade));
-    const lmIds = [...new Set(cands.map((c) => c.l.id))];
-    if (lmIds.length === 1) {
-      const inLm = cands.filter((c) => c.l.id === lmIds[0]);
-      const grades = [...new Set(inLm.map((c) => c.u.grade))];
-      if (grades.length === 1) return shelfOf(inLm[0].u.id);
-    }
-  }
-  if (!key) return null;
-  // Lehrmittel aus der Bibliothek (gleicher Kasten wie die anderen Portionen), sonst der Text vor „Unit“
-  const lm = LIB.data?.lms.find((l) => l.lang === lang && lmMatches(l.name, key));
-  const lmGr = lm ? [...new Set(LIB.data.units.filter((u) => u.lehrmittel_id === lm.id).map((u) => u.grade))] : [];
+  const unitsOf = (lmId) => LIB.data.units.filter((u) => u.lehrmittel_id === lmId && String(+((u.name.match(/\d+/) || [])[0])) === no && (!grade || u.grade === grade));
+  const scored = LIB.data.lms.filter((l) => l.lang === lang).map((l) => ({ l, sc: lmScore(l.name, before) })).filter((x) => x.sc > 0);
+  if (!scored.length) return null;
+  const top = Math.max(...scored.map((x) => x.sc));
+  let cands = scored.filter((x) => x.sc === top).map((x) => x.l);
+  if (cands.length > 1) cands = cands.filter((l) => unitsOf(l.id).length); // mehrere passen (z. B. „NW“): die mit dieser Unit
+  if (cands.length !== 1) return null; // kein eindeutiger Anhaltspunkt: frei lassen
+  const lm = cands[0], us = unitsOf(lm.id);
+  const grades = [...new Set(us.map((u) => u.grade))];
+  if (us.length && grades.length === 1) return { ...shelfOf(us.find((u) => u.grade === grades[0]).id), auto: true };
+  const lmGr = [...new Set(LIB.data.units.filter((u) => u.lehrmittel_id === lm.id).map((u) => u.grade))];
   const g = grade || (lmGr.length === 1 ? lmGr[0] : 0);
-  const lmName = lm ? lm.name : before, lmId = lm ? lm.id : `n:${libKey(before)}`;
-  return { unitId: `n:${lmId}:${g}:${no}`, unit: `${unitWord(lang)} ${no}`, grade: g, lmId, lm: lmName, auto: true };
+  return { unitId: `n:${lm.id}:${g}:${no}`, unit: `${unitWord(lang)} ${no}`, grade: g, lmId: lm.id, lm: lm.name, auto: true };
 }
+const SHELF_AUTO_V = 2; // Version der automatischen Einordnung (höher = nochmals durchgehen)
 /** Alle noch nicht eingeordneten Portionen versuchen einzuordnen. Liefert { done, left }. */
 async function shelfAuto({ quiet = false } = {}) {
-  if (cloud.uid) { try { await libLoad(); } catch { /* ohne Bibliothek: nur anhand des Namens */ } }
+  if (!cloud.uid) { openLogin(); return { done: 0, left: 0 }; }
+  try { await libLoad(); } catch { toast('Die Lehrmittel konnten nicht geladen werden. Bist du online?', 'bad'); shelfFilled = false; return { done: 0, left: 0 }; }
   let done = 0, left = 0;
   for (const s of db.sets) {
-    if (s.shelf) continue;
-    const sh = s.libUnit ? shelfOf(s.libUnit) : shelfGuess(s);
-    if (sh) { s.shelf = sh; s.updated = Date.now(); done++; } else left++;
+    if (s.shelf && !s.shelf.auto) continue; // selbst eingeordnet: nie ändern
+    const sh = (s.libUnit && shelfOf(s.libUnit)) || shelfGuess(s);
+    const before = JSON.stringify(s.shelf || null);
+    if (sh) { s.shelf = sh; if (before !== JSON.stringify(sh)) { s.updated = Date.now(); done++; } } else { if (s.shelf) { delete s.shelf; s.updated = Date.now(); } left++; }
   }
-  db.settings.shelfAutoDone = true;
+  db.settings.shelfAutoDone = SHELF_AUTO_V;
   saveDB();
   if (ui.view === 'home') render();
-  if (!quiet || done) toast(done ? `${done} ${done === 1 ? 'Portion' : 'Portionen'} eingeordnet${left ? ` – ${left} ohne „Unit“ im Namen bleiben unter „Nicht eingeordnet“` : ''}.` : 'Keine weiteren Portionen erkannt. Im Namen braucht es z. B. „Unit 3“.');
+  if (!quiet || done) toast(done ? `${done} ${done === 1 ? 'Portion' : 'Portionen'} eingeordnet${left ? ` – ${left} ohne klaren Hinweis bleiben unter „Nicht eingeordnet“` : ''}.` : 'Keine weiteren Portionen erkannt. Im Namen braucht es Lehrmittel und Unit, z. B. „YW 3 – Unit 2“.');
   return { done, left };
 }
 
 /** Geteilte Portionen von früher (nur libUnit): Einordnung einmal nachtragen */
 let shelfFilled = false;
 function shelfFillFromLibrary() {
-  if (!db.settings.shelfAutoDone && !shelfFilled && !isKid()) { shelfFilled = true; shelfAuto({ quiet: true }); return; } // einmal: alles anhand des Namens einordnen
+  if (db.settings.shelfAutoDone !== SHELF_AUTO_V && !shelfFilled && !isKid() && cloud.uid) { shelfFilled = true; shelfAuto({ quiet: true }); return; } // einmal: alles anhand des Namens einordnen
   if (shelfFilled || !cloud.uid || !db.sets.some((s) => s.libUnit && !s.shelf)) return;
   shelfFilled = true;
   libLoad().then(() => {

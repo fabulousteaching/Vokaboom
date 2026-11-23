@@ -416,7 +416,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && ui.qrFull) { closeQRFull(); return; }
   if (e.key === 'Escape' && !ui.modal && (pubPopOpen() || $('.topbar.searching'))) { closeTopSearch(); return; }
-  if (e.key === 'Escape' && ui.modal) { closeModal(); return; }
+  if (e.key === 'Escape' && ui.modal) { if (!ui.modal.locked) closeModal(); return; }
   if (ui.modal) return;
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('td[data-action="stats-cell"]')) { e.preventDefault(); e.target.click(); return; } // Übersicht: Feld mit der Tastatur öffnen
   const tag = (e.target.tagName || '').toLowerCase();
