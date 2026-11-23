@@ -362,9 +362,61 @@ function shelfRemove() {
   delete set.shelf; set.updated = Date.now(); saveDB();
   closeModal(true); toast('Einordnung entfernt.'); render();
 }
+/* ---------- Automatisch einordnen (anhand des Namens) ----------
+ * „YW 3 - Unit 2 - 3. Portion“ → Lehrmittel „Young World 3“ (aus der Bibliothek, auch als Abkürzung „YW 3“) › Unit 2.
+ * Ohne passendes Lehrmittel in der Bibliothek: der Text vor „Unit“ wird zum Lehrmittel („YW 3“ › Unit 2).
+ * Ohne „Unit/Unité + Zahl“ im Namen bleibt die Portion „Nicht eingeordnet“. Schon eingeordnete werden nie geändert. */
+const lmInitials = (name) => String(name).split(/[\s\-–_.]+/).filter(Boolean).map((w) => (/^\d+$/.test(w) ? w : w[0])).join('').toLowerCase();
+function lmMatches(lmName, key) {
+  if (!key) return false;
+  const k = libKey(lmName), ini = libKey(lmInitials(lmName));
+  return k === key || (key.length >= 4 && k.includes(key)) || (k.length >= 4 && key.includes(k)) || (ini.length >= 2 && (key === ini || key.startsWith(ini) && /\d/.test(ini)));
+}
+function shelfGuess(set) {
+  const name = String(set.name || ''), lang = langOf(set);
+  const m = name.match(/\b(?:unit|unité|unite|u)\s*\.?\s*(\d{1,2})\b/i);
+  if (!m) return null;
+  const no = String(+m[1]);
+  const before = name.slice(0, m.index).replace(/[\s\-–—:|,·/()]+$/u, '').trim(), key = libKey(before);
+  const gm = name.match(/\b([3-9])\.\s*(?:klasse|kl\.?)/i), grade = gm ? +gm[1] : 0;
+  if (LIB.data && key) {
+    const cands = LIB.data.units.map((u) => ({ u, l: libLm(u.lehrmittel_id) }))
+      .filter(({ u, l }) => l && l.lang === lang && String(+((u.name.match(/\d+/) || [])[0])) === no && lmMatches(l.name, key) && (!grade || u.grade === grade));
+    const lmIds = [...new Set(cands.map((c) => c.l.id))];
+    if (lmIds.length === 1) {
+      const inLm = cands.filter((c) => c.l.id === lmIds[0]);
+      const grades = [...new Set(inLm.map((c) => c.u.grade))];
+      if (grades.length === 1) return shelfOf(inLm[0].u.id);
+    }
+  }
+  if (!key) return null;
+  // Lehrmittel aus der Bibliothek (gleicher Kasten wie die anderen Portionen), sonst der Text vor „Unit“
+  const lm = LIB.data?.lms.find((l) => l.lang === lang && lmMatches(l.name, key));
+  const lmGr = lm ? [...new Set(LIB.data.units.filter((u) => u.lehrmittel_id === lm.id).map((u) => u.grade))] : [];
+  const g = grade || (lmGr.length === 1 ? lmGr[0] : 0);
+  const lmName = lm ? lm.name : before, lmId = lm ? lm.id : `n:${libKey(before)}`;
+  return { unitId: `n:${lmId}:${g}:${no}`, unit: `${unitWord(lang)} ${no}`, grade: g, lmId, lm: lmName, auto: true };
+}
+/** Alle noch nicht eingeordneten Portionen versuchen einzuordnen. Liefert { done, left }. */
+async function shelfAuto({ quiet = false } = {}) {
+  if (cloud.uid) { try { await libLoad(); } catch { /* ohne Bibliothek: nur anhand des Namens */ } }
+  let done = 0, left = 0;
+  for (const s of db.sets) {
+    if (s.shelf) continue;
+    const sh = s.libUnit ? shelfOf(s.libUnit) : shelfGuess(s);
+    if (sh) { s.shelf = sh; s.updated = Date.now(); done++; } else left++;
+  }
+  db.settings.shelfAutoDone = true;
+  saveDB();
+  if (ui.view === 'home') render();
+  if (!quiet || done) toast(done ? `${done} ${done === 1 ? 'Portion' : 'Portionen'} eingeordnet${left ? ` – ${left} ohne „Unit“ im Namen bleiben unter „Nicht eingeordnet“` : ''}.` : 'Keine weiteren Portionen erkannt. Im Namen braucht es z. B. „Unit 3“.');
+  return { done, left };
+}
+
 /** Geteilte Portionen von früher (nur libUnit): Einordnung einmal nachtragen */
 let shelfFilled = false;
 function shelfFillFromLibrary() {
+  if (!db.settings.shelfAutoDone && !shelfFilled && !isKid()) { shelfFilled = true; shelfAuto({ quiet: true }); return; } // einmal: alles anhand des Namens einordnen
   if (shelfFilled || !cloud.uid || !db.sets.some((s) => s.libUnit && !s.shelf)) return;
   shelfFilled = true;
   libLoad().then(() => {
@@ -416,4 +468,5 @@ const libraryActions = {
   'shelf-open': () => openLibAssign(currentSet(), 'shelf'),
   'shelf-save': () => shelfSave(),
   'shelf-remove': () => shelfRemove(),
+  'shelf-auto': () => shelfAuto(),
 };

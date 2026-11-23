@@ -1680,3 +1680,5 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .shelf-g { margin: .2rem 0 .3rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
 .shelf-unit { margin: 0 0 .5rem; padding-left: .6rem; border-left: 3px solid color-mix(in srgb, var(--primary, #4F46E5) 35%, transparent); }
 .shelf-unit h5 { margin: .1rem 0 .3rem; font-size: .95rem; }
+
+.shelf-auto-hint { padding: 0 .85rem .7rem; margin: 0; }

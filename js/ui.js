@@ -323,7 +323,7 @@ function shelfListHTML(sets) {
   const nat = (a, b) => String(a).localeCompare(String(b), 'de', { numeric: true, sensitivity: 'base' });
   const filed = sets.filter((s) => s.shelf && s.shelf.lm), loose = sets.filter((s) => !(s.shelf && s.shelf.lm));
   if (!filed.length) {
-    return `<ul class="lib-list">${sets.map(libItem).join('')}</ul>${cloud.uid ? '<p class="hint small">Tipp: Portion öffnen → <b>Einordnen</b> – dann stehen deine Portionen hier nach Lehrmittel und Unit geordnet, wie in der Bibliothek.</p>' : ''}`;
+    return `<ul class="lib-list">${sets.map(libItem).join('')}</ul><p class="hint small"><button type="button" class="link-btn" data-action="shelf-auto">Nach Lehrmittel und Unit ordnen</button> – anhand des Namens. Oder Portion öffnen → <b>Einordnen</b>.</p>`;
   }
   const closed = shelfClosed();
   const lms = new Map();
@@ -342,7 +342,8 @@ function shelfListHTML(sets) {
     }).join('');
     return `<details class="shelf-lm" data-shelf="${esc(k)}" ${closed.has(k) ? '' : 'open'}><summary><span class="shelf-name">${icon('book')} ${esc(lm.name)}</span><small>${lm.sets.length} ${lm.sets.length === 1 ? 'Portion' : 'Portionen'}</small></summary>${body}</details>`;
   }).join('');
-  const looseHTML = loose.length ? `<details class="shelf-lm loose" data-shelf="__loose" ${closed.has('__loose') ? '' : 'open'}><summary><span class="shelf-name">${icon('stack')} Nicht eingeordnet</span><small>${loose.length} ${loose.length === 1 ? 'Portion' : 'Portionen'}</small></summary><ul class="lib-list">${loose.map(libItem).join('')}</ul></details>` : '';
+  const looseHTML = loose.length ? `<details class="shelf-lm loose" data-shelf="__loose" ${closed.has('__loose') ? '' : 'open'}><summary><span class="shelf-name">${icon('stack')} Nicht eingeordnet</span><small>${loose.length} ${loose.length === 1 ? 'Portion' : 'Portionen'}</small></summary><ul class="lib-list">${loose.map(libItem).join('')}</ul>
+    <p class="hint small shelf-auto-hint"><button type="button" class="link-btn" data-action="shelf-auto">Automatisch einordnen</button> – anhand des Namens (z. B. „New World 1 – Unit 3“). Oder Portion öffnen → <b>Einordnen</b>.</p></details>` : '';
   return `<div class="shelf">${lmHTML}${looseHTML}</div>`;
 }
 
