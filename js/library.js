@@ -211,16 +211,16 @@ async function libOpenItem(setId) {
 const ASG = { setId: '', lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, allGrades: false };
 /** Schuljahre, für die das Lehrmittel Bände hat (neues Lehrmittel: alle) */
 const lmGrades = (lmId) => LIB_GRADES.filter((g) => LIB.data?.units.some((u) => u.lehrmittel_id === lmId && u.grade === g));
-async function openLibAssign(set) {
+async function openLibAssign(set, mode = 'share') {
   if (!set) return;
   if (!cloud.uid) { openLogin(); return; }
   const cur = libUnit(set.libUnit);
-  Object.assign(ASG, { setId: set.id, lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false });
-  openModal('<div class="asg"><p class="muted"><span class="spinner"></span> Bibliothek wird geladen …</p></div>', { cls: 'wide asg-modal', label: 'In der Bibliothek teilen' });
+  Object.assign(ASG, { setId: set.id, lm: '', grade: 0, unit: '', msg: { lm: '', unit: '' }, busy: false, mode });
+  openModal('<div class="asg"><p class="muted"><span class="spinner"></span> Lehrmittel werden geladen …</p></div>', { cls: 'wide asg-modal', label: mode === 'shelf' ? 'Portion einordnen' : 'In der Bibliothek teilen' });
   const wrap = ui.modal.el;
   wrap.addEventListener('submit', (e) => { const f = e.target.closest('.asg-new'); if (f) { e.preventDefault(); libCreate(f.dataset.kind, f.querySelector('input').value); } });
   try { await libLoad(true); } catch { /* Meldung unten */ }
-  const u = libUnit(set.libUnit) || cur;
+  const u = (mode === 'shelf' && libUnit(set.shelf?.unitId)) || libUnit(set.libUnit) || cur;
   if (u) Object.assign(ASG, { lm: u.lehrmittel_id, grade: u.grade, unit: u.id });
   asgRender();
 }
@@ -241,7 +241,8 @@ function asgRender() {
     <h3><span class="asg-n ${done ? 'done' : ''}">${done ? icon('check') : n}</span>${title}</h3>${on ? body : ''}</section>`;
   const newForm = (kind, ph) => `<form class="asg-new" data-kind="${kind}"><input type="text" maxlength="60" placeholder="${ph}" aria-label="${ph}" autocomplete="off"><button class="btn small secondary" type="submit">${icon('plus')} Anlegen</button></form>
     ${ASG.msg[kind] ? `<p class="asg-msg" role="alert">${ASG.msg[kind]}</p>` : ''}`;
-  box.innerHTML = `<header class="modal-head"><div><p class="eyebrow">${flag(lang)} ${LANGS[lang].name} · „${esc(set.name)}“</p><h2>In der Bibliothek teilen</h2></div>
+  const shelfMode = ASG.mode === 'shelf';
+  box.innerHTML = `<header class="modal-head"><div><p class="eyebrow">${flag(lang)} ${LANGS[lang].name} · „${esc(set.name)}“</p><h2>${shelfMode ? 'Portion einordnen' : 'In der Bibliothek teilen'}</h2></div>
       <button type="button" class="icon-btn" data-action="close-modal" aria-label="Schließen">${icon('x')}</button></header>
     <div class="asg">
       ${step(1, 'Lehrmittel', !!ASG.lm, `${lms.length ? `<ul class="asg-list">${lms.map((l) => `<li><button type="button" class="asg-opt ${ASG.lm === l.id ? 'on' : ''}" data-action="asg-pick" data-k="lm" data-v="${l.id}" aria-pressed="${ASG.lm === l.id}">${tick(ASG.lm === l.id)}${esc(l.name)}</button></li>`).join('')}</ul>` : '<p class="small muted">Noch keine Lehrmittel – leg das erste an.</p>'}
@@ -250,12 +251,13 @@ function asgRender() {
         ${!ASG.allGrades && asgGrades().length < LIB_GRADES.length ? '<button type="button" class="link-btn small" data-action="asg-all-grades">Anderes Schuljahr</button>' : ''}`, !!ASG.lm)}
       ${step(3, unitWord(lang), !!ASG.unit, `${units.length ? `<ul class="asg-list">${units.map((u) => `<li><button type="button" class="asg-opt ${ASG.unit === u.id ? 'on' : ''}" data-action="asg-pick" data-k="unit" data-v="${u.id}" aria-pressed="${ASG.unit === u.id}">${tick(ASG.unit === u.id)}${esc(u.name)}</button></li>`).join('')}</ul>` : `<p class="small muted">Noch keine ${unitWord(lang)} für dieses Schuljahr – leg sie an.</p>`}
         ${newForm('unit', `Neue ${unitWord(lang)}, z. B. ${unitWord(lang)} 3`)}`, !!ASG.lm && !!ASG.grade)}
-      <p class="small muted">Geteilt werden nur Name, Vokabeln und Bildauswahl – keine eigenen Fotos, kein Übungsstand, nicht deine E-Mail-Adresse.</p>
+      <p class="small muted">${shelfMode ? 'Nur für dich: So ist die Portion auf deiner Startseite unter dem Lehrmittel und der Unit abgelegt. Geteilt wird nichts.' : 'Geteilt werden nur Name, Vokabeln und Bildauswahl – keine eigenen Fotos, kein Übungsstand, nicht deine E-Mail-Adresse.'}</p>
     </div>
     <footer class="modal-foot">
-      ${set.published ? '<button type="button" class="btn ghost danger-ghost" data-action="asg-remove">Aus der Bibliothek nehmen</button>' : ''}
+      ${shelfMode ? (set.shelf ? '<button type="button" class="btn ghost danger-ghost" data-action="shelf-remove">Einordnung entfernen</button>' : '') : set.published ? '<button type="button" class="btn ghost danger-ghost" data-action="asg-remove">Aus der Bibliothek nehmen</button>' : ''}
       <button type="button" class="btn ghost" data-action="close-modal">Abbrechen</button>
-      <button type="button" class="btn primary" data-action="asg-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('book')} ${set.published ? 'Speichern' : 'Teilen'}</button>
+      ${shelfMode ? `<button type="button" class="btn primary" data-action="shelf-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('check')} Einordnen</button>`
+        : `<button type="button" class="btn primary" data-action="asg-save" ${ASG.unit && !ASG.busy ? '' : 'disabled'}>${icon('book')} ${set.published ? 'Speichern' : 'Teilen'}</button>`}
     </footer>`;
 }
 function asgGrades() {
@@ -313,6 +315,7 @@ async function asgSave() {
   set.published = true; set.libUnit = ASG.unit;
   try {
     await cloudPublish(set);
+    set.shelf = shelfOf(set.libUnit) || set.shelf; // auf der Startseite gleich eingeordnet
     saveDB();
     const it = LIB.data.items.find((i) => i.set_id === set.id);
     if (it) Object.assign(it, { unit_id: set.libUnit, name: set.name }); else LIB.data.items.unshift({ set_id: set.id, name: set.name, word_count: set.words.length, lang: langOf(set), unit_id: set.libUnit });
@@ -337,6 +340,38 @@ async function asgRemove() {
     toast(`„${set.name}“ ist nicht mehr in der Bibliothek.`);
     if (ui.view === 'set') render();
   } catch (e) { toast(cloudErrorText(e), 'bad'); }
+}
+
+/* ---------- Eigene Portionen einordnen (Lehrmittel › Schuljahr › Unit), ohne zu teilen ----------
+ * set.shelf = { unitId, unit, grade, lmId, lm } – Namen werden mitgespeichert, damit die Startseite sie auch offline zeigt. */
+function shelfOf(unitId) {
+  const u = libUnit(unitId), l = u && libLm(u.lehrmittel_id);
+  return u && l ? { unitId: u.id, unit: u.name, grade: u.grade, lmId: l.id, lm: l.name } : null;
+}
+function shelfSave() {
+  const set = db.sets.find((s) => s.id === ASG.setId), sh = shelfOf(ASG.unit);
+  if (!set || !sh) return;
+  set.shelf = sh; set.updated = Date.now(); saveDB();
+  closeModal(true);
+  toast(`„${set.name}“ liegt jetzt unter ${sh.lm} › ${gradeName(sh.grade)} › ${sh.unit}.`);
+  render();
+}
+function shelfRemove() {
+  const set = db.sets.find((s) => s.id === ASG.setId);
+  if (!set) return;
+  delete set.shelf; set.updated = Date.now(); saveDB();
+  closeModal(true); toast('Einordnung entfernt.'); render();
+}
+/** Geteilte Portionen von früher (nur libUnit): Einordnung einmal nachtragen */
+let shelfFilled = false;
+function shelfFillFromLibrary() {
+  if (shelfFilled || !cloud.uid || !db.sets.some((s) => s.libUnit && !s.shelf)) return;
+  shelfFilled = true;
+  libLoad().then(() => {
+    let n = 0;
+    db.sets.forEach((s) => { if (s.libUnit && !s.shelf) { const sh = shelfOf(s.libUnit); if (sh) { s.shelf = sh; n++; } } });
+    if (n) { saveDB(); if (ui.view === 'home') render(); }
+  }).catch(() => { shelfFilled = false; });
 }
 
 /** Kasten im Teilen-Fenster und auf der Portion: wo die Portion in der Bibliothek steht */
@@ -378,4 +413,7 @@ const libraryActions = {
   'asg-save': () => asgSave(),
   'asg-all-grades': () => { ASG.allGrades = true; asgRender(); },
   'asg-remove': () => asgRemove(),
+  'shelf-open': () => openLibAssign(currentSet(), 'shelf'),
+  'shelf-save': () => shelfSave(),
+  'shelf-remove': () => shelfRemove(),
 };

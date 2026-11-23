@@ -1665,3 +1665,18 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .ex-table thead th { font-size: .85rem; color: var(--ink-2); font-weight: 600; }
 .ex-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
 .ex-steps li { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem .5rem; border-radius: 8px; background: var(--surface-2, rgba(0,0,0,.03)); }
+
+/* Meine Portionen: nach Lehrmittel › Schuljahr › Unit geordnet */
+.shelf { display: grid; gap: .6rem; }
+.shelf-lm { border: 1px solid var(--line, #e5e7eb); border-radius: 14px; background: var(--surface, #fff); }
+.shelf-lm > summary { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .65rem .85rem; cursor: pointer; font-weight: 800; list-style: none; }
+.shelf-lm > summary::-webkit-details-marker { display: none; }
+.shelf-lm > summary::after { content: '▾'; color: var(--ink-2); transition: transform .2s; }
+.shelf-lm:not([open]) > summary::after { transform: rotate(-90deg); }
+.shelf-lm > summary small { margin-left: auto; font-weight: 600; color: var(--ink-2); }
+.shelf-name { display: inline-flex; align-items: center; gap: .4rem; }
+.shelf-name svg { width: 18px; height: 18px; }
+.shelf-lm > .shelf-grade, .shelf-lm.loose > .lib-list { padding: 0 .7rem .7rem; }
+.shelf-g { margin: .2rem 0 .3rem; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
+.shelf-unit { margin: 0 0 .5rem; padding-left: .6rem; border-left: 3px solid color-mix(in srgb, var(--primary, #4F46E5) 35%, transparent); }
+.shelf-unit h5 { margin: .1rem 0 .3rem; font-size: .95rem; }

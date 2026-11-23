@@ -222,3 +222,9 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 - Sobald sie beide Tools genutzt hat, können sie und alle ihre Kinder in beide Richtungen wechseln. Fehlt einem Kind das Login im anderen Tool, wird es beim ersten Wechsel dort angelegt (gleicher Benutzername, gleiche Bilder). Gibt es zur Klasse noch keine verbundene Klasse im anderen Tool, entsteht sie automatisch mit demselben Namen.
 - Hat die Lehrperson ein Kind im anderen Tool bewusst gelöscht, bekommt es dort kein neues Login.
 - Einrichten: `supabase/avatar.sql` und danach `supabase/einmaleins.sql` (Teilmal) in Supabase nochmals ganz ausführen. Wer schon Klassen oder Portionen hat, gilt im jeweiligen Tool als schon angemeldet.
+
+## Eigene Portionen einordnen
+
+- Portion öffnen → **Einordnen** (oben neben „Bearbeiten“): Lehrmittel, Schuljahr und Unit wählen – dieselbe Auswahl wie beim Teilen in der Bibliothek (neue Lehrmittel und Units lassen sich dort anlegen). Geteilt wird dabei **nichts**; die Einordnung ist nur für dich.
+- Auf der Startseite stehen deine Portionen dann geordnet: **Lehrmittel › Schuljahr › Unit › Portionen**. Lehrmittel lassen sich auf- und zuklappen (das Gerät merkt es sich). Nicht eingeordnete Portionen stehen unten unter „Nicht eingeordnet“.
+- Portionen, die schon in der Bibliothek geteilt sind, werden automatisch unter ihrer Unit eingeordnet.

@@ -304,7 +304,7 @@ function viewHome() {
       <aside class="panel library" aria-labelledby="lib-title">
         <div class="lib-head"><h2 id="lib-title">Meine ${LANGS[lang].name}-Portionen</h2>${cloud.uid ? `<button class="btn small secondary" data-action="classes">${icon('user')} Meine Klassen</button>` : ''}</div>
         ${libraryNote()}
-        ${sets.length ? `<ul class="lib-list">${sets.map(libItem).join('')}</ul>
+        ${sets.length ? `${shelfListHTML(sets)}
           <p class="hint small lib-move-hint">Falsche Sprache erwischt? Portion einfach auf den Reiter ${flag(lang === 'fr' ? 'en' : 'fr')} ${LANGS[lang === 'fr' ? 'en' : 'fr'].name} ziehen – am Handy und Tablet am Griff ⠿ anfassen.</p>` : `<p class="empty">Noch keine ${LANGS[lang].name}-Portion. Füge links deine Vokabeln ein.</p>`}
       </aside>
     </div>
@@ -313,6 +313,38 @@ function viewHome() {
 
 const HOME_PLACEHOLDERS = {"en": ["z. B. Unit 3 – Food", "apple – Apfel&#10;the dog – der Hund&#10;to swim – schwimmen&#10;…", "<code>apple – Apfel</code> oder <code>the dog = der Hund</code>"], "fr": ["z. B. Unité 3 – La nourriture", "la pomme – der Apfel&#10;le chien – der Hund&#10;nager – schwimmen&#10;…", "<code>la pomme – der Apfel</code> oder <code>le chien = der Hund</code>"]};
 const homeLang = () => (db.settings.homeLang === 'fr' ? 'fr' : 'en');
+
+/* Eigene Portionen wie in der Bibliothek: Lehrmittel › Schuljahr › Unit › Portionen (set.shelf, js/library.js).
+   Lehrmittel lassen sich auf- und zuklappen (merkt sich das Gerät). Nicht eingeordnete Portionen stehen unten. */
+const SHELF_KEY = 'vokaboom.shelfClosed';
+const shelfClosed = () => { try { return new Set(JSON.parse(localStorage.getItem(SHELF_KEY) || '[]')); } catch { return new Set(); } };
+function shelfListHTML(sets) {
+  if (typeof shelfFillFromLibrary === 'function') setTimeout(shelfFillFromLibrary, 0);
+  const nat = (a, b) => String(a).localeCompare(String(b), 'de', { numeric: true, sensitivity: 'base' });
+  const filed = sets.filter((s) => s.shelf && s.shelf.lm), loose = sets.filter((s) => !(s.shelf && s.shelf.lm));
+  if (!filed.length) {
+    return `<ul class="lib-list">${sets.map(libItem).join('')}</ul>${cloud.uid ? '<p class="hint small">Tipp: Portion öffnen → <b>Einordnen</b> – dann stehen deine Portionen hier nach Lehrmittel und Unit geordnet, wie in der Bibliothek.</p>' : ''}`;
+  }
+  const closed = shelfClosed();
+  const lms = new Map();
+  for (const s of filed) {
+    const k = s.shelf.lmId || s.shelf.lm;
+    if (!lms.has(k)) lms.set(k, { name: s.shelf.lm, sets: [] });
+    lms.get(k).sets.push(s);
+  }
+  const lmHTML = [...lms.entries()].sort((a, b) => nat(a[1].name, b[1].name)).map(([k, lm]) => {
+    const grades = [...new Set(lm.sets.map((s) => +s.shelf.grade || 0))].sort((a, b) => a - b);
+    const body = grades.map((g) => {
+      const inG = lm.sets.filter((s) => (+s.shelf.grade || 0) === g);
+      const units = [...new Set(inG.map((s) => s.shelf.unit))].sort(nat);
+      return `<div class="shelf-grade">${grades.length > 1 || g ? `<h4 class="shelf-g">${g ? gradeName(g) : ''}</h4>` : ''}
+        ${units.map((u) => `<div class="shelf-unit"><h5>${esc(u)}</h5><ul class="lib-list">${inG.filter((s) => s.shelf.unit === u).sort((a, b) => nat(a.name, b.name)).map(libItem).join('')}</ul></div>`).join('')}</div>`;
+    }).join('');
+    return `<details class="shelf-lm" data-shelf="${esc(k)}" ${closed.has(k) ? '' : 'open'}><summary><span class="shelf-name">${icon('book')} ${esc(lm.name)}</span><small>${lm.sets.length} ${lm.sets.length === 1 ? 'Portion' : 'Portionen'}</small></summary>${body}</details>`;
+  }).join('');
+  const looseHTML = loose.length ? `<details class="shelf-lm loose" data-shelf="__loose" ${closed.has('__loose') ? '' : 'open'}><summary><span class="shelf-name">${icon('stack')} Nicht eingeordnet</span><small>${loose.length} ${loose.length === 1 ? 'Portion' : 'Portionen'}</small></summary><ul class="lib-list">${loose.map(libItem).join('')}</ul></details>` : '';
+  return `<div class="shelf">${lmHTML}${looseHTML}</div>`;
+}
 
 function libItem(s) {
   const t = s.progress?.test?.best;
@@ -409,6 +441,10 @@ function bindHome() {
   if (!$('#vocab-input')) return; // Kinder-Ansicht
   bindBoom();
   bindSetDrag();
+  $$('.shelf-lm').forEach((d) => d.addEventListener('toggle', () => {
+    const c = shelfClosed(); if (d.open) c.delete(d.dataset.shelf); else c.add(d.dataset.shelf);
+    try { localStorage.setItem(SHELF_KEY, JSON.stringify([...c])); } catch { /* egal */ }
+  }));
   const ta = $('#vocab-input'), name = $('#set-name');
   const update = () => { ui.draft.text = ta.value; renderPreview(); };
   ta.addEventListener('input', debounce(update, 120));
@@ -519,6 +555,7 @@ function viewSet(set) {
       ${locked ? '' : `<div class="set-tools">
         <button class="btn ghost" data-action="edit-words">${icon('edit')} Bearbeiten</button>
         <button class="btn ghost" data-action="share">${icon(isFramed ? 'copy' : 'link')} ${isFramed ? 'Liste kopieren' : 'Teilen'}</button>
+        ${cloud.user && !isFramed ? `<button class="btn ghost ${set.shelf ? 'lib-on' : ''}" data-action="shelf-open" title="${set.shelf ? esc(`${set.shelf.lm} › ${gradeName(set.shelf.grade)} › ${set.shelf.unit}`) : 'Unter Lehrmittel und Unit ablegen (nur für dich)'}">${icon('grid')} ${set.shelf ? esc(set.shelf.unit) : 'Einordnen'}</button>` : ''}
         ${cloud.user && !isFramed ? `<button class="btn ghost ${set.published ? 'lib-on' : ''}" data-action="lib-assign" title="${set.published && set.libUnit && typeof libPath === 'function' ? esc(libPath(set.libUnit)) : 'In der Bibliothek teilen'}">${icon('book')} ${set.published ? 'In der Bibliothek' : 'Bibliothek'}</button>` : ''}
       </div>`}
     </header>
