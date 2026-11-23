@@ -527,7 +527,8 @@ function viewSet(set) {
     <div class="section-head set-ueben"><h2>Üben</h2><p class="hint">${isKid() ? 'Beim Üben verdienst du Münzen – damit kannst du unten spielen.' : 'Der Lernweg in fünf Schritten.'}</p></div>
     <ol class="path" aria-label="Lernweg">
       ${step(1, 'Lernkarten', 'Karten umdrehen und merken.', info.cards,
-        `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>`, !!p.cards, 'stack')}
+        `<button class="btn primary" data-action="mode" data-mode="cards">Karten üben</button>
+        <button class="btn ghost small" data-action="cards-print" title="Vokabelkärtchen zum Ausschneiden und Falten">${icon('down')} Kärtchen als PDF</button>`, !!p.cards, 'stack')}
       ${step(2, 'Schreiben', `Deutsch → ${L} oder ${L} → Deutsch schreiben.`, info.write,
         `<button class="btn primary" data-action="mode" data-mode="write">Schreiben üben</button>`, !!p.write, 'pencil2')}
       ${step(3, 'Aussprechen', 'Sag das Wort ins Mikrofon.', info.speak,

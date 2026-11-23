@@ -393,6 +393,7 @@ if (typeof menuActions === 'object') Object.assign(actions, menuActions); // Men
 if (typeof libraryActions === 'object') Object.assign(actions, libraryActions); // Bibliothek (js/library.js)
 if (typeof reviewActions === 'object') Object.assign(actions, reviewActions); // Wiederholen (js/review.js)
 if (typeof writeActions === 'object') Object.assign(actions, writeActions); // Schreiben (js/write.js)
+if (typeof cardPdfActions === 'object') Object.assign(actions, cardPdfActions); // Kärtchen als PDF (js/cardpdf.js)
 // weitere Spiele (js/rain.js, snake.js, fishing.js, bridge.js, detective.js) – const-Variablen hängen nicht an window
 if (typeof rainActions === 'object') Object.assign(actions, rainActions);
 if (typeof snakeActions === 'object') Object.assign(actions, snakeActions);
