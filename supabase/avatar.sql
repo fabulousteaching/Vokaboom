@@ -524,3 +524,52 @@ grant execute on function public.fab_avatar_get(text, uuid), public.fab_avatar_s
   public.fab_avatar3d_save(text, uuid, jsonb), public.fab_garage_save(text, uuid, jsonb),
   public.fab_coins_spend(text, uuid, integer, text, uuid) to anon, authenticated;
 grant execute on function public.fab_class_avatars(uuid) to authenticated;
+
+
+-- =============================================================================================
+-- Wechsel zwischen Vokaboom und Teilmal
+-- Den Knopf zum anderen Tool gibt es erst, wenn die Lehrperson in BEIDEN Tools mindestens einmal angemeldet war.
+-- Dann können die Lehrperson und ihre Kinder in beide Richtungen wechseln. Jedes Tool meldet beim Anmelden der
+-- Lehrperson „ich war da“ (fab_teacher_seen). Wer schon Klassen oder Portionen hat, gilt als schon angemeldet.
+-- =============================================================================================
+create table if not exists public.fab_teacher_tools (
+  teacher_id uuid not null references auth.users (id) on delete cascade,
+  tool text not null check (tool in ('vokaboom', 'teilmal')),
+  first_seen timestamptz not null default now(),
+  primary key (teacher_id, tool)
+);
+alter table public.fab_teacher_tools enable row level security; -- keine Policies: nur über die Funktionen unten
+
+do $$ begin
+  if to_regclass('public.einmaleins_classes') is not null then
+    insert into public.fab_teacher_tools (teacher_id, tool) select distinct teacher_id, 'teilmal' from public.einmaleins_classes on conflict do nothing;
+  end if;
+  if to_regclass('public.vokaboom_classes') is not null then
+    insert into public.fab_teacher_tools (teacher_id, tool) select distinct teacher_id, 'vokaboom' from public.vokaboom_classes on conflict do nothing;
+  end if;
+  if to_regclass('public.vokabelwelt_sets') is not null then
+    insert into public.fab_teacher_tools (teacher_id, tool) select distinct user_id, 'vokaboom' from public.vokabelwelt_sets on conflict do nothing;
+  end if;
+end $$;
+
+-- Hilfe: War diese Lehrperson in beiden Tools?
+create or replace function public.fab_teacher_both(p_teacher uuid)
+returns boolean
+language sql stable security definer set search_path = '' as $$
+  select count(distinct t.tool) = 2 from public.fab_teacher_tools t where t.teacher_id = p_teacher;
+$$;
+
+-- Lehrperson: „ich bin in diesem Tool angemeldet“. Liefert true, wenn sie in beiden Tools war (dann gibt es den Knopf).
+create or replace function public.fab_teacher_seen(p_tool text)
+returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  if (select auth.uid()) is null or p_tool not in ('vokaboom', 'teilmal') then return false; end if;
+  insert into public.fab_teacher_tools (teacher_id, tool) values ((select auth.uid()), p_tool) on conflict do nothing;
+  return public.fab_teacher_both((select auth.uid()));
+end;
+$$;
+
+revoke execute on function public.fab_teacher_both(uuid) from public, anon, authenticated;
+revoke execute on function public.fab_teacher_seen(text) from public, anon;
+grant execute on function public.fab_teacher_seen(text) to authenticated;

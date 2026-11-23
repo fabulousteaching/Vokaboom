@@ -213,3 +213,11 @@ Richtig → ein Fach weiter. Falsch → zurück ins 1. Fach (morgen wieder). Fas
 Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, Kleider, Schuhe, Extras, Haustier, Hintergrund). Das Basic-Set ist gratis, weitere Teile kosten Münzen, die sie beim Üben verdienen (Standard: 10 Punkte = 1 Münze, höchstens 40 Münzen pro Tag – im **Menü → Avatar & Münzen** einstellbar, dort auch Shop ein/aus und Bonus-Münzen). Verbundene Kinder haben in Vokaboom und Teilmal denselben Avatar und dieselben Münzen.
 
 **Einrichten:** `supabase/avatar.sql` im SQL Editor ausführen (nach Updates nochmals ganz – bestehende Avatare und Münzen bleiben). Details, Preise und die Schritte für Teilmal: `supabase/AVATAR.md`.
+
+## Wechsel zwischen Vokaboom und Teilmal
+
+- Der Knopf zum anderen Tool (oben rechts, z. B. „1×1 Teilmal“ bzw. „ABC Vokaboom“, und im Menü unter Konto) erscheint erst, wenn sich die Lehrperson **in beiden Tools mindestens einmal angemeldet** hat. Egal, in welchem Tool zuerst.
+- Solange sie nur ein Tool nutzt, gibt es keinen Wechsel – weder für sie noch für ihre Kinder.
+- Sobald sie beide Tools genutzt hat, können sie und alle ihre Kinder in beide Richtungen wechseln. Fehlt einem Kind das Login im anderen Tool, wird es beim ersten Wechsel dort angelegt (gleicher Benutzername, gleiche Bilder). Gibt es zur Klasse noch keine verbundene Klasse im anderen Tool, entsteht sie automatisch mit demselben Namen.
+- Hat die Lehrperson ein Kind im anderen Tool bewusst gelöscht, bekommt es dort kein neues Login.
+- Einrichten: `supabase/avatar.sql` und danach `supabase/einmaleins.sql` (Teilmal) in Supabase nochmals ganz ausführen. Wer schon Klassen oder Portionen hat, gilt im jeweiligen Tool als schon angemeldet.

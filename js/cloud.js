@@ -85,6 +85,7 @@ function setCloudUser(user) {
   cloud.stateUid = user.id;
   cloud.user = user.email || '';
   saveCloudState();
+  setTimeout(toolSeen, 0);
 }
 function forgetCloudUser() {
   cloud.uid = ''; cloud.user = ''; cloud.status = 'off'; cloud.error = '';
@@ -379,6 +380,9 @@ function cloudErrorText(e) {
 
 /* ---------- Oberfläche ---------- */
 function accountButtonHTML() {
+  return toolSwitchHTML() + accountButtonCore();
+}
+function accountButtonCore() {
   if (!isKid() && typeof menuButtonHTML === 'function') return menuButtonHTML(); // ein Knopf „Menü“ mit Konto drin
   if (isKid()) return kidAccountButtonHTML();
   if (cloud.user) {
@@ -552,6 +556,7 @@ function accountSectionHTML() {
     <p class="muted small">Deine Portionen werden automatisch in deinem Konto gespeichert. Beim Abmelden werden sie von diesem Gerät entfernt – sie bleiben in deinem Konto und sind beim nächsten Anmelden wieder da.</p>
     <div class="row">
       <button type="button" class="btn secondary" data-action="cloud-sync">${icon('flip')} Jetzt abgleichen</button>
+      ${toolBoth() && CLOUD_CFG.einmaleinsUrl ? '<button type="button" class="btn ghost" data-action="go-einmaleins"><span class="ot-tag">1×1</span> Zu Teilmal</button>' : ''}
       <button type="button" class="btn ghost" data-action="logout">Abmelden</button>
     </div>
     <details class="pw-change"><summary>Passwort ändern</summary>
@@ -753,3 +758,32 @@ function takePublicSet(i) {
   toast(`„${set.name}“ ist jetzt bei deinen Portionen.`);
 }
 
+
+/* ---------- Wechsel zwischen Vokaboom und Teilmal ----------
+ * Den Knopf gibt es erst, wenn die Lehrperson in BEIDEN Tools mindestens einmal angemeldet war
+ * (fab_teacher_seen in supabase/avatar.sql). Dann wechseln Lehrperson und Kinder in beide Richtungen.
+ * Kinder: das Tool fragt die Datenbank (kid.e1), ob ihre Lehrperson beide Tools nutzt. */
+const TOOL_ME = 'vokaboom';
+const toolBothKey = (uid) => `fab.tools.both.${uid}`;
+function toolBoth() {
+  if (isKid()) return !!kid.e1;
+  if (!cloud.uid) return false;
+  if (cloud.both === undefined) { try { cloud.both = localStorage.getItem(toolBothKey(cloud.uid)) === '1'; } catch { cloud.both = false; } }
+  return !!cloud.both;
+}
+/** Lehrperson angemeldet: dem Server melden „ich war in diesem Tool“; er sagt, ob sie in beiden Tools war */
+function toolSeen() {
+  const uid = cloud.uid;
+  if (!uid || cloud.toolSeenUid === uid) return;
+  cloud.toolSeenUid = uid; cloud.both = undefined;
+  cloudClient().then((c) => c.rpc('fab_teacher_seen', { p_tool: TOOL_ME })).then(({ data, error }) => {
+    if (error || cloud.uid !== uid) return;
+    const both = data === true;
+    try { localStorage.setItem(toolBothKey(uid), both ? '1' : '0'); } catch { /* egal */ }
+    if (both !== cloud.both) { cloud.both = both; renderAccountSlot(); }
+  }).catch(() => { cloud.toolSeenUid = ''; });
+}
+function toolSwitchHTML() {
+  if (!CLOUD_CFG.einmaleinsUrl || !toolBoth()) return '';
+  return `<button class="btn small ghost tool-switch" data-action="go-einmaleins" title="Zu Teilmal wechseln (1×1 rechnen)"><span class="ot-tag">1×1</span><span class="ts-name">Teilmal</span></button>`;
+}

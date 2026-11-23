@@ -1646,3 +1646,7 @@ input[type="range"] { accent-color: var(--brand); width: 100%; }
 html.playing #view.view { padding-block: 10px 12px; }
 html.playing .game-mode > .mode-bar { display: none; }
 html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none; }
+
+/* Wechsel zwischen Vokaboom und Teilmal (oben rechts, erst wenn die Lehrperson beide Tools nutzt) */
+.tool-switch { display: inline-flex; align-items: center; gap: .35rem; margin-right: .35rem; white-space: nowrap; }
+@media (max-width: 560px) { .tool-switch .ts-name { display: none; } }

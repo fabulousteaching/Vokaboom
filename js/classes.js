@@ -98,7 +98,7 @@ async function kidCheckEinmaleins() {
     const c = await cloudClient();
     const { data, error } = await c.rpc('einmaleins_kid_linked', { p_from: 'vokaboom', p_token: kid.token });
     if (error) return;
-    if (!!data !== kid.e1) { kid.e1 = !!data; kidSaveSession(); if (ui.view === 'home') render(); }
+    if (!!data !== kid.e1) { kid.e1 = !!data; kidSaveSession(); renderAccountSlot(); if (ui.view === 'home') render(); }
   } catch { /* Einmaleins nicht eingerichtet oder offline */ }
 }
 
