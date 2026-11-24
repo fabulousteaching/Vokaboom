@@ -192,7 +192,7 @@ alter table public.vokaboom_classes add column if not exists rules jsonb not nul
 alter table public.vokaboom_classes add column if not exists settings jsonb not null default '{}';
 alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_settings_check;
 alter table public.vokaboom_classes add constraint vokaboom_classes_settings_check
-  check (jsonb_typeof(settings) = 'object' and octet_length(settings::text) <= 5000);
+  check (jsonb_typeof(settings) = 'object' and octet_length(settings::text) <= 30000); -- inkl. Spielsperren pro Kind
 alter table public.vokaboom_classes drop constraint if exists vokaboom_classes_rules_check;
 alter table public.vokaboom_classes add constraint vokaboom_classes_rules_check
   check (jsonb_typeof(rules) = 'object' and octet_length(rules::text) <= 200000);

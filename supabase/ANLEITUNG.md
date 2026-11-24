@@ -240,3 +240,12 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 
 - In den Einstellungen vor dem Start: **Vorlesen auf** (Englisch/Französisch oder Deutsch) und **Auf den Karten** (Englisch/Französisch oder Deutsch). Beliebig kombinierbar – z. B. auf Deutsch vorlesen, die Kinder suchen das englische Wort auf ihrer Karte. Die Wahl merkt sich das Gerät.
 - Deutsch wird mit der Stimme des Geräts vorgelesen. Bei mehreren deutschen Bedeutungen („normalerweise, in der Regel“) gilt die erste. Wörter ohne deutsches Wort fallen weg, sobald Deutsch gewählt ist.
+
+## Spiele sperren
+
+- Klasse → **Portionen** → Abschnitt **🎮 Spiele sperren** (gilt für alle Portionen der Klasse):
+  - **Ganze Klasse:** Frei · 🔒 Alle Spiele · Einzelne Spiele (dann die Spiele antippen, die gesperrt sein sollen).
+  - **Einzelne Kinder:** pro Kind dieselbe Auswahl. Die Sperre eines Kindes kommt zur Klassen-Sperre dazu.
+- Die Kinder sehen gesperrte Spiele nicht mehr; sind alle gesperrt, steht bei „Spielen“: „Deine Lehrperson hat die Spiele gerade gesperrt. Üben geht weiter!“ Die Sperre kommt an, sobald das Kind Vokaboom neu lädt.
+- Zusätzlich gibt es weiterhin pro Portion „Für einzelne Kinder anpassen“ (Portion oder einzelne Spiele dieser Portion ausschalten).
+- Viele Sperren für einzelne Kinder brauchen mehr Platz in der Datenbank: `supabase/vokabelwelt.sql` einmal nochmals ausführen.

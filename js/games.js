@@ -22,7 +22,19 @@ const GAMES = [
   { id: 'runner', name: 'Welten-Lauf', art: '🏃', text: 'Renn mit deinem Avatar durch fünf Welten und lauf durch das richtige Wort.', min: 3 },
 ];
 const GAME_BY_ID = Object.fromEntries(GAMES.map((g) => [g.id, g]));
-const gamesOn = (set) => GAMES.filter((g) => !(set?.gamesOff || []).includes(g.id));
+/* Spielsperre der Lehrperson (Klasse → Portionen → Spiele sperren; in den Klassen-Einstellungen):
+   settings.lock = { m: 'all' | 'some', g: [Spiel-IDs] } für die ganze Klasse,
+   settings.kidLock = { "<Benutzername>": { m, g } } für einzelne Kinder (zusätzlich zur Klasse). */
+function gameLockOf(settings, username) {
+  const st = settings || {}, out = new Set();
+  const add = (l) => { if (!l || typeof l !== 'object') return false; if (l.m === 'all') return true; if (l.m === 'some' && Array.isArray(l.g)) l.g.forEach((x) => out.add(x)); return false; };
+  if (add(st.lock)) return 'all';
+  if (username && add(st.kidLock?.[username])) return 'all';
+  return out;
+}
+const kidGameLock = () => (typeof isKid === 'function' && isKid() ? gameLockOf(kid.clsSettings, kid.username) : new Set());
+const gamesAllLocked = () => kidGameLock() === 'all';
+const gamesOn = (set) => { const lk = kidGameLock(); if (lk === 'all') return []; return GAMES.filter((g) => !(set?.gamesOff || []).includes(g.id) && !lk.has(g.id)); };
 
 /* ---------- Hilfen ---------- */
 const G = { id: '', timers: [], raf: 0, keys: null, s: {} };
@@ -170,6 +182,8 @@ const gameCoins = () => (typeof AV === 'object' && AV.state ? AV.state.coins || 
 const canPlayGame = () => gamesFree() || gameCoins() >= GAME_COST;
 /** Münze bezahlen, bevor ein Spiel beginnt. Liefert true, wenn gespielt werden darf. */
 async function gamePay(id) {
+  const set0 = currentSet();
+  if (set0 && !gamesOn(set0).some((g) => g.id === id)) { toast('🔒 Dieses Spiel ist gerade gesperrt.', 'bad'); return false; }
   if (gamesFree()) return true;
   if (gameCoins() < GAME_COST) { toast(`Dir fehlt eine Münze. Üben bringt Münzen! (${GAME_BY_ID[id]?.name || 'Spiel'} kostet ${GAME_COST})`, 'bad'); return false; }
   let r = 'local';
@@ -196,7 +210,7 @@ async function gameTicketCheck(action) {
 /** Spiel-Kacheln (Portion-Seite und Spiele-Übersicht) mit Preis */
 function gameTilesHTML(set) {
   const n = gameWords(set).length, list = gamesOn(set), best = set.progress?.games || {}, free = gamesFree(), can = canPlayGame();
-  if (!list.length) return '<p class="empty">Für diese Portion sind keine Spiele eingeschaltet.</p>';
+  if (!list.length) return `<p class="empty">${gamesAllLocked() ? '🔒 Deine Lehrperson hat die Spiele gerade gesperrt. Üben geht weiter!' : 'Für diese Portion sind keine Spiele eingeschaltet.'}</p>`;
   return `<div class="game-grid">${list.map((g) => {
     const ok = n >= g.min;
     return `<button class="game-tile ${!can ? 'locked' : ''}" data-action="game-open" data-game="${g.id}" ${ok ? '' : 'disabled'}>
@@ -218,6 +232,7 @@ function renderGames() {
 function openGame(id) {
   const set = currentSet();
   if (!set || !GAME_BY_ID[id]) return;
+  if (!gamesOn(set).some((g) => g.id === id)) { toast('🔒 Dieses Spiel ist gerade gesperrt.', 'bad'); return; }
   if (id === 'memory') { startMode('match'); return; }
   stopGame();
   go('game', { game: id });
