@@ -252,7 +252,7 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 
 ## Cloud-Stimme (Google) einrichten
 
-Vokaboom liest die Vokabeln mit einer Google-Stimme in Studio-Qualität vor. Jedes Wort wird pro Stimme **einmal** erzeugt und gilt dann für alle (Lehrpersonen, Kinder, geteilte Portionen). Erzeugen dürfen nur angemeldete Lehrpersonen; Kinder spielen nur ab. An Google geht nur der Text der Vokabel. Grenzen: höchstens 600 neue Wörter pro Lehrperson und Tag, 3000 insgesamt pro Tag.
+Vokaboom liest die Vokabeln mit einer Google-Stimme in Studio-Qualität vor. Jedes Wort wird pro Stimme **einmal** erzeugt und gilt dann für alle (Lehrpersonen, Kinder, geteilte Portionen). Erzeugen dürfen nur angemeldete Lehrpersonen; Kinder spielen nur ab. An Google geht nur der Text der Vokabel. Grenzen: höchstens 600 neue Wörter pro Lehrperson und Tag, 2000 insgesamt pro Tag.
 
 1. **Google Cloud:** Projekt mit aktivierter „Cloud Text-to-Speech API“ und einem API-Schlüssel (nur diese API erlaubt, Anwendungseinschränkung „Keine“). In der Testphase nicht auf „Upgrade“ klicken – dann kostet es nichts.
 2. **SQL:** `supabase/vokabelwelt.sql` in Supabase nochmals ganz ausführen (legt den Speicher `vokaboom-tts` und den Tageszähler an).

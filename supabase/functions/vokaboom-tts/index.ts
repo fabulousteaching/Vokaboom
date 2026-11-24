@@ -13,7 +13,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const BUCKET = 'vokaboom-tts';
 const CLOUD_V = 'c1';                 // gleich wie in js/core.js (CLOUD_TTS_V)
 const PER_TEACHER_DAY = 600;          // höchstens so viele neue Wörter pro Lehrperson und Tag
-const ALL_DAY = 3000;                 // und insgesamt pro Tag (bleibt sicher im Gratis-Kontingent)
+const ALL_DAY = 2000;                 // und insgesamt pro Tag (~60'000 Wörter im Monat: sicher im Gratis-Kontingent)
 const MAX_LEN = 120;                  // längere Texte werden abgeschnitten
 
 // Stimmen: Vokaboom-Kennung → Google-Stimme (Neural2: natürliche Frauenstimmen, im Gratis-Kontingent)
