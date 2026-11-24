@@ -410,6 +410,13 @@ document.addEventListener('click', (e) => {
   if (el.tagName === 'A') return;
   if (el.type === 'submit' && el.closest('form')) return; // Formular kümmert sich selbst
   e.preventDefault();
+  // Spiele: „Nochmal“ und andere Start-Knöpfe kosten wieder eine Münze, wenn die bezahlte Runde vorbei ist (js/games.js)
+  if (typeof GAME_PLAY_ACTIONS === 'object' && GAME_PLAY_ACTIONS.has(el.dataset.action)) {
+    if (el.dataset.busy) return;
+    el.dataset.busy = '1';
+    gameTicketCheck(el.dataset.action).then((ok) => { if (ok) fn(el, e); }).finally(() => { delete el.dataset.busy; });
+    return;
+  }
   fn(el, e);
 });
 

@@ -17,7 +17,7 @@ function trackWord(set, wid, mode, result) {
   const words = set.progress.words = set.progress.words || {};
   const s = words[wid] = words[wid] || { n: 0, bad: 0, almost: 0 };
   // Münzen für den Avatar (nur Kinder mit Login): richtige Antwort 1 Punkt, Lernkarten ½, vorher schon falsch +½
-  if (result === 'correct' && typeof avatarEarnPoints === 'function') avatarEarnPoints((mode === 'cards' ? 0.5 : 1) + (s.bad ? 0.5 : 0));
+  if (result === 'correct' && mode !== 'cards' && typeof avatarEarnPoints === 'function') avatarEarnPoints(1 + (s.bad ? 0.5 : 0)); // Lernkarten geben keine Münzen (dort schätzt man sich selbst ein)
   s.n++;
   if (result === 'wrong') s.bad++;
   if (result === 'almost') s.almost = (s.almost || 0) + 1;
@@ -495,6 +495,7 @@ function matchStars() {
 function finishMatch(set) {
   clearInterval(match.tick);
   match.finished = true;
+  if (typeof gameTicketUsed === 'function') gameTicketUsed(); // Memory ist ein Spiel: die Runde ist bezahlt und vorbei
   if (match.players === 2) { sfx.win(); confetti(); renderMatch(); return; }
   match.elapsed = match.t0 ? Date.now() - match.t0 : 0;
   const st = matchStars();

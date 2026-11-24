@@ -110,6 +110,7 @@ function markResult(pk, item, ok, srs) {
   if (srs !== false) gameSrs(item, srs || (ok ? 'correct' : 'wrong')); // Spiele zählen für die Vergessenskurve
 }
 function gameRecord(set, id, score) {
+  gameTicketUsed(); // Runde fertig: „Nochmal“ kostet wieder
   const p = set.progress = set.progress || {};
   const g = p.games = p.games || {};
   const prev = g[id]?.best || 0;
@@ -176,6 +177,20 @@ async function gamePay(id) {
   if (r === 'poor') { toast('Dir fehlt eine Münze. Üben bringt Münzen!', 'bad'); return false; }
   if (r === 'local' && AV.state) { AV.state.coins = Math.max(0, (AV.state.coins || 0) - GAME_COST); try { avSave?.(); } catch { /* egal */ } }
   if (typeof avCoinUI === 'function') avCoinUI();
+  return true;
+}
+/* Jede Runde kostet: Beim Öffnen eines Spiels wird bezahlt (G.ticket). Ist die Runde fertig (gameRecord), ist das
+   Ticket verbraucht – „Nochmal“, eine andere Stufe usw. kosten dann wieder eine Münze. Lehrpersonen spielen gratis. */
+const GAME_PLAY_ACTIONS = new Set(['game-again', 'rain-start', 'fish-level', 'bl-level', 'blitz-level', 'rn-go', 'ws-mode', 'match-variant']);
+function gameTicketUsed() { G.ticket = false; }
+/** Vor einem Start-Knopf: gibt es noch ein Ticket? Sonst bezahlen. Liefert true, wenn gespielt werden darf. */
+async function gameTicketCheck(action) {
+  if (!GAME_PLAY_ACTIONS.has(action) || gamesFree()) return true;
+  if (!(ui.view === 'game' || ui.view === 'match')) return true;
+  if (G.ticket) return true;
+  const id = ui.view === 'match' ? 'memory' : ui.game;
+  if (!(await gamePay(id))) return false;
+  G.ticket = true;
   return true;
 }
 /** Spiel-Kacheln (Portion-Seite und Spiele-Übersicht) mit Preis */
@@ -1321,7 +1336,7 @@ const gameActions = {
   'rn-lives': (el) => { db.settings.runLives = +el.dataset.n; saveDB(); renderGame(); },
   'rn-go': () => runnerBegin(currentSet()),
   games: () => { stopGame(); openGames(); },
-  'game-open': async (el) => { if (el.dataset.busy) return; el.dataset.busy = '1'; try { if (await gamePay(el.dataset.game)) openGame(el.dataset.game); } finally { delete el.dataset.busy; } },
+  'game-open': async (el) => { if (el.dataset.busy) return; el.dataset.busy = '1'; try { if (await gamePay(el.dataset.game)) { G.ticket = true; openGame(el.dataset.game); } } finally { delete el.dataset.busy; } },
   'ws-tip': (el) => { el.closest('li')?.classList.toggle('flip'); },
   'ws-back': (el) => { db.settings.wsBack = el.dataset.on === '1'; saveDB(); stopGame(); renderGame(); },
   'kids-pics': (el) => {
