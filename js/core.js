@@ -1348,6 +1348,57 @@ function kokoroText(t) {
   const x = String(t || '').trim();
   return /[.!?…]$/.test(x) ? x : `${x}.`;
 }
+/* ---------- Cloud-Stimme (Google, über Supabase-Funktion „vokaboom-tts“) ----------
+   Jedes Wort wird pro Stimme einmal erzeugt und liegt öffentlich im Speicher „vokaboom-tts“ – gleicher Pfad für alle
+   (Lehrpersonen, Kinder, geteilte Portionen). Erzeugen darf nur eine angemeldete Lehrperson; Kinder spielen nur ab.
+   Fehlt die Funktion (noch nicht eingerichtet), nimmt Vokaboom wie bisher die KI-Stimme im Browser (Kokoro). */
+const CLOUD_TTS_V = 'c1'; // gleich wie in supabase/functions/vokaboom-tts/index.ts
+const TTS_BUCKET = 'vokaboom-tts';
+let cloudTtsOff = false;
+const cloudTts = () => !cloudTtsOff && !!(window.VOKABELWELT_CONFIG || {}).cloudTts && typeof cloudConfigured === 'function' && cloudConfigured();
+const cloudText = (t) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+const cloudClipPath = (voice, t) => { const x = cloudText(t); return `${voice}/${CLOUD_TTS_V}-${textHash(`${CLOUD_TTS_V}|${voice}|${x}`)}.mp3`; };
+/** Schlüssel für Arbeitsspeicher und Gerät (Cloud- und Browser-Aufnahmen getrennt) */
+const clipKey = (voice, t) => (cloudTts() ? `${voice}|${cloudClipPath(voice, t)}` : `${voice}|${clipHash(t)}`);
+const cloudMiss = new Map(); // Pfad → Zeitpunkt (fehlt gerade)
+async function fetchCloudClip(voice, t, force = false) {
+  const path = cloudClipPath(voice, t);
+  const miss = cloudMiss.get(path);
+  if (!force && miss && Date.now() - miss < 60000) return null;
+  try {
+    const r = await fetch(`${cloudUrl()}/storage/v1/object/public/${TTS_BUCKET}/${path}`);
+    if (!r.ok) { cloudMiss.set(path, Date.now()); return null; }
+    const b = await r.blob();
+    if (b.size < 200) return null;
+    cloudMiss.delete(path);
+    return new Blob([b], { type: 'audio/mpeg' });
+  } catch { return null; }
+}
+const cloudGenQ = { busy: Promise.resolve() };
+/** Neues Wort bei Google erzeugen lassen (eins nach dem anderen) und dann laden */
+function cloudGen(t, voice) {
+  const run = async () => {
+    const c = await cloudClient();
+    const { error } = await c.functions.invoke('vokaboom-tts', { body: { text: cloudText(t), voice } });
+    if (error) {
+      const st = error.context?.status || 0;
+      let info = '';
+      try { info = (await error.context?.json?.())?.error || ''; } catch { /* */ }
+      if (st === 404 || /FunctionsFetchError|Failed to send|not found/i.test(`${error.name} ${error.message}`) || info === 'no_key') {
+        cloudTtsOff = true; // noch nicht eingerichtet: wie bisher mit der KI-Stimme im Browser
+        prep.note = info === 'no_key' ? 'Cloud-Stimme: In Supabase fehlt noch das Secret GOOGLE_TTS_KEY (siehe Anleitung).' : 'Cloud-Stimme: Die Supabase-Funktion „vokaboom-tts“ ist noch nicht eingerichtet (siehe Anleitung). Bis dahin liest die Stimme im Browser.';
+      } else if (info === 'limit') prep.note = 'Cloud-Stimme: Für heute sind genug neue Wörter erzeugt. Morgen geht es weiter – bis dahin liest die Gerätestimme.';
+      kokoroNotify();
+      throw error;
+    }
+    const b = await fetchCloudClip(voice, t, true);
+    if (!b) throw new Error('cloud_missing');
+    return b;
+  };
+  const p = cloudGenQ.busy.then(run, run);
+  cloudGenQ.busy = p.catch(() => {});
+  return p;
+}
 const audioPublicURL = (owner, voice, h) => `${cloudUrl()}/storage/v1/object/public/${AUDIO_BUCKET}/${owner}/${voice}/${h}.wav`;
 
 /* Gerätespeicher (IndexedDB) für erzeugte und geladene Aufnahmen */
@@ -1480,10 +1531,10 @@ const teacherIn = () => typeof cloud === 'object' && !!cloud.uid;
    - angemeldete Lehrperson und Kinder mit Klassen-Login: immer (gespeicherte Aufnahmen)
    - über QR-Code geteilte Portion einer Lehrperson: deren gespeicherte Aufnahmen
    - alle anderen: sobald die Stimmen im Hintergrund geladen sind (Aufnahmen entstehen dann auf dem Gerät) */
-const useKokoro = (set) => ttsSupported && !!ttsEl && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o));
+const useKokoro = (set) => !!ttsEl && (cloudTts() || (ttsSupported && (kidDevice() || teacherIn() || kokoro.state === 'ready' || !!(set && set.shareId && set.audio?.o))));
 /** Darf dieses Gerät Aufnahmen selbst erzeugen? Nur angemeldete Lehrperson, nur eigene Portionen. */
-const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned)
-  && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready');
+const mayGenerate = (set) => (cloudTts() ? !!ttsEl && teacherIn() && !kidDevice() : ttsSupported && !!ttsEl && !kidDevice() && kokoro.state !== 'failed' && !(set && set.assigned)
+  && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready'));
 const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
 /** Kokoro im Hintergrund laden (einmal pro Gerät ~330 MB, danach aus dem Speicher des Browsers; nicht auf Kinder-Geräten) */
@@ -1528,6 +1579,7 @@ function bgLoadMark(delta) {
   } catch { /* */ }
 }
 function voicesInBackground() {
+  if (cloudTts()) return; // Cloud-Stimme: die KI-Stimme im Browser (330 MB) wird nicht gebraucht
   if (!ttsSupported || kidDevice() || kokoro.worker) return;
   const c = navigator.connection;
   if (c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || ''))) return; // Datensparmodus / langsames Netz
@@ -1602,12 +1654,17 @@ async function fetchRemoteClip(owner, voice, h) {
 const clipLoading = new Map();
 /** Aufnahme suchen, ohne neu zu erzeugen */
 function findClip(text, voice, set) {
-  const h = clipHash(text), key = `${voice}|${h}`;
+  const h = clipHash(text), key = clipKey(voice, text);
   if (clipMem.has(key)) return Promise.resolve(clipMem.get(key));
   if (clipLoading.has(key)) return clipLoading.get(key);
   const p = (async () => {
     const local = await idbGet(key);
     if (local) return memPut(key, await cleanClipBlob(local)); // auch ältere Aufnahmen aufbereiten
+    if (cloudTts()) { // Cloud-Stimme: gemeinsamer Speicher für alle
+      const b = await fetchCloudClip(voice, text);
+      if (b) { idbPut(key, b); return memPut(key, b); }
+      return null;
+    }
     const owner = audioOwnerFor(voice, h, set);
     if (owner) {
       const b = await fetchRemoteClip(owner, voice, h);
@@ -1620,6 +1677,14 @@ function findClip(text, voice, set) {
 }
 /** Aufnahme erzeugen und speichern (Gerät + Konto der Lehrperson) */
 async function makeClip(text, voice, set, urgent = false) {
+  if (cloudTts()) {
+    const key = clipKey(voice, text);
+    try {
+      const b = await cloudGen(text, voice);
+      idbPut(key, b);
+      return memPut(key, b);
+    } catch (e) { if (cloudTts()) throw e; } // nur wenn die Cloud fehlt: weiter mit der Stimme im Browser
+  }
   const h = clipHash(text), key = `${voice}|${h}`;
   const blob = await kokoroGen(text, voice, urgent);
   idbPut(key, blob);
@@ -1671,7 +1736,7 @@ function audioCounts(set) {
   const texts = setTexts(set), voices = prepVoices(set);
   const total = texts.length * voices.length;
   let done = 0;
-  for (const v of voices) for (const t of texts) if (set.audio?.h?.[v]?.[clipHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${clipHash(t)}`))) done++;
+  for (const v of voices) for (const t of texts) if (cloudTts() ? clipMem.has(clipKey(v, t)) : (set.audio?.h?.[v]?.[clipHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${clipHash(t)}`)))) done++;
   return { done, total };
 }
 async function audioPrepare(set) {
@@ -1684,6 +1749,11 @@ async function audioPrepare(set) {
       for (const t of texts) {
         if (!getSet(set.id) || kokoro.state === 'failed') return;
         const h = clipHash(t);
+        if (cloudTts()) { // Cloud: schon im gemeinsamen Speicher? sonst einmal erzeugen
+          if (await findClip(t, v, set)) { kokoroNotify(); continue; }
+          try { await makeClip(t, v, set); } catch { return; }
+          kokoroNotify(); continue;
+        }
         if (set.audio?.h?.[v]?.[h] && set.audio.o === cloud.uid) continue; // schon im Konto
         const local = await findClip(t, v, set);
         if (local) { if (ownsAudio(set) && !(set.audio?.o === cloud.uid && set.audio.h?.[v]?.[h])) uploadClip(set, v, h, local.blob); kokoroNotify(); continue; }
@@ -1749,10 +1819,10 @@ function speak(text, lang, { slow = false } = {}) {
   if (lang === 'de' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
   const t = ttsText(text, lang), voice = kokoroVoiceFor(lang);
   const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
-  const key = `${voice}|${clipHash(t)}`;
+  const key = clipKey(voice, t);
   const mem = clipMem.get(key);
   if (mem) { playClipURL(mem.url, rate); return; }
-  if (!audioOwnerFor(voice, clipHash(t), set)) {
+  if (!cloudTts() && !audioOwnerFor(voice, clipHash(t), set)) {
     // Keine Aufnahme im Speicher bekannt: sofort die Gerätestimme (noch beim Antippen – wichtig fürs iPhone)
     deviceSpeak(text, lang, slow);
     if (mayGenerate(set)) findClip(t, voice, set).then((c) => c || makeClip(t, voice, set, true)).catch(() => {});

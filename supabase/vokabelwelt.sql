@@ -459,3 +459,20 @@ create policy "vokaboom audio hochladen" on storage.objects for insert to authen
 drop policy if exists "vokaboom audio löschen" on storage.objects;
 create policy "vokaboom audio löschen" on storage.objects for delete to authenticated
   using (bucket_id = 'vokaboom-audio' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
+-- ---------------------------------------------------------------------------
+-- Cloud-Stimme (Google Text-to-Speech, Edge Function „vokaboom-tts“)
+-- Gemeinsamer Speicher: jedes Wort pro Stimme nur einmal für alle. Lesen darf jede Person (Kinder spielen ab),
+-- schreiben nur die Edge Function (mit dem Service-Schlüssel) – darum keine Upload-Regeln für Lehrpersonen.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('vokaboom-tts', 'vokaboom-tts', true, 1048576, array['audio/mpeg'])
+on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+
+-- Zähler pro Tag und Lehrperson (Tagesgrenze der Edge Function); nur die Funktion liest und schreibt ihn
+create table if not exists public.vokaboom_tts_usage (
+  day date not null,
+  teacher_id uuid not null references auth.users (id) on delete cascade,
+  n integer not null default 0,
+  primary key (day, teacher_id)
+);
+alter table public.vokaboom_tts_usage enable row level security; -- keine Policies: nur der Service-Schlüssel

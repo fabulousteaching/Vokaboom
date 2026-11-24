@@ -249,3 +249,15 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 - Die Kinder sehen gesperrte Spiele nicht mehr; sind alle gesperrt, steht bei „Spielen“: „Deine Lehrperson hat die Spiele gerade gesperrt. Üben geht weiter!“ Die Sperre kommt an, sobald das Kind Vokaboom neu lädt.
 - Zusätzlich gibt es weiterhin pro Portion „Für einzelne Kinder anpassen“ (Portion oder einzelne Spiele dieser Portion ausschalten).
 - Viele Sperren für einzelne Kinder brauchen mehr Platz in der Datenbank: `supabase/vokabelwelt.sql` einmal nochmals ausführen.
+
+## Cloud-Stimme (Google) einrichten
+
+Vokaboom liest die Vokabeln mit einer Google-Stimme in Studio-Qualität vor. Jedes Wort wird pro Stimme **einmal** erzeugt und gilt dann für alle (Lehrpersonen, Kinder, geteilte Portionen). Erzeugen dürfen nur angemeldete Lehrpersonen; Kinder spielen nur ab. An Google geht nur der Text der Vokabel. Grenzen: höchstens 600 neue Wörter pro Lehrperson und Tag, 3000 insgesamt pro Tag.
+
+1. **Google Cloud:** Projekt mit aktivierter „Cloud Text-to-Speech API“ und einem API-Schlüssel (nur diese API erlaubt, Anwendungseinschränkung „Keine“). In der Testphase nicht auf „Upgrade“ klicken – dann kostet es nichts.
+2. **SQL:** `supabase/vokabelwelt.sql` in Supabase nochmals ganz ausführen (legt den Speicher `vokaboom-tts` und den Tageszähler an).
+3. **Funktion anlegen:** Supabase → **Edge Functions** → **Deploy a new function** → **Via Editor** → Name genau `vokaboom-tts` → den ganzen Inhalt von `supabase/functions/vokaboom-tts/index.ts` einfügen → **Deploy**.
+4. **Schlüssel hinterlegen:** Supabase → **Edge Functions** → **Secrets** (bzw. Project Settings → Edge Functions) → **Add new secret**: Name `GOOGLE_TTS_KEY`, Wert = der API-Schlüssel aus Google → Save. (Den Schlüssel nie in die App oder in den Chat kopieren.)
+5. **Testen:** In Vokaboom angemeldet eine Portion öffnen – oben steht „Aufnahmen werden vorbereitet …“, danach „Alle Wörter sind mit der Stimme Google britisch gespeichert“. Ein Wort antippen.
+
+Fehlt die Funktion oder der Schlüssel, zeigt Vokaboom in der Portion einen Hinweis und liest vorläufig wie bisher. Meldet die Funktion „Invalid JWT“ (401), in Supabase bei der Funktion **„Verify JWT“ ausschalten** – die Funktion prüft die Anmeldung selbst.

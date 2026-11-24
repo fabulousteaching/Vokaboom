@@ -1174,6 +1174,7 @@ function voiceFieldHTML() {
 function voiceStatusText() {
   const name = VOICE_NAMES[kokoroVoice()] || '';
   if (!ttsSupported) return 'Dieses Gerät liest mit seiner eigenen Stimme vor.';
+  if (typeof cloudTts === 'function' && cloudTts()) return `Vokaboom-Stimme: <strong>Google ${db.settings.accent === 'us' ? 'amerikanisch' : 'britisch'}</strong> (Studio-Qualität, für alle gleich). Wörter, für die es noch keine Aufnahme gibt, liest kurz die Stimme des Geräts vor.`;
   return `Vokaboom-Stimme: <strong>${esc(name)}</strong> (${db.settings.accent === 'us' ? 'amerikanisch' : 'britisch'}). Wörter, für die es noch keine Aufnahme gibt, liest die Stimme des Geräts vor.`;
 }
 /** Zeile in der Portion: Wie viele Aufnahmen sind schon gespeichert? (nur bei eigenen Portionen) */
@@ -1189,8 +1190,8 @@ function voicePrepHTML(set) {
   if (prep.note) return `<p class="voice-prep warn" id="voice-prep">${icon('speaker')} ${esc(prep.note)}</p>`;
   const { done, total } = audioCounts(set);
   if (!total) return '<p class="voice-prep" id="voice-prep"></p>';
-  if (done >= total) return `<p class="voice-prep done" id="voice-prep">${icon('speaker')} Alle Wörter sind mit der Stimme ${esc(vname)} gespeichert${ownsAudio(set) ? ' – auch die Kinder hören sie sofort' : ''}.</p>`;
-  const loading = kokoro.state === 'loading' ? ` · Stimmen werden geladen${kokoro.progress ? ` (${Math.round(kokoro.progress * 100)} %)` : ''}, nur beim ersten Mal ca. 90 MB` : '';
+  if (done >= total) return `<p class="voice-prep done" id="voice-prep">${icon('speaker')} Alle Wörter sind mit der Stimme ${esc(typeof cloudTts === 'function' && cloudTts() ? `Google ${db.settings.accent === 'us' ? 'amerikanisch' : 'britisch'}` : vname)} gespeichert${ownsAudio(set) ? ' – auch die Kinder hören sie sofort' : ''}.</p>`;
+  const loading = !(typeof cloudTts === 'function' && cloudTts()) && kokoro.state === 'loading' ? ` · Stimmen werden geladen${kokoro.progress ? ` (${Math.round(kokoro.progress * 100)} %)` : ''}, nur beim ersten Mal ca. 330 MB` : '';
   return `<p class="voice-prep" id="voice-prep">${prep.running.has(set.id) ? '<span class="spinner"></span>' : icon('speaker')} Aufnahmen werden vorbereitet: <b>${done} von ${total}</b>${loading}. ${ownsAudio(set) ? 'Einmalig – danach hören alle Kinder die Stimmen sofort.' : 'Melde dich an, damit die Aufnahmen auch für die Kinder gespeichert werden.'} Seite offen lassen.</p>`;
 }
 kokoro.listeners.add(() => {
