@@ -402,6 +402,7 @@ if (typeof bridgeActions === 'object') Object.assign(actions, bridgeActions);
 if (typeof detActions === 'object') Object.assign(actions, detActions);
 if (typeof potionActions === 'object') Object.assign(actions, potionActions);
 
+if (typeof menuGamesActions === 'object') Object.assign(actions, menuGamesActions); // Menü → Spieleinstellungen
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-action]');
   if (!el || el.disabled) return;

@@ -1696,3 +1696,9 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .gl-kid .gl-games { grid-column: 1 / -1; }
 .gl-kid-name { display: inline-flex; align-items: center; gap: .4rem; font-weight: 600; }
 @media (max-width: 560px) { .gl-kid { grid-template-columns: 1fr; } }
+
+/* Spieleinstellungen im Menü / Hinweis in der Klasse */
+.gl-note { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.gl-note h2 { margin: 0; }
+.menu .gl-panel { margin-top: .6rem; }
+.seg.wrap { flex-wrap: wrap; }

@@ -243,7 +243,7 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 
 ## Spiele sperren
 
-- Klasse → **Portionen** → Abschnitt **🎮 Spiele sperren** (gilt für alle Portionen der Klasse):
+- **Menü → Spieleinstellungen** (oder Klasse → Portionen → „Spieleinstellungen“): Klasse wählen, dann (gilt für alle Portionen der Klasse):
   - **Ganze Klasse:** Frei · 🔒 Alle Spiele · Einzelne Spiele (dann die Spiele antippen, die gesperrt sein sollen).
   - **Einzelne Kinder:** pro Kind dieselbe Auswahl. Die Sperre eines Kindes kommt zur Klassen-Sperre dazu.
 - Die Kinder sehen gesperrte Spiele nicht mehr; sind alle gesperrt, steht bei „Spielen“: „Deine Lehrperson hat die Spiele gerade gesperrt. Üben geht weiter!“ Die Sperre kommt an, sobald das Kind Vokaboom neu lädt.
