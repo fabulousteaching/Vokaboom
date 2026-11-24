@@ -74,13 +74,19 @@ function liveNameProblem(name) {
 }
 
 /* ---------- Einstellungen vor dem Start ---------- */
+/* Hör-Bingo: Lehrperson wählt, in welcher Sprache vorgelesen wird (say) und was auf den Karten steht (card):
+   'fo' = Fremdsprache, 'de' = Deutsch. Ein Wort heisst im Spiel so, wie es auf der Karte steht (bingoText). */
+const deForm = (w) => (stripParens(String(w.german || '')).split(/\s*[,;/]\s*/)[0] || '').trim() || String(w.german || '').trim();
+const bingoText = (w, cfg = LV.cfg) => (cfg?.card === 'de' ? deForm(w) : gameForm(w));
+const bingoNeedsDe = (cfg = LV.cfg) => cfg?.card === 'de' || cfg?.say === 'de';
 /** Wörter, die sich für das Spiel eignen */
-function liveEligible(set, kind) {
+function liveEligible(set, kind, cfg = LV.cfg) {
   const seen = new Set();
   return set.words.filter((w) => {
     if (!w.foreign) return false;
     if (kind === 'quiz' && !w.german) return false;
-    const k = gameForm(w).toLowerCase();
+    if (kind === 'bingo' && bingoNeedsDe(cfg) && !deForm(w)) return false;
+    const k = (kind === 'bingo' ? bingoText(w, cfg) : gameForm(w)).toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
@@ -88,7 +94,7 @@ function liveEligible(set, kind) {
 }
 const liveSelected = () => liveEligible(LV.set, LV.kind).filter((w) => LV.cfg.ids.has(w.id));
 function liveCfgSave() {
-  db.settings.liveCfg = { n: LV.cfg.n, time: LV.cfg.time, auto: LV.cfg.auto, dir: LV.cfg.dir };
+  db.settings.liveCfg = { n: LV.cfg.n, time: LV.cfg.time, auto: LV.cfg.auto, dir: LV.cfg.dir, say: LV.cfg.say, card: LV.cfg.card };
   saveDB();
 }
 function liveProblem() {
@@ -109,7 +115,10 @@ function liveSetupHTML() {
     ${quiz ? `<div class="ls-row"><span class="label">Richtung</span>${seg('lv-dir', c.dir, [['de', `Deutsch → ${LANGS[LV.set.lang].name}`], ['fo', `${LANGS[LV.set.lang].name} → Deutsch`]])}</div>
       <div class="ls-row"><span class="label">Anzahl Fragen</span>${seg('lv-n', c.n === 'all' || c.n >= sel ? 'all' : c.n, nChoices)}</div>
       <div class="ls-row"><span class="label">Zeit pro Frage</span>${seg('lv-time', c.time, [10, 15, 20, 30, 45, 60].map((t) => [t, `${t} s`]))}</div>`
-      : `<div class="ls-row"><span class="label">Wörter vorlesen</span>${seg('lv-auto', c.auto, [[0, 'Von Hand'], [6, 'Alle 6 s'], [10, 'Alle 10 s'], [15, 'Alle 15 s']])}</div>`}
+      : `<div class="ls-row"><span class="label">Vorlesen auf</span>${seg('lv-say', c.say, [['fo', `${flag(LV.set.lang)} ${LANGS[LV.set.lang].name}`], ['de', '🇩🇪 Deutsch']])}</div>
+      <div class="ls-row"><span class="label">Auf den Karten</span>${seg('lv-card', c.card, [['fo', `${flag(LV.set.lang)} ${LANGS[LV.set.lang].name}`], ['de', '🇩🇪 Deutsch']])}</div>
+      <p class="small muted ls-note">${c.say === c.card ? 'Die Kinder hören das Wort, das auf der Karte steht.' : `Die Kinder hören das Wort auf ${c.say === 'de' ? 'Deutsch' : LANGS[LV.set.lang].name} und suchen die Übersetzung auf ${c.card === 'de' ? 'Deutsch' : LANGS[LV.set.lang].name}.`}</p>
+      <div class="ls-row"><span class="label">Wörter vorlesen</span>${seg('lv-auto', c.auto, [[0, 'Von Hand'], [6, 'Alle 6 s'], [10, 'Alle 10 s'], [15, 'Alle 15 s']])}</div>`}
     <details class="ls-words" ${LV.ui?.wordsOpen ? 'open' : ''}>
       <summary>Welche Wörter? <small class="muted">(${sel} von ${all.length})</small></summary>
       <div class="row"><button class="btn small ghost" data-action="lv-words" data-v="all">Alle</button><button class="btn small ghost" data-action="lv-words" data-v="none">Keine</button></div>
@@ -117,6 +126,13 @@ function liveSetupHTML() {
     </details>
     ${liveProblem() ? `<p class="small form-error">${esc(liveProblem())}</p>` : ''}
   </div>`;
+}
+/** Sprache geändert: Wörter ohne deutsches Wort fallen evtl. weg; Auswahl bleibt sonst gleich */
+function liveBingoLangChanged() {
+  const ok = new Set(liveEligible(LV.set, 'bingo').map((w) => w.id));
+  LV.cfg.ids = new Set([...LV.cfg.ids].filter((id) => ok.has(id)));
+  if (!LV.cfg.ids.size) LV.cfg.ids = ok;
+  liveRefreshLobby();
 }
 function liveRefreshLobby() {
   if (LV.role !== 'host' || LV.st.phase !== 'lobby') return;
@@ -153,9 +169,10 @@ async function liveHost(kind) {
   if (!mayHostLive(set)) return;
   liveStop();
   const saved = db.settings.liveCfg || {};
-  const elig = liveEligible(set, kind);
+  const cfg = { n: saved.n || 10, time: saved.time || 20, auto: saved.auto || 0, dir: saved.dir === 'fo' ? 'fo' : 'de', say: saved.say === 'de' ? 'de' : 'fo', card: saved.card === 'de' ? 'de' : 'fo' };
+  const elig = liveEligible(set, kind, cfg);
   Object.assign(LV, { role: 'host', kind, set, code: newCode(), players: new Map(), st: { phase: 'lobby' }, ui: {},
-    cfg: { n: saved.n || 10, time: saved.time || 20, auto: saved.auto || 0, dir: saved.dir === 'fo' ? 'fo' : 'de', ids: new Set(elig.map((w) => w.id)) } });
+    cfg: { ...cfg, ids: new Set(elig.map((w) => w.id)) } });
   go('live');
   try {
     LV.ch = await liveChannel(LV.code, hostMsg);
@@ -171,7 +188,7 @@ function hostBroadcastState() {
   if (LV.role !== 'host' || !LV.ch) return;
   const s = LV.st, set = LV.set;
   const base = { t: 'state', kind: LV.kind, title: set.name, lang: set.lang, phase: s.phase };
-  if (LV.kind === 'bingo') Object.assign(base, { words: liveSelected().map(gameForm), round: s.round || 1, calls: (s.called || []).length });
+  if (LV.kind === 'bingo') Object.assign(base, { words: liveSelected().map((w) => bingoText(w)), cardLang: LV.cfg.card === 'de' ? 'de' : set.lang, round: s.round || 1, calls: (s.called || []).length });
   if (LV.kind === 'quiz' && s.phase === 'q') Object.assign(base, { q: s.qMsg });
   LV.ch.send(base);
 }
@@ -420,7 +437,7 @@ function bingoStart() {
   clearInterval(s.autoT);
   s.phase = 'play'; s.called = []; s.round = (s.round || 0) + 1; s.winners = []; s.paused = false; s.claim = null;
   if (LV.cfg.auto) { s.autoT = lvEvery(() => { if (LV.st.phase === 'play' && !LV.st.paused) bingoCall(); }, LV.cfg.auto * 1000); }
-  LV.ch.send({ t: 'bingo-new', round: s.round, words: liveSelected().map(gameForm) }); // Karten nur aus den ausgewählten Wörtern
+  LV.ch.send({ t: 'bingo-new', round: s.round, words: liveSelected().map((w) => bingoText(w)), cardLang: LV.cfg.card === 'de' ? 'de' : LV.set.lang }); // Karten nur aus den ausgewählten Wörtern, in der gewählten Sprache
   hostBroadcastState();
   renderLive();
 }
@@ -428,14 +445,14 @@ function bingoCall(again = false) {
   const s = LV.st, set = LV.set;
   const words = liveSelected();
   if (!again) {
-    const left = words.filter((w) => !s.called.includes(gameForm(w)));
+    const left = words.filter((w) => !s.called.includes(bingoText(w)));
     if (!left.length) { clearInterval(s.autoT); toast('Alle Wörter wurden schon vorgelesen.'); return; }
-    s.called.push(gameForm(shuffle(left)[0]));
+    s.called.push(bingoText(shuffle(left)[0]));
     LV.ch.send({ t: 'call', n: s.called.length });
   }
   const last = s.called[s.called.length - 1];
-  const w = words.find((x) => gameForm(x) === last);
-  if (w) speak(w.foreign, set.lang);
+  const w = words.find((x) => bingoText(x) === last);
+  if (w) { if (LV.cfg.say === 'de') speak(deForm(w), 'de'); else speak(w.foreign, set.lang); }
   renderLive();
 }
 function bingoClaim(m) {
@@ -471,7 +488,7 @@ function bingoHostHTML() {
       </div>
     </div>
     <details class="bingo-list"><summary>Vorgelesene Wörter anzeigen (${n})</summary>
-      <ol>${s.called.map((x) => `<li lang="${LV.set.lang}">${esc(x)}</li>`).join('')}</ol></details>
+      <ol>${s.called.map((x) => { const w = liveSelected().find((y) => bingoText(y) === x); const other = w ? (LV.cfg.card === 'de' ? gameForm(w) : deForm(w)) : ''; return `<li><b lang="${LV.cfg.card === 'de' ? 'de' : LV.set.lang}">${esc(x)}</b>${other ? ` <span class="muted">· ${esc(other)}</span>` : ''}</li>`; }).join('')}</ol></details>
     ${s.winners.length ? `<p class="center">Bingo: ${s.winners.map(esc).join(', ')}</p>` : ''}
     <div class="row center"><button class="btn ghost" data-action="bingo-start">${icon('shuffle')} Neue Runde (neue Karten)</button><button class="btn ghost" data-action="lv-lobby">${icon('sliders')} Einstellungen</button><button class="btn ghost" data-action="live-close">Beenden</button></div>
   </section>`;
@@ -557,7 +574,7 @@ function playerMsg(m) {
     const first = !s.kind;
     Object.assign(s, { kind: m.kind, title: m.title, lang: m.lang });
     if (m.kind === 'bingo') {
-      s.words = m.words;
+      s.words = m.words; if (m.cardLang) s.cardLang = m.cardLang;
       if (!s.card || s.round !== m.round) bingoNewCard(m.round);
       if (m.phase === 'play') s.phase = 'bingo';
     }
@@ -584,7 +601,7 @@ function playerMsg(m) {
     return;
   }
   if (m.t === 'lobby') { Object.assign(s, { phase: 'wait', q: null, res: null }); renderLive(); return; }
-  if (m.t === 'bingo-new') { if (Array.isArray(m.words) && m.words.length) s.words = m.words; bingoNewCard(m.round); s.phase = 'bingo'; renderLive(); return; }
+  if (m.t === 'bingo-new') { if (Array.isArray(m.words) && m.words.length) s.words = m.words; if (m.cardLang) s.cardLang = m.cardLang; bingoNewCard(m.round); s.phase = 'bingo'; renderLive(); return; }
   if (m.t === 'call') { s.calls = m.n; const el = $('#bingo-calls'); if (el) el.textContent = `${m.n} Wörter vorgelesen`; return; }
   if (m.t === 'bingo-result' && m.id === LV.me.id) {
     s.result = m;
@@ -668,7 +685,7 @@ function playerHTML() {
     return `<section class="mode live-play">${head}
       <p class="center muted" id="bingo-calls">${s.calls || 0} Wörter vorgelesen</p>
       ${s.result ? `<div class="banner ${s.result.ok ? 'good' : 'bad'}">${s.result.ok ? '🎉' : icon('x')}<div><strong>${s.result.ok ? 'BINGO! Super!' : 'Noch kein Bingo.'}</strong>${s.result.ok ? '' : ` Diese Wörter wurden noch nicht vorgelesen: ${s.result.wrong.map(esc).join(', ')}`}</div></div>` : ''}
-      <div class="bingo-card" lang="${s.lang}">${s.card.map((w, i) => `<button class="bingo-cell ${s.marked.has(i) ? 'on' : ''} ${line && line.includes(i) ? 'line' : ''}" data-action="bingo-mark" data-i="${i}">${esc(w)}</button>`).join('')}</div>
+      <div class="bingo-card" lang="${s.cardLang || s.lang}">${s.card.map((w, i) => `<button class="bingo-cell ${s.marked.has(i) ? 'on' : ''} ${line && line.includes(i) ? 'line' : ''}" data-action="bingo-mark" data-i="${i}">${esc(w)}</button>`).join('')}</div>
       <div class="row center"><button class="btn primary big bingo-btn" data-action="bingo-shout" ${line ? '' : 'disabled'}>BINGO!</button></div>
       <p class="hint center">Tippe die Wörter an, die du hörst. Drei in einer Reihe (waagrecht, senkrecht oder schräg) = BINGO.</p>
     </section>`;
@@ -688,6 +705,8 @@ const liveActions = {
   'lv-time': (el) => { LV.cfg.time = +el.dataset.v; liveRefreshLobby(); },
   'lv-dir': (el) => { LV.cfg.dir = el.dataset.v === 'fo' ? 'fo' : 'de'; liveRefreshLobby(); },
   'lv-auto': (el) => { LV.cfg.auto = +el.dataset.v; liveRefreshLobby(); },
+  'lv-say': (el) => { LV.cfg.say = el.dataset.v === 'de' ? 'de' : 'fo'; liveBingoLangChanged(); },
+  'lv-card': (el) => { LV.cfg.card = el.dataset.v === 'de' ? 'de' : 'fo'; liveBingoLangChanged(); },
   'lv-words': (el) => { LV.cfg.ids = new Set(el.dataset.v === 'all' ? liveEligible(LV.set, LV.kind).map((w) => w.id) : []); LV.ui = { ...(LV.ui || {}), wordsOpen: true }; liveRefreshLobby(); },
   'lv-lobby': () => {
     // zurück in den Warteraum: gleiche Kinder, Einstellungen anpassen, neu starten

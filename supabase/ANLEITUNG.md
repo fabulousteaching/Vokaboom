@@ -235,3 +235,8 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 
 - Lernkarten geben keine Münzen (dort schätzen sich die Kinder selbst ein). Münzen gibt es fürs Schreiben, Aussprechen, Hören & Schreiben, den Test und das Wiederholen.
 - Jede Spielrunde kostet 1 Münze – auch „Nochmal“ oder eine neue Stufe nach einer fertigen Runde. Lehrpersonen spielen gratis. (In Teilmal führt „Nochmals“ zurück zum Start-Bildschirm, wo wieder bezahlt wird.)
+
+## Hör-Bingo: Sprache wählen
+
+- In den Einstellungen vor dem Start: **Vorlesen auf** (Englisch/Französisch oder Deutsch) und **Auf den Karten** (Englisch/Französisch oder Deutsch). Beliebig kombinierbar – z. B. auf Deutsch vorlesen, die Kinder suchen das englische Wort auf ihrer Karte. Die Wahl merkt sich das Gerät.
+- Deutsch wird mit der Stimme des Geräts vorgelesen. Bei mehreren deutschen Bedeutungen („normalerweise, in der Regel“) gilt die erste. Wörter ohne deutsches Wort fallen weg, sobald Deutsch gewählt ist.
