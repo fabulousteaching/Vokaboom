@@ -41,7 +41,10 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   try {
     const url = Deno.env.get('SUPABASE_URL') ?? '';
-    const svc = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    // Server-Schlüssel: alte Bezeichnung (service_role) oder neue Secret Keys (sb_secret_…)
+    let svc = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SECRET_KEY') ?? '';
+    if (!svc) { try { const k = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}'); svc = String(Object.values(k)[0] ?? ''); } catch { /* */ } }
+    if (!svc) return json({ error: 'no_service_key' }, 500);
     const key = Deno.env.get('GOOGLE_TTS_KEY') ?? '';
     if (!key) return json({ error: 'no_key' }, 500);
     const admin = createClient(url, svc, { auth: { persistSession: false } });
