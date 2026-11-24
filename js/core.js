@@ -1341,7 +1341,7 @@ function textHash(t) {
 }
 /* Version der KI-Aufnahmen: höher = alle Wörter werden einmal neu erzeugt (v2: Wort als kurzer Satz mit Punkt,
    strengerer Filter am Rand – weniger Atem-, Klick- und Restlaute vor und nach dem Wort) */
-const CLIP_V = 'v2';
+const CLIP_V = 'v3'; // v3: Modell in voller Qualität (fp32) statt komprimiert (q8)
 const clipHash = (t) => textHash(`${CLIP_V}|${t}`);
 /** Text für Kokoro: einzelne Wörter als kurzer Satz mit Punkt – so endet die Stimme sauber statt mit einem halben Laut */
 function kokoroText(t) {
@@ -1486,7 +1486,7 @@ const mayGenerate = (set) => ttsSupported && !!ttsEl && !kidDevice() && kokoro.s
   && (teacherIn() ? !(set && set.shareId) : kokoro.state === 'ready');
 const ownsAudio = (set) => !!(set && cloud.uid && !set.shareId && !set.assigned);
 
-/** Kokoro im Hintergrund laden (einmal pro Gerät ~90 MB, danach aus dem Speicher des Browsers) */
+/** Kokoro im Hintergrund laden (einmal pro Gerät ~330 MB, danach aus dem Speicher des Browsers; nicht auf Kinder-Geräten) */
 function kokoroStart() {
   if (!ttsSupported || kidDevice() || kokoro.worker || kokoro.state === 'failed') return;
   bgLoadMark(+1);

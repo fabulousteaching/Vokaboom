@@ -1,5 +1,5 @@
 /* Vokaboom – Vorlesen mit Kokoro (läuft im Hintergrund, damit die Seite nicht ruckelt)
- * Kokoro-82M: Apache-2.0 (hexgrad), kokoro-js: Apache-2.0. Das Modell (~90 MB) lädt der Browser einmal
+ * Kokoro-82M: Apache-2.0 (hexgrad), kokoro-js: Apache-2.0. Das Modell (~330 MB, volle Qualität) lädt der Browser einmal
  * von Hugging Face und speichert es; danach geht es ohne erneuten Download.
  * Französisch (Stimme Siwis): kokoro-js kann nur englische Lautschrift. Die französische Lautschrift macht
  * eSpeak NG (espeak-phonemizer, GPL-3.0, ca. 6 MB, wird nur nachgeladen, nicht in Vokaboom eingebaut).
@@ -14,7 +14,7 @@ function load() {
     ttsP = (async () => {
       const { KokoroTTS } = await import(KOKORO_JS);
       return KokoroTTS.from_pretrained(MODEL, {
-        dtype: 'q8',
+        dtype: 'fp32', // volle Qualität: die komprimierte Fassung (q8) verschleift Laute und hängt Restlaute an
         device: 'wasm',
         progress_callback: (p) => {
           if (p && p.status === 'progress' && /onnx/.test(p.file || '')) postMessage({ type: 'progress', loaded: p.loaded, total: p.total });
