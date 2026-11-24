@@ -688,7 +688,8 @@ function speakZone(set, w) {
       <div class="row center">
         <button class="btn primary" data-action="listen">${icon('mic')} Nochmal sprechen</button>
         <button class="btn ghost" data-action="speak-skip">Überspringen ${icon('right')}</button>
-      </div>`;
+      </div>
+      ${typeof teacherIn === 'function' && teacherIn() && !(typeof kidDevice === 'function' && kidDevice()) ? `<details class="ph-diag"><summary>Für die Fehlersuche (nur Lehrperson)</summary><code>${esc(phDiagText(r, w))}</code></details>` : ''}`;
   }
   if (s === 'ok') {
     return `<div class="banner good">${icon('check')}<div><strong>Richtig!</strong></div></div>
@@ -1298,4 +1299,15 @@ function renderTestResult(set) {
       </ol>
     </div>
   </section>`;
+}
+
+/** Was die Lauterkennung gehört hat – als Text zum Kopieren (kein Ton, nur Laute und Punkte) */
+function phDiagText(r, w) {
+  const v = typeof APP_VERSION === 'string' ? APP_VERSION : '';
+  return [`v${v}`, `Wort: ${w?.foreign || ''} (${r.ref || ''})`, `Punkte ${r.score}/${r.passMin} · GOP ${r.gop}`,
+    `Laute: ${(r.phones || []).map((x) => `${x.exp}>${x.heard}:${x.score}`).join(' ')}`,
+    `Gehört: ${r.dec || ''}`, `Zu viel: ${(r.extra || []).join(',') || '-'}`,
+    `Variante: ${r.rival ? `${r.rival.exp}>${r.rival.ph} +${r.rival.diff}` : '-'}`,
+    `Top: ${(r.rivals || []).slice().sort((x, y) => y.diff - x.diff).slice(0, 3).map((x) => `${x.exp}>${x.phs || x.ph} ${x.diff.toFixed(1)}`).join(', ')}`,
+    `Pegel ${r.peak != null ? Number(r.peak).toFixed(2) : '?'}`].join(' | ');
 }

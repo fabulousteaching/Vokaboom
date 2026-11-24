@@ -1706,3 +1706,8 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 /* Spiele sperren: Text in Hell und Dunkel gut lesbar */
 .gl-game, .gl-kid-name, .gl-kids > summary { color: var(--ink); }
 .gl-game { border-color: var(--line-2); }
+
+/* Aussprechen: Angaben für die Fehlersuche (nur Lehrperson) */
+.ph-diag { margin-top: .8rem; font-size: .8rem; color: var(--muted, #667); text-align: left; }
+.ph-diag summary { cursor: pointer; }
+.ph-diag code { display: block; margin-top: .4rem; padding: .5rem; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); white-space: pre-wrap; word-break: break-word; user-select: all; }
