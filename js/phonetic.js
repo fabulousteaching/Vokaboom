@@ -231,6 +231,13 @@ function phExpectedAll(engine, text) {
     const alts = [w];
     const n = w.length;
     if (n >= 3 && w[n - 2] === 'D' && (w[n - 1] === 'IY' || w[n - 1] === 'EY')) alts.push([...w.slice(0, -1), w[n - 1] === 'IY' ? 'EY' : 'IY']);
+    // „v“ am Wortanfang wie „w“ und „dsch“ am Wortende wie „tsch“ gelten auch (village): eigene Varianten, damit die Laute dahinter richtig zugeordnet werden
+    for (const x of alts.slice()) {
+      const v = x[0] === 'V', j = x.length > 1 && x[x.length - 1] === 'JH';
+      if (v) alts.push(['W', ...x.slice(1)]);
+      if (j) alts.push([...x.slice(0, -1), 'CH']);
+      if (v && j) alts.push(['W', ...x.slice(1, -1), 'CH']);
+    }
     all = all.flatMap((pre) => alts.map((a) => [...pre, ...a])).slice(0, 8);
   }
   return all.filter((x) => x.length);
@@ -240,7 +247,7 @@ function phExpectedAll(engine, text) {
    EN_SAME  – gilt als derselbe Laut (unbetonte Vokale, britisches „Thursday“ ohne r …)
    EN_CLOSE – sehr nah, zählt fast voll (stimmhaft/stimmlos, th → f/s/t …)
    Bewusst NICHT dabei: e/ä (bed – bad), i/ie (ship – sheep), m/p (lamb – lamp). */
-const EN_SAME = { ER: ['AH', 'EH', 'AO', 'R'], AH: ['IH', 'ER', 'AA', 'UH', 'EH'], AA: ['AO', 'AH'], AO: ['AA', 'OW'], UH: ['UW', 'AH'], UW: ['UH', 'AH'], IH: ['AH', 'IY'], OW: ['AO'], HH: [] };
+const EN_SAME = { ER: ['AH', 'EH', 'AO', 'R'], AH: ['IH', 'ER', 'AA', 'UH', 'EH'], AA: ['AO', 'AH'], AO: ['AA', 'OW'], UH: ['UW', 'AH'], UW: ['UH', 'AH'], IH: ['AH', 'IY'], OW: ['AO'], HH: [], V: ['W'], JH: ['CH'] }; // v wie w und dsch wie tsch gelten (village): das Modell hört es auch bei richtiger Aussprache so
 const EN_CLOSE = { S: ['Z'], Z: ['S'], D: ['T', 'DH'], T: ['D'], B: ['P'], P: ['B'], G: ['K'], K: ['G'], V: ['F', 'W'], F: ['V', 'TH'], TH: ['F', 'S'], DH: ['D', 'Z', 'V'], EY: ['EH', 'IY'], IY: ['IH', 'EY'], EH: ['EY', 'AH'], AE: ['AH'], W: ['V'], N: ['M', 'NG'], NG: ['N'] };
 const EN_CLOSE_W = 0.75; // so viel ist ein sehr naher Laut wert
 
@@ -254,15 +261,15 @@ const EN_RIVAL_VOW = { IY: ['IH', 'AY', 'EH'], IH: ['IY', 'EH'], EH: ['AE', 'IH'
   // englisches „ur/er/ir“ (turn, bird, work): deutsch oft „u-r“, „o-r“, „e-r“, „i-r“
   ER: [['UH', 'R'], ['UW', 'R'], ['AO', 'R'], ['EH', 'R'], ['IH', 'R'], 'UH', 'UW', 'EH', 'AA'] };
 // v/f am Anfang hört das Modell nicht sicher – darum bei V nur W
-const EN_RIVAL_CONS = { TH: ['S', 'F', 'T'], DH: ['D', 'Z'], V: ['W'], W: ['V'], SH: ['S'], CH: ['SH'], JH: ['CH', 'SH'], NG: ['N'] }; // s/z nicht: wird auch von Muttersprachlern oft weich/hart gesprochen
+const EN_RIVAL_CONS = { TH: ['S', 'F', 'T'], DH: ['D', 'Z'], W: ['V'], SH: ['S'], CH: ['SH'], JH: ['CH', 'SH'], NG: ['N'] }; // s/z nicht: wird auch von Muttersprachlern oft weich/hart gesprochen
 /* Auslautverhärtung (typisch Deutsch): am Wortende weich → hart (live → lif, bad → bat, dog → dock, his → hiss) */
-const EN_DEVOICE = { V: 'F', D: 'T', B: 'P', G: 'K', Z: 'S', DH: 'TH', JH: 'CH' };
+const EN_DEVOICE = { V: 'F', D: 'T', B: 'P', G: 'K', Z: 'S', DH: 'TH' };
 function phRivals(phones, stress, allowed) {
   const out = [], seen = new Set(allowed);
   phones.forEach((p, j) => {
     let alts = [];
     if (EN_VOWELS.has(p)) { if (stress && stress[j] && stress[j] !== '0') alts = EN_RIVAL_VOW[p] || []; } // nur typische Verwechslungen (sonst zu viele Fehlalarme)
-    else alts = [...(EN_RIVAL_CONS[p] || [])];
+    else alts = p === 'JH' && j === phones.length - 1 ? [] : [...(EN_RIVAL_CONS[p] || [])]; // „tsch“ am Wortende gilt (village, orange, bridge)
     const fin = j === phones.length - 1 && EN_DEVOICE[p];
     if (fin && !alts.includes(fin)) alts.push(fin);
     for (const q of alts) {
@@ -322,7 +329,10 @@ function phScore(engine, post, phones, { stress = null, allowed = [] } = {}) {
     const n = b - a + 1;
     if (n < Math.max(8, ids.length * 2)) return null;
     const sub = probs.subarray(a * V, (b + 1) * V);
-    const align = core.forcedAlign(sub, n, V, ids);
+    // Zuordnung mit „gleichen“ Lauten (EN_SAME): sonst verrutscht alles, wenn z. B. das unbetonte „a“ in village wie „i“ klingt
+    const K = ids.length, em = new Float32Array(n * K);
+    for (let t = 0; t < n; t++) for (let j = 0; j < K; j++) { let m = 0; for (const c of same[j]) { const v = sub[t * V + c]; if (v > m) m = v; } em[t * K + j] = m; }
+    const align = core.forcedAlign(em, n, K, ids.map((_, j) => j));
     const st = ids.map(() => ({ g: [], votes: new Float64Array(V), t0: -1, t1: -1 }));
     for (let t = 0; t < n; t++) {
       const row = sub.subarray(t * V, t * V + V);
