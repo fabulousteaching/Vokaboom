@@ -264,6 +264,6 @@ Fehlt die Funktion oder der Schlüssel, zeigt Vokaboom in der Portion einen Hinw
 
 ## Aussprechen: Vergleich mit der Vorlage
 
-- Die Lauterkennung bewertet zuerst die Google-Aufnahme des Worts (die „Vorlage“) und dann die Aufnahme des Kindes. Was selbst die saubere Vorlage nicht voll schafft (z. B. „sh“ in *she*, „-day“ in *Saturday*), wird dem Kind nicht abgezogen: Die Punkte des Kindes werden im Verhältnis zur Vorlage gerechnet (höchstens 1,5-fach).
+- Die Punkte werden wie bisher ohne Vorlage berechnet (die Anhebung im Verhältnis zur Vorlage war zu grosszügig und ist ausgeschaltet).
 - Klappt es nicht, zeigt Vokaboom, wo der schwierige Laut ist („am Anfang / in der Mitte / am Ende“), und mit **„Hör genau hin“** hört man genau diesen Teil der Vorlage etwas langsamer.
 - Alles bleibt auf dem Gerät: Die Stimme der Kinder wird nicht hochgeladen. Gibt es für ein Wort noch keine Google-Aufnahme, wird wie bisher ohne Vorlage bewertet.

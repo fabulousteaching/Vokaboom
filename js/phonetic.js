@@ -416,6 +416,8 @@ async function phRefScore(word, lang) {
   p.then((r) => { if (!r) phRefCache.delete(key); }); // noch keine Vorlage: später nochmals versuchen
   return p;
 }
+/* Punkte im Verhältnis zur Vorlage: AUS – bewertet wieder wie vor dem Vergleich. Die Vorlage dient nur noch für „Hör genau hin“. */
+const PH_REF_NORM = false;
 /** Punkte des Kindes im Verhältnis zur Vorlage */
 const phRel = (kid, ref) => Math.min(100, Math.round(kid * 100 / Math.min(100, Math.max(66, ref))));
 
@@ -426,11 +428,11 @@ async function assessWave(wave, word, lang = 'en') {
     const ref = await phRefScore(word, lang).catch(() => null);
     if (ref) {
       best.rawScore = best.score; best.refScore = ref.score;
-      best.score = phRel(best.score, ref.score);
+      if (PH_REF_NORM) best.score = phRel(best.score, ref.score); // ausgeschaltet: hob zu viel Falsches über die Grenze
       // Laute einzeln vergleichen, wenn Vorlage und Kind dieselbe Lautfolge haben
       const same = ref.phones && best.phones && ref.ref === best.ref && ref.phones.length === best.phones.length && ref.phones.every((p, i) => p.exp === best.phones[i].exp);
       if (same) {
-        best.phones = best.phones.map((p, i) => ({ ...p, rawScore: p.score, score: phRel(p.score, ref.phones[i].score) }));
+        if (PH_REF_NORM) best.phones = best.phones.map((p, i) => ({ ...p, rawScore: p.score, score: phRel(p.score, ref.phones[i].score) }));
         // schwächster Laut: diesen Teil der Vorlage kann man sich anhören
         let wi = -1;
         best.phones.forEach((p, i) => { if (p.exp && p.score < 60 && (wi < 0 || p.score < best.phones[wi].score)) wi = i; });
