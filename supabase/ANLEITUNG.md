@@ -261,3 +261,9 @@ Vokaboom liest die Vokabeln mit einer Google-Stimme in Studio-Qualität vor. Jed
 5. **Testen:** In Vokaboom angemeldet eine Portion öffnen – oben steht „Aufnahmen werden vorbereitet …“, danach „Alle Wörter sind mit der Stimme Google britisch gespeichert“. Ein Wort antippen.
 
 Fehlt die Funktion oder der Schlüssel, zeigt Vokaboom in der Portion einen Hinweis und liest vorläufig wie bisher. Meldet die Funktion „Invalid JWT“ (401), in Supabase bei der Funktion **„Verify JWT“ ausschalten** – die Funktion prüft die Anmeldung selbst.
+
+## Aussprechen: Vergleich mit der Vorlage
+
+- Die Lauterkennung bewertet zuerst die Google-Aufnahme des Worts (die „Vorlage“) und dann die Aufnahme des Kindes. Was selbst die saubere Vorlage nicht voll schafft (z. B. „sh“ in *she*, „-day“ in *Saturday*), wird dem Kind nicht abgezogen: Die Punkte des Kindes werden im Verhältnis zur Vorlage gerechnet (höchstens 1,5-fach).
+- Klappt es nicht, zeigt Vokaboom, wo der schwierige Laut ist („am Anfang / in der Mitte / am Ende“), und mit **„Hör genau hin“** hört man genau diesen Teil der Vorlage etwas langsamer.
+- Alles bleibt auf dem Gerät: Die Stimme der Kinder wird nicht hochgeladen. Gibt es für ein Wort noch keine Google-Aufnahme, wird wie bisher ohne Vorlage bewertet.

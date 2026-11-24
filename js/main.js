@@ -237,6 +237,7 @@ const actions = {
   /* Aussprechen */
   listen: () => doListen(),
   'speak-show': (el) => { speakM.show = el.dataset.show; stopListening(true); resetSpeakWord(); renderSpeak(); },
+  'speak-weak': () => { if (typeof phPlayWeak === 'function') phPlayWeak(speakM.ph?.weak); },
   'speak-hear': (el) => {
     const set = currentSet();
     const w = speakWord(set);

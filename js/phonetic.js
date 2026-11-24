@@ -275,10 +275,11 @@ function phScore(engine, post, phones) {
     if (n < Math.max(8, ids.length * 2)) return null;
     const sub = probs.subarray(a * V, (b + 1) * V);
     const align = core.forcedAlign(sub, n, V, ids);
-    const st = ids.map(() => ({ g: [], votes: new Float64Array(V) }));
+    const st = ids.map(() => ({ g: [], votes: new Float64Array(V), t0: -1, t1: -1 }));
     for (let t = 0; t < n; t++) {
       const row = sub.subarray(t * V, t * V + V);
       const j = align[t], s = st[j];
+      if (s.t0 < 0) s.t0 = a + t; s.t1 = a + t;
       const bb = argmax(row);
       let own = 0;
       for (const c of same[j]) own = Math.max(own, row[c]);
@@ -293,7 +294,7 @@ function phScore(engine, post, phones) {
       const score = g.length ? Math.round(100 * Math.exp(g.reduce((acc, x) => acc + x, 0) / g.length)) : 0;
       const top = argmax(s.votes);
       const heard = same[j].includes(top) ? p : (id2p[top] || '?');
-      return { exp: p, heard, score };
+      return { exp: p, heard, score, t0: s.t0, t1: s.t1 };
     });
     // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte
     const ps = result.map((r) => r.score);
@@ -389,8 +390,77 @@ async function assessSpoken(word, { onStart, onLevel, onPhase } = {}, lang = 'en
   return best;
 }
 
-/** Eine Aufnahme (16 kHz) bewerten: alle Varianten (mit/ohne Artikel, Aussprache-Varianten) – die beste zählt */
+/* ---------- Vergleich mit der Vorlage (Google-Aufnahme des Worts, auf dem Gerät) ----------
+   Das Modell bewertet zuerst die saubere Vorlage. Was selbst die Vorlage nicht schafft (z. B. „th“, „sh“, „-day“),
+   wird dem Kind nicht abgezogen: Punkte = Punkte des Kindes im Verhältnis zur Vorlage (höchstens 1,5-fach).
+   Kein Ton verlässt das Gerät; geladen wird nur die Vorlage, die es zum Vorspielen ohnehin gibt. */
+const phRefCache = new Map();
+async function phRefScore(word, lang) {
+  const key = `${lang}|${typeof kokoroVoiceFor === 'function' ? kokoroVoiceFor(lang) : ''}|${word.foreign}`;
+  if (phRefCache.has(key)) return phRefCache.get(key);
+  const p = (async () => {
+    if (typeof findClip !== 'function' || typeof kokoroVoiceFor !== 'function') return null;
+    const t = ttsText(word.foreign, lang), voice = kokoroVoiceFor(lang);
+    const set = typeof currentSet === 'function' ? currentSet() : null;
+    const clip = await findClip(t, voice, set).catch(() => null);
+    if (!clip?.blob) return null;
+    const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new OAC(1, 16000, 16000); // dekodiert direkt in 16 kHz
+    const ab = await clip.blob.arrayBuffer();
+    const audio = await new Promise((res, rej) => { const q = ctx.decodeAudioData(ab, res, rej); if (q && q.then) q.then(res, rej); });
+    const wave = audio.getChannelData(0).slice();
+    const r = await assessWaveRaw(wave, word, lang);
+    return r && !r.silent ? { ...r, wave } : null;
+  })().catch(() => null);
+  phRefCache.set(key, p);
+  p.then((r) => { if (!r) phRefCache.delete(key); }); // noch keine Vorlage: später nochmals versuchen
+  return p;
+}
+/** Punkte des Kindes im Verhältnis zur Vorlage */
+const phRel = (kid, ref) => Math.min(100, Math.round(kid * 100 / Math.min(100, Math.max(66, ref))));
+
+/** Eine Aufnahme (16 kHz) bewerten – mit Vorlage, wenn es eine gibt */
 async function assessWave(wave, word, lang = 'en') {
+  const best = await assessWaveRaw(wave, word, lang);
+  if (!best.silent) {
+    const ref = await phRefScore(word, lang).catch(() => null);
+    if (ref) {
+      best.rawScore = best.score; best.refScore = ref.score;
+      best.score = phRel(best.score, ref.score);
+      // Laute einzeln vergleichen, wenn Vorlage und Kind dieselbe Lautfolge haben
+      const same = ref.phones && best.phones && ref.ref === best.ref && ref.phones.length === best.phones.length && ref.phones.every((p, i) => p.exp === best.phones[i].exp);
+      if (same) {
+        best.phones = best.phones.map((p, i) => ({ ...p, rawScore: p.score, score: phRel(p.score, ref.phones[i].score) }));
+        // schwächster Laut: diesen Teil der Vorlage kann man sich anhören
+        let wi = -1;
+        best.phones.forEach((p, i) => { if (p.exp && p.score < 60 && (wi < 0 || p.score < best.phones[wi].score)) wi = i; });
+        const rp = wi >= 0 ? ref.phones[wi] : null;
+        if (rp && rp.t0 >= 0) best.weak = { exp: best.phones[wi].exp, i: wi, n: best.phones.length, t0: rp.t0, t1: rp.t1, wave: ref.wave };
+      }
+    }
+    best.passMin = passMinNow();
+    best.ok = best.score >= best.passMin;
+  }
+  return best;
+}
+/** Teil der Vorlage um einen Laut herum langsamer vorspielen (mit etwas Umgebung, damit es natürlich klingt) */
+function phPlayWeak(weak) {
+  if (!weak?.wave) return;
+  try {
+    const ctx = phPlayWeak.ctx = phPlayWeak.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const a = Math.max(0, (weak.t0 - 12) * 160), b = Math.min(weak.wave.length, (weak.t1 + 14) * 160);
+    const seg = weak.wave.slice(a, b);
+    const fade = Math.min(400, seg.length >> 3);
+    for (let i = 0; i < fade; i++) { const k = i / fade; seg[i] *= k; seg[seg.length - 1 - i] *= k; }
+    const buf = ctx.createBuffer(1, seg.length, 16000);
+    buf.getChannelData(0).set(seg);
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.playbackRate.value = 0.8; src.connect(ctx.destination); src.start();
+  } catch { /* kein Ton */ }
+}
+
+/** Eine Aufnahme (16 kHz) bewerten: alle Varianten (mit/ohne Artikel, Aussprache-Varianten) – die beste zählt */
+async function assessWaveRaw(wave, word, lang = 'en') {
   let best = null;
   const take = (r, ref) => {
     if (r.silent) { best = best || { ...r, ref }; return; }
@@ -411,11 +481,6 @@ async function assessWave(wave, word, lang = 'en') {
     }
   }
   if (!best) throw 'ph-word';
-  if (!best.silent) {
-    // gleiche Grenze für alle Wörter: ähnliche Laute sind schon in der Bewertung berücksichtigt
-    best.passMin = passMinNow();
-    best.ok = best.score >= best.passMin; // ab der eingestellten Punktzahl (Standard 60) ist es richtig
-  }
   return best;
 }
 
