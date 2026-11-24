@@ -40,7 +40,7 @@ const phSupported = () => typeof WebAssembly === 'object' && !!navigator.mediaDe
 const phoneticOn = () => phSupported();
 /** Lauterkennung benutzen, sobald sie geladen ist. Bis dahin die Spracherkennung des Browsers (falls vorhanden). */
 /** Französisch: immer die Lauterkennung auf dem Gerät (die Spracherkennung des Browsers „verbessert“ falsch Gesagtes zum richtigen Wort) */
-const phoneticFor = (lang = 'en') => (lang === 'fr' ? phSupported() : lang === 'en' && phSupported() && (!!phState.engine || !canListen()));
+const phoneticFor = (lang = 'en') => (lang === 'fr' || lang === 'en') && phSupported(); // immer die Lauterkennung: die Browser-Erkennung macht aus „town“ ein „ton“
 const phReady = (lang = 'en') => (lang === 'fr' ? !!phState.fr : !!phState.engine);
 const phMB = (lang = 'en') => (lang === 'fr' ? PH_FR.MB : PH.MB);
 /** Datenpaket der Lauterkennung bei allen automatisch im Hintergrund laden (nicht im Datensparmodus) */
@@ -217,6 +217,11 @@ function phExpected(engine, text) {
   return phones.filter((p) => engine.vocab[p] != null);
 }
 
+/** Betonung je Laut (gleiche Reihenfolge wie phExpected): 1/2 = betonter Vokal, 0 = unbetont, '' = Mitlaut */
+function phStress(engine, text) {
+  const { groups } = engine.phonemizer.getPhonesAndWords(text);
+  return groups.flat().filter((p) => engine.vocab[p.replace(/[0-9]$/, '')] != null).map((p) => (/[0-9]$/.test(p) ? p.slice(-1) : ''));
+}
 /** Alle Aussprache-Varianten eines Textes: „-day“ als [deɪ] und [di] (Saturday, Monday …) */
 function phExpectedAll(engine, text) {
   const { groups } = engine.phonemizer.getPhonesAndWords(text);
@@ -239,6 +244,41 @@ const EN_SAME = { ER: ['AH', 'EH', 'AO', 'R'], AH: ['IH', 'ER', 'AA', 'UH', 'EH'
 const EN_CLOSE = { S: ['Z'], Z: ['S'], D: ['T', 'DH'], T: ['D'], B: ['P'], P: ['B'], G: ['K'], K: ['G'], V: ['F', 'W'], F: ['V', 'TH'], TH: ['F', 'S'], DH: ['D', 'Z', 'V'], EY: ['EH', 'IY'], IY: ['IH', 'EY'], EH: ['EY', 'AH'], AE: ['AH'], W: ['V'], N: ['M', 'NG'], NG: ['N'] };
 const EN_CLOSE_W = 0.75; // so viel ist ein sehr naher Laut wert
 
+/* ---------- Gegenkandidaten („ton“ gegen „town“, „she“ gegen „see“, „Wednesday“ gegen „Vednesday“) ----------
+   Für jeden betonten Vokal alle anderen Vokale (ausser fast gleichen), für Mitlaute die typischen Verwechslungen
+   deutschsprachiger Kinder. Gewinnt eine solche Variante in der Aufnahme klar gegen das Zielwort, ist es falsch. */
+const EN_VOWEL_LIST = ['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW'];
+/* Typische Vokal-Verwechslungen (ton/town/tone/tan, she/see, he/hi, sheep/ship, bed/bad, cloud/clod …) */
+const EN_RIVAL_VOW = { IY: ['IH', 'AY', 'EH'], IH: ['IY', 'EH'], EH: ['AE', 'IH'], AE: ['EH', 'AA'], AH: ['AW', 'OW', 'AO', 'AE'], AA: ['AE', 'AW', 'OW'],
+  AO: ['OW', 'AW'], OW: ['AO', 'AW', 'UW'], AW: ['AA', 'AO', 'OW', 'AE', 'AY'], AY: ['EY', 'AE', 'IY', 'AA'], EY: ['AY', 'AE'], UW: ['OW', 'AW'], ER: ['EH', 'AA'], OY: ['AY', 'OW'] };
+const EN_RIVAL_CONS = { TH: ['S', 'F', 'T'], DH: ['D', 'Z'], V: ['W', 'F'], W: ['V'], SH: ['S'], CH: ['SH'], JH: ['CH', 'SH'], NG: ['N'] }; // s/z nicht: wird auch von Muttersprachlern oft weich/hart gesprochen
+function phRivals(phones, stress, allowed) {
+  const out = [], seen = new Set(allowed);
+  phones.forEach((p, j) => {
+    let alts = [];
+    if (EN_VOWELS.has(p)) { if (stress && stress[j] && stress[j] !== '0') alts = EN_RIVAL_VOW[p] || []; } // nur typische Verwechslungen (sonst zu viele Fehlalarme)
+    else alts = EN_RIVAL_CONS[p] || [];
+    for (const q of alts) {
+      const seq = phones.slice(); seq[j] = q;
+      const key = seq.join(' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ key, pos: j, exp: p, ph: q, seq });
+    }
+  });
+  return out.slice(0, 60);
+}
+/** Wie gut passt eine Lautfolge auf den Ausschnitt [a, b]? (Summe der Log-Wahrscheinlichkeiten entlang der besten Zuordnung) */
+function phLL(engine, post, seqIds, a, b) {
+  const { core } = engine, { probs, V } = post, n = b - a + 1;
+  if (n < seqIds.length) return -Infinity;
+  const sub = probs.subarray(a * V, (b + 1) * V);
+  const al = core.forcedAlign(sub, n, V, seqIds);
+  let s = 0;
+  for (let t = 0; t < n; t++) s += Math.log(sub[t * V + seqIds[al[t]]] + 1e-8);
+  return s;
+}
+
 /** Wahrscheinlichkeiten je 10 ms (Frames × Laute) */
 async function phPosteriors(engine, wave) {
   const { core, session, ort } = engine;
@@ -254,7 +294,7 @@ async function phPosteriors(engine, wave) {
  * Durchschnitt über die Frames des Lauts von  log P(erwarteter Laut) − log P(wahrscheinlichster Laut).
  * 100 = genau dieser Laut war am deutlichsten zu hören.
  */
-function phScore(engine, post, phones) {
+function phScore(engine, post, phones, { stress = null, allowed = [] } = {}) {
   const { core, vocab } = engine;
   const { probs, frames, V } = post;
   const SIL = vocab['[SIL]'];
@@ -262,7 +302,7 @@ function phScore(engine, post, phones) {
   const argmax = (row) => { let b = 0, bv = -1; for (let c = 0; c < V; c++) { if (special.has(c)) continue; if (row[c] > bv) { bv = row[c]; b = c; } } return b; };
   // Bereich mit Sprache (ohne Stille am Anfang und Ende)
   let first = -1, last = -1;
-  for (let t = 0; t < frames; t++) if (argmax(probs.subarray(t * V, t * V + V)) !== SIL) { if (first < 0) first = t; last = t; }
+  for (let t = 0; t < frames; t++) if (argmax(probs.subarray(t * V, t * V + V)) !== SIL || probs[t * V + SIL] < 0.6) { if (first < 0) first = t; last = t; } // auch kurze Wörter („he“), die das Modell halb als Stille hört
   const ids = phones.map((p) => vocab[p]);
   if (first < 0 || last - first + 1 < Math.max(8, ids.length * 2)) return { silent: true };
   const id2p = {};
@@ -299,7 +339,7 @@ function phScore(engine, post, phones) {
     // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte
     const ps = result.map((r) => r.score);
     const mean = ps.reduce((acc, x) => acc + x, 0) / ps.length;
-    return { gop: Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length))), phones: result };
+    return { gop: Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length))), phones: result, a, b };
   };
   // Atem, Schmatzen oder Mikrofon-Geräusch ganz am Rand (bis 60 ms) nicht dem ersten/letzten Laut anrechnen
   let best = null;
@@ -312,7 +352,10 @@ function phScore(engine, post, phones) {
   const dec = phDecode(engine, post);
   const extra = phInserted(phones, dec);
   const score = Math.max(0, best.gop - 45 * extra.length); // ein deutlich eingeschobener Mitlaut macht ein anderes Wort (lamb → lamp)
-  return { silent: false, score, gop: best.gop, extra: extra.map((x) => x.ph), dec: dec.map((x) => `${x.ph}:${x.n}:${Math.round(x.p * 100)}`).join(' '), phones: best.phones };
+  // Gegenkandidaten: um wie viel passt die Variante besser als das Zielwort? (> 0 = Variante passt besser)
+  const base = phLL(engine, post, ids, best.a, best.b);
+  const rivals = phRivals(phones, stress, allowed).map((r) => ({ ...r, diff: phLL(engine, post, r.seq.map((q) => vocab[q]), best.a, best.b) - base }));
+  return { silent: false, score, gop: best.gop, extra: extra.map((x) => x.ph), dec: dec.map((x) => `${x.ph}:${x.n}:${Math.round(x.p * 100)}`).join(' '), phones: best.phones, rivals, seqKey: phones.join(' ') };
 }
 
 /**
@@ -440,11 +483,31 @@ async function assessWave(wave, word, lang = 'en') {
         if (rp && rp.t0 >= 0) best.weak = { exp: best.phones[wi].exp, i: wi, n: best.phones.length, t0: rp.t0, t1: rp.t1, wave: ref.wave };
       }
     }
+    // Gegenkandidaten: Gewinnt eine ähnliche Variante klar, ist es falsch („town“ statt „ton“).
+    // Mit Vorlage zählen nur Varianten, die das Modell bei der sauberen Google-Aufnahme klar vom Zielwort unterscheidet.
+    const refRiv = ref && ref.seqKey === best.seqKey ? new Map((ref.rivals || []).map((r) => [r.key, r.diff])) : null;
+    const beaten = (best.rivals || []).filter((r) => (refRiv && refRiv.has(r.key) ? r.diff > PH_RIVAL_WIN && refRiv.get(r.key) < -PH_RIVAL_REF : r.diff > PH_RIVAL_WIN_NOREF))
+      .sort((x, y) => y.diff - x.diff);
+    if (beaten.length) {
+      const r = beaten[0];
+      best.rival = { exp: r.exp, ph: r.ph, pos: r.pos, n: best.phones?.length || 1, diff: Math.round(r.diff) };
+      best.score = Math.min(best.score, PH_RIVAL_CAP);
+      if (ref?.phones && ref.seqKey === best.seqKey && ref.phones[r.pos]?.t0 >= 0) best.weak = { exp: r.exp, i: r.pos, n: best.phones.length, t0: ref.phones[r.pos].t0, t1: ref.phones[r.pos].t1, wave: ref.wave };
+    }
     best.passMin = passMinNow();
-    best.ok = best.score >= best.passMin;
+    // Sehr kurze Wörter (2 Laute: he, she, no …) bewertet das Modell schlecht. Hier entscheiden die Gegenkandidaten:
+    // gewinnt keine ähnliche Variante („see“, „hi“), reicht eine tiefere Grundgrenze.
+    const short = (best.phones?.length || 9) <= 2 && !best.rival && !(best.extra || []).length;
+    best.ok = best.score >= best.passMin || (short && best.score >= PH_SHORT_MIN);
   }
   return best;
 }
+const PH_SHORT_MIN = 15;
+/* Grenzen (Summe der Log-Wahrscheinlichkeiten über das ganze Wort):
+   WIN – so viel besser muss eine Variante passen, damit das Wort falsch ist;
+   REF – so klar muss die Vorlage das Zielwort bevorzugen, damit die Variante zählt;
+   WIN_NOREF – ohne Vorlage etwas vorsichtiger. CAP – Punkte, wenn eine Variante gewinnt. */
+const PH_RIVAL_WIN = 3, PH_RIVAL_REF = 3, PH_RIVAL_WIN_NOREF = 6, PH_RIVAL_CAP = 35;
 /** Teil der Vorlage um einen Laut herum langsamer vorspielen (mit etwas Umgebung, damit es natürlich klingt) */
 function phPlayWeak(weak) {
   if (!weak?.wave) return;
@@ -479,7 +542,8 @@ async function assessWaveRaw(wave, word, lang = 'en') {
     const engine = await loadPhoneticEngine();
     const post = await phPosteriors(engine, wave);
     for (const ref of phReferences(word)) {
-      for (const phones of phExpectedAll(engine, ref)) if (phones.length) take(phScore(engine, post, phones), ref);
+      const vars = phExpectedAll(engine, ref), st = phStress(engine, ref), allowed = vars.map((v) => v.join(' '));
+      for (const phones of vars) if (phones.length) take(phScore(engine, post, phones, { stress: st.length === phones.length ? st : null, allowed }), ref);
     }
   }
   if (!best) throw 'ph-word';

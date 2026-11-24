@@ -679,8 +679,11 @@ function speakZone(set, w) {
     const extra = (r.extra || []).map((x) => LET[x] || x.toLowerCase());
     const why = extra.length ? ` Da war ein Laut zu viel: „${esc(extra.join('“, „'))}“.` : '';
     const wk = r.weak, where = wk ? (wk.i === 0 ? 'am Anfang' : wk.i >= wk.n - 1 ? 'am Ende' : 'in der Mitte') : '';
+    const SAY = { AA: 'a', AE: 'ä', AH: 'a', AO: 'o', AW: 'au', AY: 'ai', EH: 'e', ER: 'ör', EY: 'ei', IH: 'i', IY: 'i', OW: 'ou', OY: 'eu', UH: 'u', UW: 'u', ...LET };
+    const rv = r.rival, rvWhere = rv ? (rv.pos === 0 ? 'am Anfang' : rv.pos >= rv.n - 1 ? 'am Ende' : 'in der Mitte') : '';
+    const rivalTxt = rv ? ` ${rvWhere[0].toUpperCase()}${rvWhere.slice(1)} klang es wie „${esc(SAY[rv.ph] || rv.ph.toLowerCase())}“ – da gehört ein anderer Laut hin.` : '';
     const weakBtn = wk ? `<button class="btn secondary" data-action="speak-weak">${icon('speaker')} Hör genau hin: ${where}</button>` : '';
-    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz.</strong>${why}${wk && !why ? ` Achte auf den Laut ${where} des Worts.` : ''} Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
+    return `<div class="banner bad">${icon('x')}<div><strong>Noch nicht ganz.</strong>${why}${rivalTxt}${wk && !why && !rv ? ` Achte auf den Laut ${where} des Worts.` : ''} Hör dir die richtige Aussprache an und versuch es nochmal.</div></div>
       <div class="row center">${listenBtns}${weakBtn}</div>
       <div class="row center">
         <button class="btn primary" data-action="listen">${icon('mic')} Nochmal sprechen</button>
