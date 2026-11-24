@@ -250,20 +250,28 @@ const EN_CLOSE_W = 0.75; // so viel ist ein sehr naher Laut wert
 const EN_VOWEL_LIST = ['AA', 'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW'];
 /* Typische Vokal-Verwechslungen (ton/town/tone/tan, she/see, he/hi, sheep/ship, bed/bad, cloud/clod …) */
 const EN_RIVAL_VOW = { IY: ['IH', 'AY', 'EH'], IH: ['IY', 'EH'], EH: ['AE', 'IH'], AE: ['EH', 'AA'], AH: ['AW', 'OW', 'AO', 'AE'], AA: ['AE', 'AW', 'OW'],
-  AO: ['OW', 'AW'], OW: ['AO', 'AW', 'UW'], AW: ['AA', 'AO', 'OW', 'AE', 'AY'], AY: ['EY', 'AE', 'IY', 'AA'], EY: ['AY', 'AE'], UW: ['OW', 'AW'], ER: ['EH', 'AA'], OY: ['AY', 'OW'] };
-const EN_RIVAL_CONS = { TH: ['S', 'F', 'T'], DH: ['D', 'Z'], V: ['W', 'F'], W: ['V'], SH: ['S'], CH: ['SH'], JH: ['CH', 'SH'], NG: ['N'] }; // s/z nicht: wird auch von Muttersprachlern oft weich/hart gesprochen
+  AO: ['OW', 'AW'], OW: ['AO', 'AW', 'UW'], AW: ['AA', 'AO', 'OW', 'AE', 'AY'], AY: ['EY', 'AE', 'IY', 'AA'], EY: ['AY', 'AE'], UW: ['OW', 'AW'], OY: ['AY', 'OW'],
+  // englisches „ur/er/ir“ (turn, bird, work): deutsch oft „u-r“, „o-r“, „e-r“, „i-r“
+  ER: [['UH', 'R'], ['UW', 'R'], ['AO', 'R'], ['EH', 'R'], ['IH', 'R'], 'UH', 'UW', 'EH', 'AA'] };
+// v/f am Anfang hört das Modell nicht sicher – darum bei V nur W
+const EN_RIVAL_CONS = { TH: ['S', 'F', 'T'], DH: ['D', 'Z'], V: ['W'], W: ['V'], SH: ['S'], CH: ['SH'], JH: ['CH', 'SH'], NG: ['N'] }; // s/z nicht: wird auch von Muttersprachlern oft weich/hart gesprochen
+/* Auslautverhärtung (typisch Deutsch): am Wortende weich → hart (live → lif, bad → bat, dog → dock, his → hiss) */
+const EN_DEVOICE = { V: 'F', D: 'T', B: 'P', G: 'K', Z: 'S', DH: 'TH', JH: 'CH' };
 function phRivals(phones, stress, allowed) {
   const out = [], seen = new Set(allowed);
   phones.forEach((p, j) => {
     let alts = [];
     if (EN_VOWELS.has(p)) { if (stress && stress[j] && stress[j] !== '0') alts = EN_RIVAL_VOW[p] || []; } // nur typische Verwechslungen (sonst zu viele Fehlalarme)
-    else alts = EN_RIVAL_CONS[p] || [];
+    else alts = [...(EN_RIVAL_CONS[p] || [])];
+    const fin = j === phones.length - 1 && EN_DEVOICE[p];
+    if (fin && !alts.includes(fin)) alts.push(fin);
     for (const q of alts) {
-      const seq = phones.slice(); seq[j] = q;
+      const rep2 = Array.isArray(q) ? q : [q];
+      const seq = [...phones.slice(0, j), ...rep2, ...phones.slice(j + 1)];
       const key = seq.join(' ');
       if (seen.has(key)) continue;
       seen.add(key);
-      out.push({ key, pos: j, exp: p, ph: q, seq });
+      out.push({ key, pos: j, exp: p, ph: rep2[0], phs: rep2.join(' '), seq, fin: !!(fin && q === fin) });
     }
   });
   return out.slice(0, 60);
@@ -486,7 +494,7 @@ async function assessWave(wave, word, lang = 'en') {
     // Gegenkandidaten: Gewinnt eine ähnliche Variante klar, ist es falsch („town“ statt „ton“).
     // Mit Vorlage zählen nur Varianten, die das Modell bei der sauberen Google-Aufnahme klar vom Zielwort unterscheidet.
     const refRiv = ref && ref.seqKey === best.seqKey ? new Map((ref.rivals || []).map((r) => [r.key, r.diff])) : null;
-    const beaten = (best.rivals || []).filter((r) => (refRiv && refRiv.has(r.key) ? r.diff > PH_RIVAL_WIN && refRiv.get(r.key) < -PH_RIVAL_REF : r.diff > PH_RIVAL_WIN_NOREF))
+    const beaten = (best.rivals || []).filter((r) => (r.fin ? r.diff > (PH_FINAL_WIN_BY[r.exp] ?? PH_FINAL_WIN) && (!refRiv || !refRiv.has(r.key) || refRiv.get(r.key) < 0) : refRiv && refRiv.has(r.key) ? r.diff > PH_RIVAL_WIN && refRiv.get(r.key) < -PH_RIVAL_REF : r.diff > PH_RIVAL_WIN_NOREF))
       .sort((x, y) => y.diff - x.diff);
     if (beaten.length) {
       const r = beaten[0];
@@ -508,6 +516,8 @@ const PH_SHORT_MIN = 15;
    REF – so klar muss die Vorlage das Zielwort bevorzugen, damit die Variante zählt;
    WIN_NOREF – ohne Vorlage etwas vorsichtiger. CAP – Punkte, wenn eine Variante gewinnt. */
 const PH_RIVAL_WIN = 3, PH_RIVAL_REF = 3, PH_RIVAL_WIN_NOREF = 6, PH_RIVAL_CAP = 35;
+const PH_FINAL_WIN_BY = { JH: 30 }; // „village“: auch richtig gesprochen klingt das Ende etwas nach „tsch“
+const PH_FINAL_WIN = 10; // Wortende (live/lif): der harte Laut muss deutlich gewinnen (auch Muttersprachler klingen am Ende etwas hart)
 /** Teil der Vorlage um einen Laut herum langsamer vorspielen (mit etwas Umgebung, damit es natürlich klingt) */
 function phPlayWeak(weak) {
   if (!weak?.wave) return;
