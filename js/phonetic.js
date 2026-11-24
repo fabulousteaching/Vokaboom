@@ -417,7 +417,8 @@ function phInserted(exp, dec) {
   }
   return ins.filter(({ j: jj, before }) => {
     const x = dec[jj];
-    return before > 0 && !EN_VOWELS.has(x.ph) && x.n >= 5 && x.p >= 0.7;
+    // „h“ zählt nie: das ist meist nur der Atem nach dem Wort oder ein behauchtes k/t/p (baker, paper)
+    return before > 0 && !EN_VOWELS.has(x.ph) && x.ph !== 'HH' && x.n >= 5 && x.p >= 0.7;
   }).map(({ j: jj }) => dec[jj]);
 }
 
