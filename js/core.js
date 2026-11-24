@@ -1339,6 +1339,15 @@ function textHash(t) {
   for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193); b = (Math.imul(b, 33) + c) | 0; }
   return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
 }
+/* Version der KI-Aufnahmen: höher = alle Wörter werden einmal neu erzeugt (v2: Wort als kurzer Satz mit Punkt,
+   strengerer Filter am Rand – weniger Atem-, Klick- und Restlaute vor und nach dem Wort) */
+const CLIP_V = 'v2';
+const clipHash = (t) => textHash(`${CLIP_V}|${t}`);
+/** Text für Kokoro: einzelne Wörter als kurzer Satz mit Punkt – so endet die Stimme sauber statt mit einem halben Laut */
+function kokoroText(t) {
+  const x = String(t || '').trim();
+  return /[.!?…]$/.test(x) ? x : `${x}.`;
+}
 const audioPublicURL = (owner, voice, h) => `${cloudUrl()}/storage/v1/object/public/${AUDIO_BUCKET}/${owner}/${voice}/${h}.wav`;
 
 /* Gerätespeicher (IndexedDB) für erzeugte und geladene Aufnahmen */
@@ -1406,11 +1415,12 @@ function cleanVoice(f32, sr) {
   if (!segs.length) return x;
   // Störungen am Rand: sehr kurz (≤ 60 ms) oder viel leiser als das Wort, und durch Stille abgesetzt
   const main = segs.reduce((m, g) => (g.sum > m.sum ? g : m), segs[0]);
-  const keep = segs.filter((g) => g === main || ((g.b - g.a + 1) > 6 && g.e > main.e * 0.18));
+  // vor/nach dem Hauptteil nur behalten, was deutlich nach Sprache klingt (länger als 80 ms und nicht viel leiser)
+  const keep = segs.filter((g) => g === main || ((g.b - g.a + 1) > 8 && g.e > main.e * 0.3));
   let first = keep[0].a, last = keep[keep.length - 1].b;
   // leise Anlaute und Auslaute („s“, „f“, „th“) direkt am Wort behalten: bis zur Hälfte der Schwelle weitergehen
   while (first > 0 && rms[first - 1] >= thr * 0.45) first--;
-  while (last < nf - 1 && rms[last + 1] >= thr * 0.45) last++;
+  while (last < nf - 1 && rms[last + 1] >= thr * 0.6) last++; // hinten etwas strenger: kein Nachhauchen
   const pre = Math.round(sr * 0.03), post = Math.round(sr * 0.07);
   const a = Math.max(0, first * F - pre), b = Math.min(n, (last + 1) * F + post);
   const y = x.slice(a, b);
@@ -1541,7 +1551,7 @@ function kokoroPump() {
   const job = kokoro.queue.shift();
   job.id = ++kokoro.seq;
   kokoro.busy = job;
-  kokoro.worker.postMessage({ type: 'gen', id: job.id, text: job.text, voice: job.voice, speed: 1 });
+  kokoro.worker.postMessage({ type: 'gen', id: job.id, text: kokoroText(job.text), voice: job.voice, speed: 1 });
 }
 /** Neue Aufnahme erzeugen (Warteschlange; urgent = vor allen anderen) */
 function kokoroGen(text, voice, urgent = false) {
@@ -1592,7 +1602,7 @@ async function fetchRemoteClip(owner, voice, h) {
 const clipLoading = new Map();
 /** Aufnahme suchen, ohne neu zu erzeugen */
 function findClip(text, voice, set) {
-  const h = textHash(text), key = `${voice}|${h}`;
+  const h = clipHash(text), key = `${voice}|${h}`;
   if (clipMem.has(key)) return Promise.resolve(clipMem.get(key));
   if (clipLoading.has(key)) return clipLoading.get(key);
   const p = (async () => {
@@ -1610,7 +1620,7 @@ function findClip(text, voice, set) {
 }
 /** Aufnahme erzeugen und speichern (Gerät + Konto der Lehrperson) */
 async function makeClip(text, voice, set, urgent = false) {
-  const h = textHash(text), key = `${voice}|${h}`;
+  const h = clipHash(text), key = `${voice}|${h}`;
   const blob = await kokoroGen(text, voice, urgent);
   idbPut(key, blob);
   const c = memPut(key, blob);
@@ -1661,7 +1671,7 @@ function audioCounts(set) {
   const texts = setTexts(set), voices = prepVoices(set);
   const total = texts.length * voices.length;
   let done = 0;
-  for (const v of voices) for (const t of texts) if (set.audio?.h?.[v]?.[textHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${textHash(t)}`))) done++;
+  for (const v of voices) for (const t of texts) if (set.audio?.h?.[v]?.[clipHash(t)] || (!ownsAudio(set) && clipMem.has(`${v}|${clipHash(t)}`))) done++;
   return { done, total };
 }
 async function audioPrepare(set) {
@@ -1673,7 +1683,7 @@ async function audioPrepare(set) {
     for (const v of voices) {
       for (const t of texts) {
         if (!getSet(set.id) || kokoro.state === 'failed') return;
-        const h = textHash(t);
+        const h = clipHash(t);
         if (set.audio?.h?.[v]?.[h] && set.audio.o === cloud.uid) continue; // schon im Konto
         const local = await findClip(t, v, set);
         if (local) { if (ownsAudio(set) && !(set.audio?.o === cloud.uid && set.audio.h?.[v]?.[h])) uploadClip(set, v, h, local.blob); kokoroNotify(); continue; }
@@ -1739,10 +1749,10 @@ function speak(text, lang, { slow = false } = {}) {
   if (lang === 'de' || !useKokoro(set)) { deviceSpeak(text, lang, slow); return; }
   const t = ttsText(text, lang), voice = kokoroVoiceFor(lang);
   const rate = slow ? 0.7 : Math.min(1.2, Math.max(0.6, db.settings.rate || 0.9));
-  const key = `${voice}|${textHash(t)}`;
+  const key = `${voice}|${clipHash(t)}`;
   const mem = clipMem.get(key);
   if (mem) { playClipURL(mem.url, rate); return; }
-  if (!audioOwnerFor(voice, textHash(t), set)) {
+  if (!audioOwnerFor(voice, clipHash(t), set)) {
     // Keine Aufnahme im Speicher bekannt: sofort die Gerätestimme (noch beim Antippen – wichtig fürs iPhone)
     deviceSpeak(text, lang, slow);
     if (mayGenerate(set)) findClip(t, voice, set).then((c) => c || makeClip(t, voice, set, true)).catch(() => {});
