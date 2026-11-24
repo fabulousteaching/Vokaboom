@@ -365,7 +365,7 @@ const avMine = () => (isKid() && AV.state ? AV.state.avatar : null);
 
 /* ---------------- Münzen verdienen ----------------
    Punkte beim Üben → alle 10 Punkte eine Münze (Lehrperson kann 5–20 einstellen; pro Tag höchstens 40, prüft die Datenbank).
-   Vokaboom: richtige Antwort 1 Punkt (Lernkarten „gewusst“ ½), ein Wort, das vorher schon mal falsch war, +½,
+   Vokaboom: richtige Antwort 1 Punkt (Lernkarten geben keine Punkte), ein Wort, das vorher schon mal falsch war, +½,
    Test ab 80 % +3, alles richtig +5, ein fertig gespieltes Spiel +1. Teilmal: jede verdiente Münze zählt hier auch. */
 const AV_PTS_KEY = () => `fab.avpts.${kid.username || ''}`;
 function avPtsGet() { try { return parseFloat(localStorage.getItem(AV_PTS_KEY())) || 0; } catch { return 0; } }
@@ -543,7 +543,7 @@ function avCoinsInfo() {
     ${avLock() ? `<p class="av-lock-note">🔒 ${avEsc(avLockText())}</p>` : ''}
     <div class="av-next"><span>Nächste Münze</span><i class="av-coin-prog big"><i style="width:${Math.min(100, (avPtsGet() / avPPC()) * 100)}%"></i></i><small>noch ${String(left).replace('.', ',')} Punkte</small></div>
     <ul class="av-rules">
-      ${AV_APP === 'vokaboom' ? `<li><b>Richtige Antwort = 1 Punkt</b> (beim Aussprechen, Hören & Schreiben, im Test und in den Übungen; Lernkarten „gewusst“ ½ Punkt).</li>
+      ${AV_APP === 'vokaboom' ? `<li><b>Richtige Antwort = 1 Punkt</b> (beim Schreiben, Aussprechen, Hören & Schreiben, im Test und beim Wiederholen; Lernkarten geben keine Punkte).</li>
       <li><b>Dranbleiben lohnt sich:</b> Ein Wort, das du vorher schon mal falsch hattest, gibt ½ Punkt extra.</li>
       <li><b>Test ab 80 %:</b> 3 Punkte Bonus, alles richtig: 5 Punkte.</li>
       ${cfg.games ? '<li><b>Spiel fertig gespielt:</b> 1 Punkt.</li>' : ''}` : '<li><b>Jede Münze aus den Übungen</b> zählt auch für deinen Avatar.</li>'}

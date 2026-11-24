@@ -230,3 +230,8 @@ Kinder gestalten unter **Mein Avatar** eine eigene Figur (Haut, Gesicht, Haare, 
 - Portionen, die schon in der Bibliothek geteilt sind, werden automatisch unter ihrer Unit eingeordnet.
 - **Automatisch einordnen:** Vokaboom ordnet deine Portionen anhand des Namens ein – aber nur unter Lehrmitteln, die es in der Bibliothek schon gibt. Erkannt werden ganze Namen und Abkürzungen: „YW 3“ oder „JW3“ → Young World 3, „NW“ → New World (welches, entscheidet die Unit oder „6. Klasse“ im Namen), „DD 5“ → dis donc! 5. Dazu braucht es „Unit/Unité + Zahl“ im Namen. Ohne eindeutigen Hinweis bleibt die Portion unter „Nicht eingeordnet“ (dort gibt es den Link **Automatisch einordnen** für später). Selbst eingeordnete Portionen werden nie verändert.
 - **Neue Portion:** Nach „Karten erstellen“ fragt Vokaboom sofort: **Wo gehört die Portion hin?** – Lehrmittel, Schuljahr, Unit, wie beim Teilen in der Bibliothek, mit einem Vorschlag aus dem Namen. Für eigene Wortlisten ohne Lehrmittel gibt es „Gehört zu keinem Lehrmittel“.
+
+## Münzen und Spiele
+
+- Lernkarten geben keine Münzen (dort schätzen sich die Kinder selbst ein). Münzen gibt es fürs Schreiben, Aussprechen, Hören & Schreiben, den Test und das Wiederholen.
+- Jede Spielrunde kostet 1 Münze – auch „Nochmal“ oder eine neue Stufe nach einer fertigen Runde. Lehrpersonen spielen gratis. (In Teilmal führt „Nochmals“ zurück zum Start-Bildschirm, wo wieder bezahlt wird.)
