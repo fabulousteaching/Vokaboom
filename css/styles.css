@@ -1664,11 +1664,11 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .ex-table th, .ex-table td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line, #e5e7eb); }
 .ex-table thead th { font-size: .85rem; color: var(--ink-2); font-weight: 600; }
 .ex-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
-.ex-steps li { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem .5rem; border-radius: 8px; background: var(--surface-2, rgba(0,0,0,.03)); }
+.ex-steps li { display: flex; justify-content: space-between; gap: 1rem; padding: .35rem .5rem; border-radius: 8px; background: color-mix(in srgb, var(--ink) 5%, var(--paper)); }
 
 /* Meine Portionen: nach Lehrmittel › Schuljahr › Unit geordnet */
 .shelf { display: grid; gap: .6rem; }
-.shelf-lm { border: 1px solid var(--line, #e5e7eb); border-radius: 14px; background: var(--surface, #fff); }
+.shelf-lm { border: 1px solid var(--line, #e5e7eb); border-radius: 14px; background: var(--paper); }
 .shelf-lm > summary { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .65rem .85rem; cursor: pointer; font-weight: 800; list-style: none; }
 .shelf-lm > summary::-webkit-details-marker { display: none; }
 .shelf-lm > summary::after { content: '▾'; color: var(--ink-2); transition: transform .2s; }
@@ -1686,13 +1686,13 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 /* Spiele sperren (Klasse) */
 .gl-panel .field { display: grid; gap: .45rem; }
 .gl-games { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .2rem; }
-.gl-game { display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .65rem; border-radius: 99px; border: 1px solid var(--line, #e5e7eb); background: var(--surface, #fff); font: inherit; font-size: .88rem; cursor: pointer; }
-.gl-game.on { background: #FDE2E2; border-color: #F3A3A3; color: #8B1C1C; font-weight: 700; }
+.gl-game { display: inline-flex; align-items: center; gap: .3rem; padding: .35rem .65rem; border-radius: 99px; border: 1px solid var(--line, #e5e7eb); background: var(--paper); font: inherit; font-size: .88rem; cursor: pointer; }
+.gl-game.on { background: color-mix(in srgb, #E5484D 16%, var(--paper)); border-color: color-mix(in srgb, #E5484D 55%, var(--paper)); color: color-mix(in srgb, #E5484D 60%, var(--ink)); font-weight: 700; }
 .gl-kids { margin-top: .9rem; }
 .gl-kids > summary { cursor: pointer; font-weight: 700; }
 .gl-kid-list { list-style: none; margin: .6rem 0 0; padding: 0; display: grid; gap: .5rem; }
-.gl-kid { display: grid; grid-template-columns: minmax(140px, 1fr) auto; align-items: center; gap: .4rem .8rem; padding: .45rem .6rem; border-radius: 12px; background: var(--surface-2, rgba(0,0,0,.03)); }
-.gl-kid.locked { background: #FFF4F4; }
+.gl-kid { display: grid; grid-template-columns: minmax(140px, 1fr) auto; align-items: center; gap: .4rem .8rem; padding: .45rem .6rem; border-radius: 12px; background: color-mix(in srgb, var(--ink) 5%, var(--paper)); }
+.gl-kid.locked { background: color-mix(in srgb, #E5484D 8%, var(--paper)); box-shadow: inset 3px 0 0 color-mix(in srgb, #E5484D 60%, var(--paper)); }
 .gl-kid .gl-games { grid-column: 1 / -1; }
 .gl-kid-name { display: inline-flex; align-items: center; gap: .4rem; font-weight: 600; }
 @media (max-width: 560px) { .gl-kid { grid-template-columns: 1fr; } }
@@ -1702,3 +1702,7 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .gl-note h2 { margin: 0; }
 .menu .gl-panel { margin-top: .6rem; }
 .seg.wrap { flex-wrap: wrap; }
+
+/* Spiele sperren: Text in Hell und Dunkel gut lesbar */
+.gl-game, .gl-kid-name, .gl-kids > summary { color: var(--ink); }
+.gl-game { border-color: var(--line-2); }
