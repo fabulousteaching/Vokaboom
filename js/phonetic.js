@@ -249,6 +249,22 @@ function phExpectedAll(engine, text) {
    Bewusst NICHT dabei: e/ä (bed – bad), i/ie (ship – sheep), m/p (lamb – lamp). */
 const EN_SAME = { ER: ['AH', 'EH', 'AO', 'R'], AH: ['IH', 'ER', 'AA', 'UH', 'EH'], AA: ['AO', 'AH'], AO: ['AA', 'OW'], UH: ['UW', 'AH'], UW: ['UH', 'AH'], IH: ['AH', 'IY'], OW: ['AO'], HH: [], V: ['W'], JH: ['CH'] }; // v wie w und dsch wie tsch gelten (village): das Modell hört es auch bei richtiger Aussprache so
 const EN_CLOSE = { S: ['Z'], Z: ['S'], D: ['T', 'DH'], T: ['D'], B: ['P'], P: ['B'], G: ['K'], K: ['G'], V: ['F', 'W'], F: ['V', 'TH'], TH: ['F', 'S'], DH: ['D', 'Z', 'V'], EY: ['EH', 'IY'], IY: ['IH', 'EY'], EH: ['EY', 'AH'], AE: ['AH'], W: ['V'], N: ['M', 'NG'], NG: ['N'] };
+/* Was das Modell selbst bei RICHTIG gesprochenen Wörtern oft verwechselt – getrennt nach Wortanfang, Mitte, Ende.
+   Gemessen an einer Testsammlung (viele Stimmen, richtig gesprochen); zählt wie ein naher Laut.
+   Echte Lernfehler (th→s, w→v, sh→s …) fängt weiterhin der Vergleich mit den Gegenkandidaten ab. */
+/*EN_CONF_BEGIN*/
+const EN_CONF = {
+  ini: { AE: ['AY', 'EH'], AW: ['AA', 'OW'], B: ['R', 'DH', 'L'], CH: ['JH', 'D', 'T'], D: ['B', 'N'], EH: ['AY', 'AE'], F: ['B'], G: ['D', 'B', 'TH', 'N'], HH: ['EH', 'AE'], IH: ['N'], IY: ['Y'], JH: ['D', 'T', 'Y', 'SH'], K: ['HH', 'P', 'B'], M: ['N'], N: ['L'], T: ['SH'], TH: ['DH'] },
+  mid: { AA: ['AY', 'AE'], AE: ['EH'], AO: ['AH', 'AY', 'OY'], AW: ['AE', 'OW', 'L', 'EH', 'AH'], AY: ['EY'], CH: ['T'], ER: ['OW', 'P', 'AE'], F: ['P', 'N', 'K'], G: ['B'], IH: ['EH', 'EY'], IY: ['EH'], K: ['AH'], L: ['OW'], M: ['N'], OW: ['AH'], P: ['T'], R: ['AY'], UH: ['EH', 'OW', 'D'], UW: ['IY', 'IH', 'OW'], W: ['UW', 'R'], Y: ['R', 'IY', 'IH'] },
+  fin: { AW: ['AH', 'OW'], ER: ['OW', 'AA', 'AY'], G: ['[SIL]', 'D', 'T', 'EY'], JH: ['D', 'T'], K: ['[SIL]', 'T', 'OW'], L: ['OW'], M: ['N'], OY: ['AY'], P: ['N', '[SIL]', 'T', 'M'], R: ['AY', 'ER', 'OW'], T: ['[SIL]'], TH: ['AY'], V: ['AY', 'TH', 'N'] },
+};
+/*EN_CONF_END*/
+const PH_FORGIVE_N = 3, PH_FORGIVE_TO = 70;
+/** Typischer Lernfehler (w→v, th→s, sh→s, hartes Wortende …)? Der wird nie verziehen. */
+const phLearnerSub = (exp, heard) => (EN_RIVAL_CONS[exp] || []).includes(heard) || EN_DEVOICE[exp] === heard || (exp === 'W' && (heard === 'F' || heard === 'B'));
+/* Strenge aus dem Regler „Ein Wort zählt ab … Punkten“: 60 = normal (1), höher = strenger (> 1: kein verziehener Laut,
+   Gegenkandidaten gewinnen schneller), tiefer = nachsichtiger (< 1). */
+const phStrict = () => { const p = typeof passMinNow === 'function' ? passMinNow() : 60; return p > 65 ? 1 + (p - 60) / 20 : p < 55 ? Math.max(0.5, 1 - (60 - p) / 40) : 1; };
 const EN_CLOSE_W = 0.75; // so viel ist ein sehr naher Laut wert
 
 /* ---------- Gegenkandidaten („ton“ gegen „town“, „she“ gegen „see“, „Wednesday“ gegen „Vednesday“) ----------
@@ -305,6 +321,27 @@ async function phPosteriors(engine, wave) {
 }
 
 /**
+ * Zwei Durchgänge: einmal wie aufgenommen, einmal 12 % langsamer und tiefer – die Wahrscheinlichkeiten werden gemittelt.
+ * Das Modell kennt vor allem erwachsene Stimmen; in der tieferen Lage versteht es Kinderstimmen besser, und zufällige
+ * Verhörer (vor allem am Wortanfang) mitteln sich heraus. In der Testsammlung: mehr richtig Gesprochenes akzeptiert.
+ */
+const PH_SLOW = 0.88;
+async function phPosteriors2(engine, wave) {
+  const a = await phPosteriors(engine, wave);
+  try {
+    const n = Math.round(wave.length / PH_SLOW), slow = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i * PH_SLOW, k = Math.floor(x), f = x - k; slow[i] = (wave[k] || 0) * (1 - f) + (wave[k + 1] ?? wave[k] ?? 0) * f; }
+    const b = await phPosteriors(engine, slow);
+    const { frames, V } = a, probs = new Float32Array(frames * V);
+    for (let t = 0; t < frames; t++) {
+      const x = frames > 1 ? t * (b.frames - 1) / (frames - 1) : 0, k = Math.floor(x), f = x - k, k2 = Math.min(b.frames - 1, k + 1);
+      for (let c = 0; c < V; c++) probs[t * V + c] = 0.5 * a.probs[t * V + c] + 0.5 * (b.probs[k * V + c] * (1 - f) + b.probs[k2 * V + c] * f);
+    }
+    return { probs, frames, V };
+  } catch { return a; }
+}
+
+/**
  * Punkte je erwartetem Laut (0–100) per „Goodness of Pronunciation“:
  * Durchschnitt über die Frames des Lauts von  log P(erwarteter Laut) − log P(wahrscheinlichster Laut).
  * 100 = genau dieser Laut war am deutlichsten zu hören.
@@ -323,7 +360,7 @@ function phScore(engine, post, phones, { stress = null, allowed = [] } = {}) {
   const id2p = {};
   for (const [p, i] of Object.entries(vocab)) id2p[i] = p;
   const same = phones.map((p) => [vocab[p], ...(EN_SAME[p] || []).map((q) => vocab[q])].filter((x) => x != null));
-  const close = phones.map((p) => (EN_CLOSE[p] || []).map((q) => vocab[q]).filter((x) => x != null));
+  const close = phones.map((p, j) => [...(EN_CLOSE[p] || []), ...(EN_CONF[j === 0 ? 'ini' : j === phones.length - 1 ? 'fin' : 'mid'][p] || [])].map((q) => vocab[q]).filter((x) => x != null));
   // Bewertung für einen Ausschnitt [a, b]
   const rate = (a, b) => {
     const n = b - a + 1;
@@ -356,6 +393,9 @@ function phScore(engine, post, phones, { stress = null, allowed = [] } = {}) {
     });
     // Durchschnitt aller Laute, aber jeder klar falsche Laut (unter 20) kostet 22 Punkte
     const ps = result.map((r) => r.score);
+    // Ab 3 Lauten wird EIN schwach gehörter Mitlaut verziehen (Vokale nie): das Modell verhört sich auch bei richtiger Aussprache
+    // bei etwa jedem 20. Laut (vor allem am Wortanfang). Typische Fehler fängt der Vergleich mit den Gegenkandidaten ab.
+    if (ps.length >= PH_FORGIVE_N && phStrict() <= 1) { let w = -1; for (let i = 0; i < ps.length; i++) if (!EN_VOWELS.has(phones[i]) && !phLearnerSub(phones[i], result[i].heard) && (w < 0 || ps[i] < ps[w])) w = i; if (w >= 0 && ps[w] < PH_FORGIVE_TO) ps[w] = PH_FORGIVE_TO; }
     const mean = ps.reduce((acc, x) => acc + x, 0) / ps.length;
     return { gop: Math.max(0, Math.min(100, Math.round(mean - 22 * ps.filter((x) => x < 20).length))), phones: result, a, b };
   };
@@ -372,8 +412,11 @@ function phScore(engine, post, phones, { stress = null, allowed = [] } = {}) {
   const score = Math.max(0, best.gop - 45 * extra.length); // ein deutlich eingeschobener Mitlaut macht ein anderes Wort (lamb → lamp)
   // Gegenkandidaten: um wie viel passt die Variante besser als das Zielwort? (> 0 = Variante passt besser)
   const base = phLL(engine, post, ids, best.a, best.b);
-  const rivals = phRivals(phones, stress, allowed).map((r) => ({ ...r, diff: phLL(engine, post, r.seq.map((q) => vocab[q]), best.a, best.b) - base }));
-  return { silent: false, score, gop: best.gop, extra: extra.map((x) => x.ph), dec: dec.map((x) => `${x.ph}:${x.n}:${Math.round(x.p * 100)}`).join(' '), phones: best.phones, rivals, seqKey: phones.join(' ') };
+  // Wie viel schlechter passt das Zielwort als die frei gehörten Laute? (0 = genau das Gehörte, je Frame gemittelt)
+  let free = 0;
+  for (let t = best.a; t <= best.b; t++) free += Math.log(probs[t * V + argmax(probs.subarray(t * V, t * V + V))] + 1e-8);
+  const llr = (base - free) / (best.b - best.a + 1);
+  return { silent: false, score, gop: best.gop, extra: extra.map((x) => x.ph), dec: dec.map((x) => `${x.ph}:${x.n}:${Math.round(x.p * 100)}`).join(' '), phones: best.phones, seqKey: phones.join(' '), llr, nf: best.b - best.a + 1, a: best.a, b: best.b };
 }
 
 /**
@@ -485,9 +528,14 @@ const phRel = (kid, ref) => Math.min(100, Math.round(kid * 100 / Math.min(100, M
 
 /** Eine Aufnahme (16 kHz) bewerten – mit Vorlage, wenn es eine gibt */
 async function assessWave(wave, word, lang = 'en') {
-  const best = await assessWaveRaw(wave, word, lang);
-  if (!best.silent) {
-    const ref = await phRefScore(word, lang).catch(() => null);
+  const ref = await phRefScore(word, lang).catch(() => null);
+  const best = await assessWaveRaw(wave, word, lang, ref?.heardSeq || null);
+  if (!best.silent) phDecide(best, ref);
+  return best;
+}
+/** Entscheidung: Punkte, Gegenkandidaten, richtig/falsch (ref = Bewertung der Vorlage oder null) */
+function phDecide(best, ref) {
+  {
     if (ref) {
       best.rawScore = best.score; best.refScore = ref.score;
       if (PH_REF_NORM) best.score = phRel(best.score, ref.score); // ausgeschaltet: hob zu viel Falsches über die Grenze
@@ -504,12 +552,17 @@ async function assessWave(wave, word, lang = 'en') {
     }
     // Gegenkandidaten: Gewinnt eine ähnliche Variante klar, ist es falsch („town“ statt „ton“).
     // Mit Vorlage zählen nur Varianten, die das Modell bei der sauberen Google-Aufnahme klar vom Zielwort unterscheidet.
-    const refRiv = ref && ref.seqKey === best.seqKey ? new Map((ref.rivals || []).map((r) => [r.key, r.diff])) : null;
-    const beaten = (best.rivals || []).filter((r) => (r.fin ? r.diff > (PH_FINAL_WIN_BY[r.exp] ?? PH_FINAL_WIN) && (!refRiv || !refRiv.has(r.key) || refRiv.get(r.key) < 0) : refRiv && refRiv.has(r.key) ? r.diff > PH_RIVAL_WIN && refRiv.get(r.key) < -PH_RIVAL_REF : r.diff > PH_RIVAL_WIN_NOREF))
-      .sort((x, y) => y.diff - x.diff);
+    const refRiv = ref ? new Map((ref.rivals || []).map((r) => [r.key, r.diff])) : null;
+    const beaten = (best.rivals || []).filter((r) => {
+      const t0 = PH_RIVAL_T[`${r.exp}>${r.phs}${r.fin ? '$' : ''}`] ?? PH_RIVAL_T['*'];
+      if (!(t0 < 1e6)) return false;
+      const t = Math.max(3, t0 / phStrict()); // diese Verwechslung hört das Modell nicht zuverlässig
+      if (refRiv && refRiv.has(r.key)) return r.diff > t && refRiv.get(r.key) < -PH_RIVAL_REF; // die Vorlage muss den Unterschied selbst klar zeigen
+      return r.diff > t + PH_RIVAL_NOREF;
+    }).sort((x, y) => y.diff - x.diff);
     if (beaten.length) {
       const r = beaten[0];
-      best.rival = { exp: r.exp, ph: r.ph, pos: r.pos, n: best.phones?.length || 1, diff: Math.round(r.diff) };
+      best.rival = { exp: r.exp, ph: r.ph, pos: r.pos, n: r.n || best.phones?.length || 1, diff: Math.round(r.diff) };
       best.score = Math.min(best.score, PH_RIVAL_CAP);
       if (ref?.phones && ref.seqKey === best.seqKey && ref.phones[r.pos]?.t0 >= 0) best.weak = { exp: r.exp, i: r.pos, n: best.phones.length, t0: ref.phones[r.pos].t0, t1: ref.phones[r.pos].t1, wave: ref.wave };
     }
@@ -526,9 +579,12 @@ const PH_SHORT_MIN = 15;
    WIN – so viel besser muss eine Variante passen, damit das Wort falsch ist;
    REF – so klar muss die Vorlage das Zielwort bevorzugen, damit die Variante zählt;
    WIN_NOREF – ohne Vorlage etwas vorsichtiger. CAP – Punkte, wenn eine Variante gewinnt. */
-const PH_RIVAL_WIN = 3, PH_RIVAL_REF = 3, PH_RIVAL_WIN_NOREF = 6, PH_RIVAL_CAP = 35;
-const PH_FINAL_WIN_BY = { JH: 30 }; // „village“: auch richtig gesprochen klingt das Ende etwas nach „tsch“
-const PH_FINAL_WIN = 10; // Wortende (live/lif): der harte Laut muss deutlich gewinnen (auch Muttersprachler klingen am Ende etwas hart)
+const PH_RIVAL_REF = 3, PH_RIVAL_NOREF = 4, PH_RIVAL_CAP = 35;
+/* Grenze je Verwechslung („erwartet>gehört“, $ = am Wortende), gemessen an der Testsammlung:
+   so gewählt, dass richtig gesprochene Wörter fast nie daran scheitern. 1e9 = wird nicht geprüft. */
+/*PH_RIVAL_T_BEGIN*/
+const PH_RIVAL_T = { '*': 1e9, 'AA>AE': 65, 'AA>AW': 13, 'AA>OW': 30, 'AE>AA': 30, 'AE>EH': 18, 'AH>AE': 25, 'AH>AO': 4, 'AH>AW': 4, 'AH>OW': 20, 'AO>AW': 40, 'AO>OW': 40, 'AW>AA': 1e9, 'AW>AE': 1e9, 'AW>AO': 4, 'AW>AY': 20, 'AW>OW': 65, 'AY>AA': 4, 'AY>AE': 4, 'AY>EY': 50, 'AY>IY': 4, 'CH>SH': 80, 'D>T$': 65, 'DE>DE': 50, 'DH>D': 25, 'DH>TH$': 1e9, 'DH>Z': 10, 'EH>AE': 30, 'EH>IH': 4, 'ER>AA': 25, 'ER>AO R': 80, 'ER>EH': 1e9, 'ER>EH R': 1e9, 'ER>IH R': 65, 'ER>UH': 4, 'ER>UH R': 65, 'ER>UW': 4, 'ER>UW R': 65, 'EY>AE': 4, 'EY>AY': 4, 'G>K$': 80, 'IH>EH': 1e9, 'IH>IY': 10, 'IY>AY': 4, 'IY>EH': 30, 'IY>IH': 50, 'JH>CH': 50, 'JH>SH': 1e9, 'NG>N': 30, 'OW>AO': 4, 'OW>AW': 65, 'OW>UW': 4, 'OY>AY': 1e9, 'OY>OW': 1e9, 'SH>S': 8, 'TH>F': 80, 'TH>S': 10, 'TH>T': 30, 'UW>AW': 4, 'UW>OW': 50, 'V>F$': 12, 'W>V': 4, 'Z>S$': 12 };
+/*PH_RIVAL_T_END*/
 /** Teil der Vorlage um einen Laut herum langsamer vorspielen (mit etwas Umgebung, damit es natürlich klingt) */
 function phPlayWeak(weak) {
   if (!weak?.wave) return;
@@ -545,8 +601,105 @@ function phPlayWeak(weak) {
   } catch { /* kein Ton */ }
 }
 
+/* ---------- „Auf Deutsch gelesen“ als Gegenkandidat ----------
+   Der häufigste Fehler: das Wort so aussprechen, wie man es auf Deutsch lesen würde („knife“ mit k, „blood“ mit o,
+   „village“ wie „Willage“). Dafür wird die Schreibweise nach deutschen Regeln in Laute übersetzt und tritt als
+   Gegenkandidat gegen die richtige Aussprache an. */
+const DE_MULTI = [['tsch', ['CH']], ['sch', ['SH']], ['ck', ['K']], ['ph', ['F']], ['th', ['T']], ['sh', ['SH']], ['ch', ['K']], ['qu', ['K', 'V']],
+  ['ng', ['NG']], ['ie', ['IY']], ['ei', ['AY']], ['ai', ['AY']], ['ay', ['AY']], ['ey', ['AY']], ['eu', ['OY']], ['au', ['AW']], ['ou', ['OW']],
+  ['ee', ['EY']], ['oo', ['OW']], ['aa', ['AA']], ['ea', ['EH', 'AA']], ['oa', ['OW', 'AA']], ['ue', ['UW', 'EH']], ['ui', ['UW', 'IH']], ['gh', ['G']]];
+const DE_ONE = { a: ['AA'], b: ['B'], c: ['K'], d: ['D'], e: ['EH'], f: ['F'], g: ['G'], h: ['HH'], i: ['IH'], j: ['Y'], k: ['K'], l: ['L'], m: ['M'], n: ['N'],
+  o: ['AO'], p: ['P'], r: ['R'], s: ['S'], t: ['T'], u: ['UH'], v: ['F'], w: ['V'], x: ['K', 'S'], y: ['IY'], z: ['T', 'S'] };
+function phGermanReading(word) {
+  const w = String(word || '').toLowerCase();
+  if (!/^[a-z]{2,}$/.test(w)) return null;
+  const out = [], isV = (c) => 'aeiouy'.includes(c);
+  let i = 0;
+  while (i < w.length) {
+    const m = DE_MULTI.find(([k]) => w.startsWith(k, i));
+    if (m) { out.push(...m[1]); i += m[0].length; continue; }
+    const c = w[i], nx = w[i + 1] || '', pv = w[i - 1] || '';
+    if (c === pv && !isV(c)) { i++; continue; }                                  // Doppelkonsonant
+    if (c === 'h' && pv && isV(pv)) { i++; continue; }                           // Dehnungs-h
+    if (c === 'e' && i === w.length - 1 && w.length > 2) { out.push('AH'); i++; continue; } // Schluss-e
+    if (c === 'e' && nx === 'r' && i === w.length - 2) { out.push('ER'); i += 2; continue; }
+    if (c === 's' && i === 0 && (nx === 't' || nx === 'p')) { out.push('SH'); i++; continue; }
+    if (c === 's' && i === 0 && isV(nx)) { out.push('Z'); i++; continue; }
+    if (c === 'c' && (nx === 'e' || nx === 'i')) { out.push('T', 'S'); i++; continue; }
+    if (c === 'y' && i === 0) { out.push('Y'); i++; continue; }
+    out.push(...(DE_ONE[c] || [])); i++;
+  }
+  const fin = { B: 'P', D: 'T', G: 'K', V: 'F', Z: 'S' }, last = out[out.length - 1];
+  if (fin[last]) out[out.length - 1] = fin[last];                                // Auslautverhärtung
+  return out.length ? out : null;
+}
+
+/** Lautfolge, wie das Modell eine Aufnahme frei hört (für die Vorlage): nur deutliche Laute */
+function phTemplate(engine, post) {
+  const out = [];
+  for (const x of phDecode(engine, post)) if (x.n >= 3 && x.p >= 0.45 && out[out.length - 1] !== x.ph) out.push(x.ph);
+  return out.length >= 1 && out.length <= 30 ? out : null;
+}
+/** Die gehörte Vorlage gilt nur, wenn sie nahe am Wörterbuch liegt (sonst hat sich das Modell bei der Vorlage verhört) */
+function phTplOk(tpl, list) {
+  if (tpl.length < 3) return false;
+  const cost = (a, b) => (a === b || (EN_SAME[a] || []).includes(b) || (EN_SAME[b] || []).includes(a) ? 0 : (EN_CLOSE[a] || []).includes(b) || (EN_CLOSE[b] || []).includes(a) ? 0.5 : 1);
+  let best = Infinity;
+  for (const ph of list) {
+    const n = ph.length, m = tpl.length, d = Array.from({ length: n + 1 }, (_, i) => { const row = new Float64Array(m + 1); row[0] = i; return row; });
+    for (let j = 1; j <= m; j++) d[0][j] = j;
+    for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost(ph[i - 1], tpl[j - 1]));
+    best = Math.min(best, d[n][m] / Math.max(n, m));
+  }
+  return best <= 0.34;
+}
+/**
+ * Englisch: Wahrscheinlichkeiten gegen alle gültigen Lautfolgen prüfen – die beste zählt.
+ * Gültig sind: das Wörterbuch (amerikanisch, mit/ohne Artikel, Aussprache-Varianten) und – wenn es eine Vorlage gibt –
+ * die Lautfolge, die das Modell bei der Vorlage hört (tpl). So gilt automatisch auch die britische Aussprache der
+ * Vokaboom-Stimme („bath“, „February“, „Tuesday“, „car“ ohne r …).
+ * Gegenkandidaten (typische Fehler) treten danach gegen die beste gültige Lautfolge an.
+ */
+function phAssessPost(engine, post, refs, tpl = null) {
+  const { vocab } = engine;
+  const cands = [];
+  for (const ref of refs) {
+    const vars = phExpectedAll(engine, ref), st = phStress(engine, ref);
+    for (const phones of vars) if (phones.length) cands.push({ phones, ref, stress: st.length === phones.length ? st : null });
+  }
+  if (tpl && tpl.length && phTplOk(tpl, cands.map((c) => c.phones)) && !cands.some((c) => c.phones.join(' ') === tpl.join(' '))) cands.push({ phones: tpl, ref: refs[0], stress: null, tpl: true });
+  let best = null, bc = null;
+  for (const c of cands) {
+    c.r = phScore(engine, post, c.phones);
+    if (c.r.silent) { best = best || { ...c.r, ref: c.ref }; continue; }
+    if (!best || best.silent || c.r.score > best.score) { best = { ...c.r, ref: c.ref, tpl: !!c.tpl }; bc = c; }
+  }
+  if (!best || best.silent) return best;
+  // Gegenkandidaten: um wie viel passt die Variante besser als die beste gültige Lautfolge? (> 0 = Variante passt besser)
+  const allowed = cands.map((c) => c.phones.join(' '));
+  const ll = (seq) => phLL(engine, post, seq.map((q) => vocab[q]), best.a, best.b);
+  let acc = -Infinity;
+  for (const c of cands) acc = Math.max(acc, ll(c.phones));
+  const seen = new Set(), rivals = [];
+  for (const c of cands) {
+    if (c.tpl || c.ref !== bc.ref && !bc.tpl) continue; // nur Varianten desselben Textes (mit oder ohne Artikel)
+    for (const rv of phRivals(c.phones, c.stress, allowed)) {
+      if (seen.has(rv.key)) continue;
+      seen.add(rv.key);
+      rivals.push({ ...rv, n: c.phones.length, diff: ll(rv.seq) - acc });
+    }
+  }
+  // „auf Deutsch gelesen“ (nur einzelne Wörter)
+  const de = phGermanReading(bc.tpl ? refs[refs.length - 1] : bc.ref);
+  if (de && de.every((q) => vocab[q] != null) && !allowed.includes(de.join(' ')) && !seen.has(de.join(' '))) {
+    rivals.push({ key: de.join(' '), pos: -1, exp: 'DE', ph: 'DE', phs: 'DE', seq: de, fin: false, n: de.length, diff: ll(de) - acc });
+  }
+  best.rivals = rivals;
+  return best;
+}
+
 /** Eine Aufnahme (16 kHz) bewerten: alle Varianten (mit/ohne Artikel, Aussprache-Varianten) – die beste zählt */
-async function assessWaveRaw(wave, word, lang = 'en') {
+async function assessWaveRaw(wave, word, lang = 'en', tpl = null) {
   let best = null;
   const take = (r, ref) => {
     if (r.silent) { best = best || { ...r, ref }; return; }
@@ -561,11 +714,9 @@ async function assessWaveRaw(wave, word, lang = 'en') {
     }
   } else {
     const engine = await loadPhoneticEngine();
-    const post = await phPosteriors(engine, wave);
-    for (const ref of phReferences(word)) {
-      const vars = phExpectedAll(engine, ref), st = phStress(engine, ref), allowed = vars.map((v) => v.join(' '));
-      for (const phones of vars) if (phones.length) take(phScore(engine, post, phones, { stress: st.length === phones.length ? st : null, allowed }), ref);
-    }
+    const post = await phPosteriors2(engine, wave);
+    best = phAssessPost(engine, post, phReferences(word), tpl);
+    if (best && !best.silent && !tpl) best.heardSeq = phTemplate(engine, post); // für die Vorlage: so hört das Modell diese Aufnahme
   }
   if (!best) throw 'ph-word';
   return best;

@@ -1209,6 +1209,7 @@ function phoneticSettingsHTML(s) {
     <label for="ph-min"><span class="small muted">Ein Wort zählt ab <strong id="ph-min-val">${passMin}</strong> von 100 Punkten</span></label>
     <input type="range" id="ph-min" min="30" max="90" step="5" value="${passMin}">
     <p class="small muted">${isTeacher() ? 'Gilt auch für deine Klassen und für Portionen, die du per Link oder QR-Code teilst.' : 'Gilt auch für Portionen, die du per Link oder QR-Code teilst.'} Die Kinder sehen nur „richtig“ oder „noch nicht ganz“.</p>
+    <p class="small muted">60 = ausgewogen. Höher = strenger: mehr Fehler werden erkannt, aber auch richtig Gesprochenes wird öfter abgelehnt. Tiefer = nachsichtiger.</p>
   </div>`;
 }
 
