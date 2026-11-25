@@ -177,7 +177,7 @@ function openGames() {
 }
 /* ---------- Spielen kostet Münzen (wie in Teilmal): Kinder verdienen sie beim Üben ---------- */
 const GAME_COST = 1;
-const gamesFree = () => !isKid(); // Lehrpersonen und Gäste: gratis zum Ausprobieren
+const gamesFree = () => !isKid() && !(typeof kidGate === 'function' && kidGate()); // Lehrpersonen und Gäste: gratis zum Ausprobieren (nicht auf Schüler-Geräten)
 const gameCoins = () => (typeof AV === 'object' && AV.state ? AV.state.coins || 0 : 0);
 const canPlayGame = () => gamesFree() || gameCoins() >= GAME_COST;
 /** Münze bezahlen, bevor ein Spiel beginnt. Liefert true, wenn gespielt werden darf. */

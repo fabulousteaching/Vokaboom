@@ -452,6 +452,7 @@ async function importFromHash() {
   if (liveFromHash()) return true;
   const m = location.hash.match(/^#v=([A-Za-z0-9_-]+)$/);
   if (!m) return false;
+  if (typeof kidGate === 'function' && kidGate()) return false; // Schüler-Gerät, abgemeldet: keine Portionen per Link
   if (isKid()) {
     try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
     toast('Du bist mit deinem Kärtchen angemeldet. Hier siehst du die Portionen deiner Lehrperson.');

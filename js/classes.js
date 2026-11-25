@@ -57,8 +57,27 @@ function kidLoadSession() {
   } catch { /* */ }
   if (isKid()) STORE_KEY = KID_DB_KEY;
 }
+/* Schüler-Gerät: Hat sich hier einmal ein Kind angemeldet, gibt es nach dem Abmelden keinen Gast-Modus mehr
+   (sonst könnten Kinder abgemeldet gratis spielen und eigene Portionen anlegen). Dann geht es nur mit Anmeldung weiter. */
+const KID_DEVICE_KEY = 'vokaboom.kidDevice';
+const kidDeviceMarked = () => { try { return localStorage.getItem(KID_DEVICE_KEY) === '1'; } catch { return false; } };
+const teacherSessionStored = () => { try { return Object.keys(localStorage).some((k) => /^sb-.+-auth-token/.test(k)); } catch { return false; } };
+const kidGate = () => kidDeviceMarked() && !isKid() && !(typeof cloud === 'object' && cloud.uid) && !teacherSessionStored();
+function kidGateHTML() {
+  return `<section class="kid-gate">
+    <div class="test-card">
+      <h1>Bitte melde dich an</h1>
+      <p class="lead">Auf diesem Gerät übst du mit deinem Kärtchen.</p>
+      <div class="row center">
+        <button type="button" class="btn primary" data-action="kid-login">Ich bin ein Kind</button>
+        <button type="button" class="btn ghost" data-action="login" data-mode="login">Ich bin Lehrperson</button>
+      </div>
+    </div>
+  </section>`;
+}
 function kidSaveSession() {
   const { token, first, initial, username, cls, clsSettings, sent, sso, e1 } = kid;
+  try { localStorage.setItem(KID_DEVICE_KEY, '1'); } catch { /* */ }
   try { localStorage.setItem(KID_KEY, JSON.stringify({ token, first, initial, username, cls, clsSettings, sent, sso, e1 })); } catch { /* */ }
 }
 

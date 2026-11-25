@@ -122,6 +122,7 @@ function renderCrumbs() {
 
 function render() {
   const v = $('#view');
+  if (typeof kidGate === 'function' && kidGate()) { ui.view = 'home'; renderCrumbs(); v.innerHTML = kidGateHTML(); return; } // Schüler-Gerät: abgemeldet geht nichts
   const set = currentSet();
   if (!['home', 'classes', 'class', 'live', 'avatar', 'library', 'review'].includes(ui.view) && !set) ui.view = 'home';
   const w3 = typeof renderWorld3D === 'function' && w3WebGL(); // 3D-Avatar (js/world3d.js, gleich wie in Teilmal), sonst der 2D-Avatar
