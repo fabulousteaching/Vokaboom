@@ -34,11 +34,39 @@ async function liveChannel(code, onMsg) {
   });
   return { send: (m) => ch.send({ type: 'broadcast', event: 'm', payload: m }), close: () => { try { c.removeChannel(ch); } catch { /* */ } } };
 }
+/* Bildschirm wach halten: Beim Hör-Bingo tippen die Kinder lange nichts – geht das Tablet in den Ruhezustand,
+   bricht die Verbindung ab und das Kind „fällt raus“. */
+let lvWake = null;
+async function liveWakeOn() {
+  try { if (!lvWake && navigator.wakeLock && document.visibilityState === 'visible') { lvWake = await navigator.wakeLock.request('screen'); lvWake.addEventListener('release', () => { lvWake = null; }); } } catch { lvWake = null; }
+}
+function liveWakeOff() { try { lvWake?.release(); } catch { /* */ } lvWake = null; }
+// zurück im Vordergrund / wieder online: Bildschirm wach halten und sich neu melden (verpasste Nachrichten nachholen)
+function liveBack() {
+  if (!LV.role || document.visibilityState !== 'visible') return;
+  liveWakeOn();
+  if (LV.role === 'player') LV.hello?.(); else hostBroadcastState();
+}
+document.addEventListener('visibilitychange', liveBack);
+window.addEventListener('online', liveBack);
+window.addEventListener('pageshow', liveBack);
+/* Kind: Runde auf diesem Gerät merken – nach versehentlichem Neuladen ist es wieder dabei, mit derselben Bingo-Karte */
+const LV_KEEP = 'vokaboom.livePlayer';
+function liveKeep() {
+  if (LV.role !== 'player' || !LV.me) return;
+  const s = LV.st, k = LV.keptCard;
+  try { sessionStorage.setItem(LV_KEEP, JSON.stringify({ code: LV.code, name: LV.me.name, round: s.round || k?.round || 0, card: s.card || k?.card || null, marked: s.marked ? [...s.marked] : k?.marked || [], ts: Date.now() })); } catch { /* */ }
+}
+function liveForget() { try { sessionStorage.removeItem(LV_KEEP); } catch { /* */ } }
+function liveKept() {
+  try { const k = JSON.parse(sessionStorage.getItem(LV_KEEP) || 'null'); return k && k.code && k.name && Date.now() - k.ts < 60 * 60000 ? k : null; } catch { return null; }
+}
 function liveStop() {
+  liveWakeOff();
   LV.timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
   LV.timers = [];
   try { LV.ch?.close(); } catch { /* */ }
-  Object.assign(LV, { role: '', code: '', ch: null, kind: '', set: null, players: new Map(), me: null, st: {} });
+  Object.assign(LV, { role: '', code: '', ch: null, kind: '', set: null, players: new Map(), me: null, st: {}, hello: null, keptCard: null, lastMsg: 0 });
 }
 const joinUrl = (code) => `${siteUrl()}#live=${code}`;
 
@@ -182,6 +210,7 @@ async function liveHost(kind) {
     return;
   }
   lvEvery(() => hostBroadcastState(), 2500);
+  liveWakeOn();
   renderLive();
 }
 function hostBroadcastState() {
@@ -539,7 +568,7 @@ function bindJoinForm() {
     await liveJoin(code, name);
   });
 }
-async function liveJoin(code, name) {
+async function liveJoin(code, name, kept = null) {
   liveStop();
   let id = '';
   try { id = sessionStorage.getItem('vokaboom.liveId') || ''; } catch { /* */ }
@@ -556,12 +585,21 @@ async function liveJoin(code, name) {
   const av = typeof avMine === 'function' ? avMine() : null;
   const a3 = typeof w3LiveLook === 'function' ? w3LiveLook() : null; // 3D-Look (gleich wie in Teilmal), falls schon gestaltet
   const hello = () => LV.ch?.send({ t: 'join', id, name, kid: isKid(), av, a3 });
+  LV.hello = hello;
+  if (kept && Array.isArray(kept.card)) LV.keptCard = kept; // nach dem Neuladen: dieselbe Karte, wenn die Runde noch läuft
   hello();
   lvEvery(() => { if (!LV.st.kind) hello(); }, 2000); // bis die Lehrperson antwortet
+  // hört das Kind länger nichts von der Lehrperson (die meldet sich alle 2,5 s), meldet es sich neu
+  LV.lastMsg = Date.now();
+  lvEvery(() => { if (Date.now() - (LV.lastMsg || 0) > 9000) hello(); }, 5000);
+  if (kept) lvLater(() => { if (LV.role === 'player' && !LV.st.kind) { liveForget(); liveStop(); go('home'); toast('Die Live-Runde ist vorbei.'); } }, 20000);
+  liveWakeOn();
+  liveKeep();
   renderLive();
 }
 function playerMsg(m) {
   if (!m || LV.role !== 'player') return;
+  LV.lastMsg = Date.now();
   if (m.t === 'denied' && m.id === LV.me?.id) {
     const code = LV.code;
     liveStop(); LV.role = ''; LV.st = { code, fromQr: true };
@@ -575,8 +613,12 @@ function playerMsg(m) {
     Object.assign(s, { kind: m.kind, title: m.title, lang: m.lang });
     if (m.kind === 'bingo') {
       s.words = m.words; if (m.cardLang) s.cardLang = m.cardLang;
+      const before = `${s.phase}|${s.round}`;
       if (!s.card || s.round !== m.round) bingoNewCard(m.round);
       if (m.phase === 'play') s.phase = 'bingo';
+      if (typeof m.calls === 'number' && m.calls !== s.calls) { s.calls = m.calls; const el = $('#bingo-calls'); if (el) el.textContent = `${m.calls} Wörter vorgelesen`; }
+      // Start verpasst (kurz ohne Verbindung)? Dann jetzt die Karte zeigen statt weiter zu warten
+      if (!first && before !== `${s.phase}|${s.round}`) { liveKeep(); renderLive(); return; }
     }
     if (m.kind === 'quiz' && m.phase === 'q' && m.q && s.qi !== m.q.i) playerQuestion(m.q);
     else if (first) renderLive();
@@ -644,6 +686,9 @@ function bingoNewCard(round) {
   const size = 3;
   s.card = shuffle((s.words || []).slice()).slice(0, size * size);
   s.marked = new Set(); s.round = round; s.result = null;
+  const k = LV.keptCard; LV.keptCard = null;
+  if (k && k.round === round && Array.isArray(k.card) && k.card.length === s.card.length && k.card.every((w) => (s.words || []).includes(w))) { s.card = k.card; s.marked = new Set(k.marked || []); }
+  liveKeep();
 }
 const BINGO_LINES = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
 function bingoLine() { const m = LV.st.marked; return BINGO_LINES.find((l) => l.every((i) => m.has(i))) || null; }
@@ -699,7 +744,7 @@ const liveActions = {
   'live-host': (el) => liveHost(el.dataset.kind),
   'live-close': () => { const set = LV.set; liveStop(); if (set) openSet(set.id); else go('home'); },
   'live-join': () => openJoin(),
-  'live-leave': () => { liveStop(); go('home'); },
+  'live-leave': () => { liveForget(); liveStop(); go('home'); },
   'quiz-start': () => quizStart(),
   'lv-n': (el) => { LV.cfg.n = el.dataset.v === 'all' ? 'all' : +el.dataset.v; liveRefreshLobby(); },
   'lv-time': (el) => { LV.cfg.time = +el.dataset.v; liveRefreshLobby(); },
@@ -733,6 +778,7 @@ const liveActions = {
   'bingo-mark': (el) => {
     const s = LV.st, i = +el.dataset.i;
     if (s.marked.has(i)) s.marked.delete(i); else s.marked.add(i);
+    liveKeep();
     sfx.flip();
     renderLive();
   },
@@ -746,7 +792,12 @@ const liveActions = {
 /** Über QR-Code: …#live=ABCDE */
 function liveFromHash() {
   const m = location.hash.match(/^#live=([A-Za-z0-9]{5})$/);
-  if (!m) return false;
+  if (!m) {
+    const k = location.hash ? null : liveKept(); // versehentlich neu geladen: gleich wieder in die laufende Runde
+    if (!k) return false;
+    go('live'); liveJoin(k.code, k.name, k);
+    return true;
+  }
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* */ }
   openJoin(m[1], true);
   return true;
