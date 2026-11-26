@@ -81,12 +81,57 @@ function renderWrite() {
   setTimeout(() => $('#w-answer')?.focus(), 60);
 }
 
+/* ---------- Prüfen ---------- */
+/** Mehrere Bedeutungen („leben, wohnen“, „gross / hoch“): ausserhalb von Klammern an , ; / trennen */
+function wrParts(text) {
+  const out = []; let cur = '', depth = 0;
+  for (const ch of String(text || '')) {
+    if (ch === '(') depth++; else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (!depth && (ch === ',' || ch === ';' || ch === '/')) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map((x) => x.trim()).filter(Boolean);
+}
+const wrBetter = (a, b) => { const rank = { correct: 2, almost: 1, wrong: 0 }; return !a || rank[b.status] > rank[a.status] ? b : a; };
+/**
+ * Auf Deutsch schreiben: Hier geht es um die Bedeutung, nicht um deutsche Rechtschreibung. Darum gilt:
+ * EINE der Bedeutungen reicht, der Artikel (der/die/das/ein …) und „sich“ dürfen fehlen, Gross-/Kleinschreibung
+ * und ss/ß sind egal. Ein Tippfehler gibt „fast richtig“.
+ */
+function wrCheckGerman(input, german) {
+  const norm = (x) => String(x || '').toLowerCase().replace(/ß/g, 'ss').replace(/\([^)]*\)/g, ' ').replace(/[.!?…]+$/g, '').replace(/\s+/g, ' ').trim();
+  const bare = (x) => x.replace(/^(der|die|das|den|dem|ein|eine|einen|einem|einer|sich|zu|etwas|jemanden|jemandem|jdn\.?|jdm\.?|etw\.?)\s+/, '').trim();
+  const mine = norm(input);
+  if (!mine) return { status: 'wrong', note: 'Keine Antwort.' };
+  const targets = new Set();
+  for (const p of [german, ...wrParts(german)]) { const n = norm(p); if (n) { targets.add(n); targets.add(bare(n)); targets.add(bare(bare(n))); } }
+  let best = null;
+  for (const t of targets) {
+    if (!t) continue;
+    for (const m of new Set([mine, bare(mine)])) {
+      if (m === t) return { status: 'correct' };
+      best = wrBetter(best, checkAnswerBase(m, { foreign: t }));
+    }
+  }
+  return best && best.status !== 'wrong' ? { status: 'almost', note: 'Fast! Ein kleiner Rechtschreibfehler.' } : { status: 'wrong' };
+}
+/** In der Fremdsprache schreiben: wie bisher; zusätzlich reicht bei mit Komma getrennten Wörtern („grandma, grandmother“) eines davon */
+function wrCheckForeign(input, w) {
+  const r = checkAnswer(input, w);
+  if (r.status === 'correct') return r;
+  const parts = wrParts(w.foreign);
+  if (parts.length < 2 || /[.!?]/.test(w.foreign) || !/[,;]/.test(w.foreign)) return r;
+  let best = r;
+  for (const p of parts) best = wrBetter(best, checkAnswer(input, { ...w, foreign: p }));
+  return best;
+}
+
 function checkWrite(giveUp = false) {
   const set = currentSet(), w = wrWord(set), input = $('#w-answer');
   if (!w || !input || wr.checked) return;
   if (!giveUp && !input.value.trim()) { input.focus(); input.classList.add('nudge'); setTimeout(() => input.classList.remove('nudge'), 400); return; }
   const P = wrPair(set, w);
-  const r = giveUp ? { status: 'wrong' } : wr.dir === 'de' ? checkAnswer(input.value, w) : checkAnswerBase(input.value, { ...w, foreign: w.german });
+  const r = giveUp ? { status: 'wrong' } : wr.dir === 'de' ? wrCheckForeign(input.value, w) : wrCheckGerman(input.value, w.german);
   // zählt für die Lernkarten (Vergessenskurve) nur beim ersten Versuch: falsch beim 1. Mal = nicht gewusst
   if (!wr.firstTry.has(w.id)) { wr.firstTry.set(w.id, r.status === 'correct'); trackWord(set, w.id, 'write', r.status); }
   wr.tries = (wr.tries || 0) + 1;
