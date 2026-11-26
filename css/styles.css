@@ -1711,3 +1711,8 @@ html.playing .game-mode :is(.rn, .balloon-sky) { min-height: 0; max-height: none
 .ph-diag { margin-top: .8rem; font-size: .8rem; color: var(--muted, #667); text-align: left; }
 .ph-diag summary { cursor: pointer; }
 .ph-diag code { display: block; margin-top: .4rem; padding: .5rem; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); white-space: pre-wrap; word-break: break-word; user-select: all; }
+
+/* Menü: Münzen je Übung */
+.coin-modes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .5rem .9rem; }
+.coin-mode { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.coin-mode select { min-width: 7.5rem; }

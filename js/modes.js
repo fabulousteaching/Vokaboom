@@ -11,13 +11,21 @@ const progressBar = (frac, label) => `<div class="progress" role="progressbar" a
  * Merkt sich pro Wort, wie es in einer Übung lief (für „Schwierige Wörter“ und die Auswertung der Lehrperson).
  * result: 'correct' | 'almost' | 'wrong'. Gespeichert in set.progress.words[wid] = { n, bad, almost, last, t, by: { mode: [n, bad] } }
  */
+/* Münzen je Übung (Menü der Lehrperson → Avatar & Münzen): 0 = keine, 0.5 = halb, 1 = normal, 2 = doppelt.
+   Ohne Einstellung: Lernkarten keine (dort schätzt man sich selbst ein), alles andere normal. */
+const COIN_MODES = [['write', 'Schreiben'], ['speak', 'Aussprechen'], ['dictation', 'Hören & Schreiben'], ['test', 'Test'], ['review', 'Wiederholen'], ['cards', 'Lernkarten']];
+const coinModeDefault = (mode) => (mode === 'cards' ? 0 : 1);
+function coinMult(mode, cfg = typeof avCfg === 'function' ? avCfg() : {}) {
+  const v = cfg?.modes?.[mode];
+  return [0, 0.5, 1, 2].includes(v) ? v : coinModeDefault(mode);
+}
 function trackWord(set, wid, mode, result) {
   if (!set || !wid || !result) return;
   set.progress = set.progress || {};
   const words = set.progress.words = set.progress.words || {};
   const s = words[wid] = words[wid] || { n: 0, bad: 0, almost: 0 };
-  // Münzen für den Avatar (nur Kinder mit Login): richtige Antwort 1 Punkt, Lernkarten ½, vorher schon falsch +½
-  if (result === 'correct' && mode !== 'cards' && typeof avatarEarnPoints === 'function') avatarEarnPoints(1 + (s.bad ? 0.5 : 0)); // Lernkarten geben keine Münzen (dort schätzt man sich selbst ein)
+  // Münzen für den Avatar (nur Kinder mit Login): richtige Antwort 1 Punkt (mal Einstellung je Übung), vorher schon falsch +½
+  if (result === 'correct' && typeof avatarEarnPoints === 'function') avatarEarnPoints((1 + (s.bad ? 0.5 : 0)) * coinMult(mode)); // wie viel je Übung, stellt die Lehrperson ein
   s.n++;
   if (result === 'wrong') s.bad++;
   if (result === 'almost') s.almost = (s.almost || 0) + 1;

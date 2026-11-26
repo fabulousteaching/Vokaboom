@@ -149,6 +149,8 @@ function checkWrite(giveUp = false) {
   const r = giveUp ? { status: 'wrong' } : wr.dir === 'de' ? wrCheckForeign(input.value, w) : wrCheckGerman(input.value, w.german);
   // zählt für die Lernkarten (Vergessenskurve) nur beim ersten Versuch: falsch beim 1. Mal = nicht gewusst
   if (!wr.firstTry.has(w.id)) { wr.firstTry.set(w.id, r.status === 'correct'); trackWord(set, w.id, 'write', r.status); }
+  // beim 2. oder 3. Versuch doch noch richtig: halber Punkt für die Münzen (zählt aber nicht als gewusst)
+  if (wr.tries > 0 && r.status === 'correct' && typeof avatarEarnPoints === 'function') avatarEarnPoints(0.5 * coinMult('write'));
   wr.tries = (wr.tries || 0) + 1;
   if (r.status === 'wrong' && !giveUp && wr.tries < WR_TRIES) {
     const left = WR_TRIES - wr.tries;

@@ -114,6 +114,10 @@ function menuBindOnce(m) {
       if (t.dataset.card === 'secret') { saveDB(); $('#menu-body').innerHTML = menuSectionHTML('klassen'); return; }
     }
     if (t.dataset.classPw) { saveClassPw(t.dataset.classPw, t.value).then((ok) => { if (ok) { MENU.cardsChanged = true; menuSaved(); } }); return; }
+    if (t.dataset.avmode) {
+      MENU.avCfg = { ...(MENU.avCfg || {}), modes: { ...(MENU.avCfg?.modes || {}), [t.dataset.avmode]: parseFloat(t.value) } };
+      menuSaveAvatarCfg();
+    }
     if (t.dataset.av) {
       const v = t.type === 'checkbox' ? t.checked : +t.value;
       MENU.avCfg = { ...(MENU.avCfg || {}), [t.dataset.av]: v };
@@ -126,7 +130,7 @@ function menuBindOnce(m) {
 }
 
 /** Beispiel zum Tempo: wie viele Münzen eine Lektion mit 50 richtigen Antworten bringt */
-const menuCoinHint = (pc) => `1 richtige Antwort = 1 Punkt (Lernkarten ½). Eine Lektion mit 50 richtigen Antworten gibt ${Math.floor(50 / pc)} ${Math.floor(50 / pc) === 1 ? 'Münze' : 'Münzen'}.`;
+const menuCoinHint = (pc) => `1 richtige Antwort = 1 Punkt (je Übung unten einstellbar). Eine Lektion mit 50 richtigen Antworten gibt ${Math.floor(50 / pc)} ${Math.floor(50 / pc) === 1 ? 'Münze' : 'Münzen'}.`;
 
 /* ---------- Inhalte der Bereiche ---------- */
 function menuSectionHTML(sec) {
@@ -210,6 +214,10 @@ function menuSectionHTML(sec) {
             <input type="range" id="av-daymax" data-av="dayMax" min="5" max="100" step="5" value="${a.dayMax}">
             <span class="range-ends"><span>5</span><span>100</span></span></label>
           <label class="switch"><input type="checkbox" data-av="games" ${a.games ? 'checked' : ''}><span>Auch Spiele geben Punkte (1 Punkt pro fertigem Spiel)</span></label>
+          <h3>Münzen je Übung</h3>
+          <p class="small muted">Wie viele Punkte eine richtige Antwort gibt. „Normal“ = 1 Punkt.</p>
+          <div class="coin-modes">${COIN_MODES.map(([m, name]) => `<label class="coin-mode"><span>${name}</span>
+            <select data-avmode="${m}" aria-label="Münzen für ${name}">${[[0, 'keine'], [0.5, 'halb'], [1, 'normal'], [2, 'doppelt']].map(([v, t]) => `<option value="${v}" ${coinMult(m, a) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`).join('')}</div>
           <h3>Shop</h3>
           <label class="switch"><input type="checkbox" data-av="shop" ${a.shop ? 'checked' : ''}><span>Kinder dürfen mit Münzen besondere Teile kaufen<small>Ausgeschaltet: nur das Basic-Set (gekaufte Teile bleiben).</small></span></label>
         </fieldset>

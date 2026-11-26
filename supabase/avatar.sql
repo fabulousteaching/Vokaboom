@@ -135,7 +135,7 @@ alter table public.fab_coin_log enable row level security;
 revoke all on public.fab_coin_log from anon, authenticated;
 
 -- Einstellungen der Lehrperson (gelten für alle ihre Klassen, in beiden Tools):
--- {"on": true, "coins": true, "shop": true, "games": true, "perCoin": 10, "dayMax": 40}
+-- {"on": true, "coins": true, "shop": true, "games": true, "perCoin": 10, "dayMax": 40, "modes": {"write": 1, "cards": 0}}
 create table if not exists public.fab_teacher_settings (
   teacher_id uuid primary key default auth.uid() references auth.users (id) on delete cascade,
   avatar jsonb not null default '{}' check (jsonb_typeof(avatar) = 'object' and octet_length(avatar::text) <= 2000),
@@ -188,6 +188,7 @@ begin
     'games', coalesce((cfg ->> 'games')::boolean, true),
     'perCoin', least(30, greatest(3, coalesce((cfg ->> 'perCoin')::integer, 10))),
     'dayMax', least(100, greatest(0, coalesce((cfg ->> 'dayMax')::integer, 40))),
+    'modes', case when jsonb_typeof(cfg -> 'modes') = 'object' then cfg -> 'modes' else '{}'::jsonb end, -- Münzen je Übung (Vokaboom)
     'lock', lk);
 end;
 $$;
