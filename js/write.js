@@ -117,14 +117,27 @@ function wrCheckGerman(input, german) {
 }
 /** Nur Gross-/Kleinschreibung anders („winner“ statt „Winner“): zählt als richtig, mit einem kleinen Hinweis */
 const wrCaseOk = (r) => (r.status === 'almost' && r.note === 'Fast! Achte auf die Groß- und Kleinschreibung.' ? { status: 'correct', hint: 'Achte noch auf die Gross- und Kleinschreibung.' } : r);
+/* Englische Nomen schreibt man klein. Steht in der Portion „Winner“ und das Kind schreibt „winner“, ist das einfach richtig –
+   ohne Hinweis. Ein Hinweis kommt nur, wenn das Kind etwas gross schreibt, das klein gehört („Village“), oder wenn ein Wort
+   klein geschrieben wurde, das im Englischen immer gross ist (Wochentage, Monate, I, Sprachen und Länder). */
+const WR_ALWAYS_CAP = new Set(('i monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december '
+  + 'english german french italian spanish swiss british american england switzerland germany france italy spain britain america london christmas easter halloween mr mrs ms').split(' '));
+function wrCaseHint(r, input, target) {
+  if (!r.hint) return r;
+  const words = (x) => String(x || '').match(/[A-Za-zÀ-ÿ']+/g) || [];
+  const mine = words(input), want = words(target);
+  const tooBig = mine.some((m, i) => /^[A-ZÀ-Þ]/.test(m) && want[i] && !/^[A-ZÀ-Þ]/.test(want[i]));
+  const tooSmall = mine.some((m, i) => /^[a-zß-ÿ]/.test(m) && want[i] && /^[A-ZÀ-Þ]/.test(want[i]) && WR_ALWAYS_CAP.has(want[i].toLowerCase()));
+  return tooBig || tooSmall ? r : { status: 'correct' };
+}
 /** In der Fremdsprache schreiben: wie bisher; zusätzlich reicht bei mit Komma getrennten Wörtern („grandma, grandmother“) eines davon */
 function wrCheckForeign(input, w) {
-  const r = wrCaseOk(checkAnswer(input, w));
+  const r = wrCaseHint(wrCaseOk(checkAnswer(input, w)), input, w.foreign);
   if (r.status === 'correct') return r;
   const parts = wrParts(w.foreign);
   if (parts.length < 2 || /[.!?]/.test(w.foreign) || !/[,;]/.test(w.foreign)) return r;
   let best = r;
-  for (const p of parts) best = wrBetter(best, wrCaseOk(checkAnswer(input, { ...w, foreign: p })));
+  for (const p of parts) best = wrBetter(best, wrCaseHint(wrCaseOk(checkAnswer(input, { ...w, foreign: p })), input, p));
   return best;
 }
 
