@@ -115,14 +115,16 @@ function wrCheckGerman(input, german) {
   }
   return best && best.status !== 'wrong' ? { status: 'almost', note: 'Fast! Ein kleiner Rechtschreibfehler.' } : { status: 'wrong' };
 }
+/** Nur Gross-/Kleinschreibung anders („winner“ statt „Winner“): zählt als richtig, mit einem kleinen Hinweis */
+const wrCaseOk = (r) => (r.status === 'almost' && r.note === 'Fast! Achte auf die Groß- und Kleinschreibung.' ? { status: 'correct', hint: 'Achte noch auf die Gross- und Kleinschreibung.' } : r);
 /** In der Fremdsprache schreiben: wie bisher; zusätzlich reicht bei mit Komma getrennten Wörtern („grandma, grandmother“) eines davon */
 function wrCheckForeign(input, w) {
-  const r = checkAnswer(input, w);
+  const r = wrCaseOk(checkAnswer(input, w));
   if (r.status === 'correct') return r;
   const parts = wrParts(w.foreign);
   if (parts.length < 2 || /[.!?]/.test(w.foreign) || !/[,;]/.test(w.foreign)) return r;
   let best = r;
-  for (const p of parts) best = wrBetter(best, checkAnswer(input, { ...w, foreign: p }));
+  for (const p of parts) best = wrBetter(best, wrCaseOk(checkAnswer(input, { ...w, foreign: p })));
   return best;
 }
 
@@ -149,14 +151,14 @@ function checkWrite(giveUp = false) {
   $('#w-submit').innerHTML = `Weiter ${icon('right')}`;
   $('#w-more')?.remove();
   const sol = `<span class="solution"><strong lang="${P.wantLang}">${esc(P.want)}</strong>${P.wantLang === 'de' ? '' : sayBtn(P.want, set.lang)}</span>`;
-  $('#w-feedback').innerHTML = (r.status === 'correct' ? `<div class="banner good">${icon('check')}<div><strong>Richtig!</strong> ${sol}</div></div>`
+  $('#w-feedback').innerHTML = (r.status === 'correct' ? `<div class="banner good">${icon('check')}<div><strong>Richtig!</strong> ${sol}${r.hint ? ` <span class="small">${esc(r.hint)}</span>` : ''}</div></div>`
     : r.status === 'almost' ? `<div class="banner almost">${icon('pencil2')}<div><strong>${esc(r.note || 'Fast richtig!')}</strong> Richtig ist: ${sol}</div></div>`
       : `<div class="banner bad">${icon('x')}<div><strong>Leider falsch.</strong> Richtig ist: ${sol}</div></div>`)
     + (r.status === 'wrong' ? '<p class="muted small center">Das Wort kommt gleich noch einmal.</p>' : '');
   (r.status === 'correct' ? sfx.good : r.status === 'almost' ? sfx.almost : sfx.bad)();
   const t = $('.wr-mode .tally .ok'); if (t) t.innerHTML = `${icon('check')} ${wrOk()}`;
   $('#w-submit').focus();
-  if (r.status === 'correct') { const id = w.id; wr.timer = setTimeout(() => { if (ui.view === 'write' && wr.checked && wr.queue[0] === id) nextWrite(); }, AUTO_NEXT_MS); }
+  if (r.status === 'correct' && !r.hint) { const id = w.id; wr.timer = setTimeout(() => { if (ui.view === 'write' && wr.checked && wr.queue[0] === id) nextWrite(); }, AUTO_NEXT_MS); }
 }
 function nextWrite() {
   clearTimeout(wr.timer);
